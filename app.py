@@ -1,10 +1,8 @@
 import streamlit as st
-from google import genai
+import google.generativeai as genai
 
-# Read API Key from key.txt
-with open("key.txt", "r") as f:
-    api_key = f.read().strip()
-
+api_key = st.secrets["GEMINI_API_KEY"]
+genai.configure(api_key=api_key)
 # Initialize Gemini Client
 client = genai.Client(api_key=api_key)
 
