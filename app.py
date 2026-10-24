@@ -29,7 +29,7 @@ if prompt := st.chat_input("Ask anything..."):
         st.markdown(prompt)
 
     with st.chat_message("assistant"):
-        response = st.session_state.chat.send_message(message=prompt)
+        response = st.session_state.chat.send_message(prompt)
         st.markdown(response.text)
         st.session_state.messages.append({"role": "assistant", "content": response.text})      
 
