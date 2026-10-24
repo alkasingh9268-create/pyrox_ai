@@ -25,10 +25,13 @@ if prompt := st.chat_input("Ask anything..."):
 
     with st.chat_message("assistant"):
         try:
-            response = client.models.generate_content(
-                model="gemini-1.5-flash",
+    response = client.models.generate_content(
+                model="gemini-2.5-flash",
                 contents=prompt
             )
+
+
+            
             st.markdown(response.text)
             st.session_state.messages.append({"role": "assistant", "content": response.text})
         except Exception as e:
