@@ -5,7 +5,7 @@ st.title("My AI App Pyrox")
 
 # API Key check
 if "GEMINI_API_KEY" in st.secrets:
-    api_key = st.secrets["GEMINI_API_KEY"]
+    api_key = st.secrets["AQ.Ab8RN6IceYTKZkdsGC8NwJmNjffg6H4AhtnviDZgCMbnrKssqA"]
 else:
     api_key = "YOUR_API_KEY_HERE" # अगर secrets में नहीं है तो यहाँ सीधे अपनी असली की डालकर चेक कर सकते हैं
 
