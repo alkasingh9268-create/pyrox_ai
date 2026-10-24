@@ -3,16 +3,10 @@ from google import genai
 
 st.title("My AI App Pyrox")
 
-# API Key check
-if "GEMINI_API_KEY" in st.secrets:
-    api_key = st.secrets["AQ.Ab8RN6IceYTKZkdsGC8NwJmNjffg6H4AhtnviDZgCMbnrKssqA"]
-else:
-    api_key = "YOUR_API_KEY_HERE" # अगर secrets में नहीं है तो यहाँ सीधे अपनी असली की डालकर चेक कर सकते हैं
+# Streamlit secrets से सुरक्षित तरीके से API key ले रहे हैं
+api_key = st.secrets["GEMINI_API_KEY"]
 
-try:
-    client = genai.Client(api_key=api_key)
-except Exception as e:
-    st.error(f"Client Init Error: {e}")
+client = genai.Client(api_key=api_key)
 
 # Initialize Chat History
 if "messages" not in st.session_state:
@@ -38,4 +32,4 @@ if prompt := st.chat_input("Ask anything..."):
             st.markdown(response.text)
             st.session_state.messages.append({"role": "assistant", "content": response.text})
         except Exception as e:
-            st.error(f"API Connection Error: {e}")
+            st.error(f"API Error: {e}")
