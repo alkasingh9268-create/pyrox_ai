@@ -1,11 +1,13 @@
+import os
 import streamlit as st
 from google import genai
 
 st.title("My AI App Pyrox")
 
-# API Key Init
+# API Key Setup & Environment Variable
 api_key = st.secrets["GEMINI_API_KEY"]
-client = genai.Client(api_key=api_key)
+os.environ["GEMINI_API_KEY"] = api_key
+client = genai.Client()
 
 # Initialize Chat History
 if "messages" not in st.session_state:
@@ -24,7 +26,7 @@ if prompt := st.chat_input("Ask anything..."):
 
     with st.chat_message("assistant"):
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-1.5-flash",
             contents=prompt
         )
         st.markdown(response.text)
