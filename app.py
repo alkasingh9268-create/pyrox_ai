@@ -9,66 +9,60 @@ st.set_page_config(
 )
 
 st.title("🤖 Pyrox AI Chatbot")
-st.markdown("Groq API द्वारा संचालित।")
 
-# Check and initialize Groq client using Streamlit secrets
+# Check API key from secrets
 if "GROQ_API_KEY" in st.secrets:
     api_key = st.secrets["GROQ_API_KEY"]
 else:
     st.error("त्रुटि: Streamlit Secrets में 'GROQ_API_KEY' नहीं मिली!")
     st.stop()
 
-# Initialize the Groq client
+# Initialize Groq client
 client = Groq(api_key=api_key)
 
-# Fetch models and strictly keep only Llama chat models
+# Fetch available models directly from your API key
+available_models = []
 try:
     models_response = client.models.list()
-    available_models = [
-        m.id for m in models_response.data 
-        if m.id.startswith("llama")
-    ]
+    available_models = [m.id for m in models_response.data if "embed" not in m.id and "whisper" not in m.id]
 except Exception as e:
-    available_models = []
+    pass
 
 # Sidebar for controls
 with st.sidebar:
     st.header("⚙️ Settings")
+    
     if available_models:
-        model_choice = st.selectbox("Choose Model", available_models, index=0)
+        model_choice = st.selectbox("Select Your Key's Active Model", available_models)
     else:
-        model_choice = "llama-3.1-8b-instant"
-        st.warning("मॉडल लिस्ट लोड नहीं हो पाई, डिफ़ॉल्ट उपयोग हो रहा है।")
+        # Fallback text input if auto-fetch fails, so you have full control
+        model_choice = st.text_input("Enter Model Name Manually", value="llama-3.1-70b-versatile")
     
     if st.button("Clear Chat History", type="primary"):
         st.session_state.messages = []
         st.rerun()
 
-# Initialize chat history in session state
+# Initialize chat history
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Display prior chat messages from history
+# Display chat history
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# Accept user input from chat box
+# User input
 if prompt := st.chat_input("यहाँ अपना संदेश टाइप करें..."):
-    # Add user message to session state
     st.session_state.messages.append({"role": "user", "content": prompt})
     
-    # Display user message in chat container
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # Generate assistant response
     with st.chat_message("assistant"):
         message_placeholder = st.empty()
         full_response = ""
         
         try:
-            # Request completion from Groq API with streaming enabled
             completion = client.chat.completions.create(
                 model=model_choice,
                 messages=[
@@ -89,5 +83,4 @@ if prompt := st.chat_input("यहाँ अपना संदेश टाइ�
             full_response = f"कनेक्शन एरर: {e}"
             message_placeholder.error(full_response)
             
-        # Add assistant response to session state
         st.session_state.messages.append({"role": "assistant", "content": full_response})
