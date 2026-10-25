@@ -1,5 +1,7 @@
 import streamlit as st
 from groq import Groq
+from gtts import gTTS
+import os
 
 # Page configuration
 st.set_page_config(
@@ -8,7 +10,7 @@ st.set_page_config(
     layout="centered"
 )
 
-# Sidebar - Settings & Dynamic Theme Engine
+# Sidebar - Settings, Theme Engine & Voice Toggle
 with st.sidebar:
     st.header("⚙️ सेटिंग्स")
     
@@ -19,6 +21,9 @@ with st.sidebar:
     )
     
     model_choice = st.text_input("एक्टिव मॉडल", value="qwen/qwen3.8-27b")
+    
+    # Voice Toggle inside Sidebar
+    enable_voice = st.checkbox("🔊 AI वॉयस आउटपुट चालू करें", value=False)
     
     if st.button("🗑️ चैट इतिहास साफ़ करें", type="primary", use_container_width=True):
         st.session_state.messages = []
@@ -274,17 +279,16 @@ if prompt := st.chat_input("यहाँ अपना संदेश टाइ�
     try:
         recent_messages = st.session_state.messages[-4:]
         
-        # Supercharged Human-Like Conversational Persona System Prompt
+        # Super-Strict Anti-Hallucination & Human-Like Conversational Persona System Prompt
         system_prompt = {
             "role": "system",
             "content": (
                 "You are Pyrox AI Studio, a super-fast, ultra-intelligent, and warm AI assistant crafted and created by Harshit. "
-                "CRITICAL INSTRUCTION ON TONE: Never talk like a cold, rigid manual or robot. "
-                "Always talk like a smart, friendly, and engaging human expert companion. "
-                "When a user asks to learn something (like Python, coding, or any topic), do NOT jump straight into dry technical steps or installations. "
-                "Instead, start with a natural, conversational greeting or hook, explain what the concept actually is in simple, relatable human terms, build context first, and then guide them step-by-step with warmth and clarity. "
-                "Match the user's language style naturally (Hindi, Hinglish, or English), keep sentences flowing, avoid weird robotic grammar or spelling mix-ups, and make the conversation feel alive. "
-                "If anyone asks who created you, proudly state that you were created by Harshit."
+                "CRITICAL INSTRUCTIONS:\n"
+                "1. NEVER hallucinate or mix up random unrelated topics (e.g., never claim Python has any connection to health, fitness, or physical body terms).\n"
+                "2. Talk like a sharp, friendly, and engaging human tech mentor. Use natural Hinglish or English matching the user's vibe.\n"
+                "3. Keep answers direct, accurate, and structured. When asked about learning a language like Python, give a clear, simple definition first, and then practical guidance without sounding like a rigid robot.\n"
+                "4. If anyone asks who created you, proudly state that you were created by Harshit."
             )
         }
         
@@ -311,6 +315,17 @@ if prompt := st.chat_input("यहाँ अपना संदेश टाइ�
         
         # Immediate Inline Disclaimer under the answer
         st.markdown('<div class="inline-disclaimer">Pyrox is AI and can make mistakes.</div>', unsafe_allow_html=True)
+        
+        # Voice Generation if enabled in sidebar
+        if enable_voice and full_response:
+            try:
+                clean_text = full_response.replace("*", "").replace("#", "").replace("`", "")
+                tts = gTTS(text=clean_text, lang='hi', slow=False)
+                audio_file = "temp_response.mp3"
+                tts.save(audio_file)
+                st.audio(audio_file, format="audio/mp3", autoplay=True)
+            except Exception:
+                pass
         
     except Exception as e:
         loader_placeholder.empty()
