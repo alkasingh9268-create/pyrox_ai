@@ -1,11 +1,12 @@
 import streamlit as st
 from google import genai
+from google.genai import types
 import time
 
-# Page Configuration - Mixed ChatGPT & Gemini Vibe
+# Page Configuration
 st.set_page_config(page_title="Pyrox AI", page_icon="✨", layout="centered")
 
-# Custom CSS for Gemini + ChatGPT Hybrid Theme and 5-6 Orbiting Atoms
+# Custom CSS for Gemini + ChatGPT Hybrid Theme and True Multi-Directional 3D Atoms
 st.markdown("""
 <style>
     /* Dark Gemini-style Background and Clean Typography */
@@ -14,7 +15,7 @@ st.markdown("""
         color: #e3e3e3;
     }
     
-    /* Sleek Modern Header (Gemini + ChatGPT Mix) */
+    /* Sleek Modern Header */
     .pyrox-header {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         font-size: 30px;
@@ -34,7 +35,7 @@ st.markdown("""
         -webkit-text-fill-color: transparent;
     }
 
-    /* Atom Loader Box with 5 Orbiting Electrons */
+    /* Atom Loader Box with True 3D Multi-Directional Orbits */
     .atom-container {
         display: flex;
         align-items: center;
@@ -50,15 +51,16 @@ st.markdown("""
 
     .atom-model {
         position: relative;
-        width: 36px;
-        height: 36px;
+        width: 40px;
+        height: 40px;
+        perspective: 1000px;
     }
 
     /* Central Glowing Nucleus */
     .nucleus {
         position: absolute;
-        top: 14px;
-        left: 14px;
+        top: 16px;
+        left: 16px;
         width: 8px;
         height: 8px;
         background-color: #00e5ff;
@@ -66,38 +68,42 @@ st.markdown("""
         box-shadow: 0 0 10px #00e5ff, 0 0 18px #7c4dff;
     }
 
-    /* 5 Orbit Rings with Fast Orbiting Atoms/Electrons */
+    /* 5 Multi-Directional 3D Orbit Rings */
     .orbit-1, .orbit-2, .orbit-3, .orbit-4, .orbit-5 {
         position: absolute;
         top: 0;
         left: 0;
         width: 100%;
         height: 100%;
-        border: 1.5px solid rgba(0, 229, 255, 0.25);
+        border: 1.5px solid rgba(0, 229, 255, 0.35);
         border-radius: 50%;
     }
 
-    .orbit-1 { animation: spin-fast 0.7s linear infinite; }
-    .orbit-2 { transform: rotate(36deg); animation: spin-fast 0.5s linear infinite reverse; }
-    .orbit-3 { transform: rotate(72deg); animation: spin-fast 0.9s linear infinite; }
-    .orbit-4 { transform: rotate(108deg); animation: spin-fast 0.6s linear infinite reverse; }
-    .orbit-5 { transform: rotate(144deg); animation: spin-fast 0.8s linear infinite; }
+    .orbit-1 { transform: rotateX(65deg) rotateZ(15deg); animation: spin-3d-1 0.7s linear infinite; }
+    .orbit-2 { transform: rotateY(65deg) rotateZ(45deg); animation: spin-3d-2 0.5s linear infinite reverse; }
+    .orbit-3 { transform: rotateX(30deg) rotateY(65deg); animation: spin-3d-1 0.9s linear infinite; }
+    .orbit-4 { transform: rotateX(-50deg) rotateY(35deg); animation: spin-3d-2 0.6s linear infinite reverse; }
+    .orbit-5 { transform: rotateY(-65deg) rotateZ(-30deg); animation: spin-3d-1 0.8s linear infinite; }
 
     /* Fast Electrons on Boundary */
     .electron {
         position: absolute;
-        top: -2px;
-        left: 15px;
+        top: -3px;
+        left: 17px;
         width: 5px;
         height: 5px;
         background-color: #ffffff;
         border-radius: 50%;
-        box-shadow: 0 0 6px #00e5ff;
+        box-shadow: 0 0 8px #00e5ff;
     }
 
-    @keyframes spin-fast {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
+    @keyframes spin-3d-1 {
+        0% { transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) rotateZ(0deg); }
+        100% { transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) rotateZ(360deg); }
+    }
+    @keyframes spin-3d-2 {
+        0% { transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) rotateZ(360deg); }
+        100% { transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) rotateZ(0deg); }
     }
 
     .status-text {
@@ -143,7 +149,7 @@ if prompt := st.chat_input("Pyrox se kuch bhi poochho..."):
     with st.chat_message("assistant"):
         response_text = None
         
-        # Real Atom Loader with 5 Electrons & English Status Text
+        # Real Atom Loader with 3D Multi-Axis Orbits & Status Text
         loader_placeholder = st.empty()
         loader_placeholder.markdown("""
             <div class="atom-container">
@@ -159,13 +165,14 @@ if prompt := st.chat_input("Pyrox se kuch bhi poochho..."):
             </div>
         """, unsafe_allow_html=True)
         
-        # Smart Exponential Backoff Retry Loop
+        # Robust API Call with Proper SDK Config Structure
         for attempt in range(3):
             try:
                 response = client.models.generate_content(
                     model="gemini-2.0-flash",
-                    config={
-                        "system_instruction": (
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        system_instruction=(
                             "Your name is Pyrox AI, and you are developed and created by Harshit. "
                             "If anyone asks who made you, who created you, or who your developer is, "
                             "you must proudly and clearly state that you were developed by Harshit. "
@@ -175,18 +182,18 @@ if prompt := st.chat_input("Pyrox se kuch bhi poochho..."):
                             "If the user makes spelling mistakes, typos, or sends random meaningless letters (like 'jj' or 'hhhh' or gibberish), "
                             "do not throw a technical error. Politely and playfully ask the user in a friendly tone to type a proper question."
                         )
-                    },
-                    contents=prompt
+                    )
                 )
                 response_text = response.text
                 break
             except Exception as e:
                 if attempt == 0:
-                    time.sleep(3)
+                    time.sleep(2)
                 elif attempt == 1:
-                    time.sleep(6)
+                    time.sleep(4)
                 else:
-                    response_text = "Bhai, free server par thoda traffic heavy hai. Ek 10 second ka break le kar aaram se bhej, ekdam makkhan chalega!"
+                    # Agar tab bhi error aaye, toh asli error print karega taaki pata chale
+                    response_text = f"Bhai, API mein ye issue aa raha hai: `{str(e)}`. Ek baar check kar le!"
 
         # Loader hata kar output dikhayenge
         loader_placeholder.empty()
