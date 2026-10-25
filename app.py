@@ -21,12 +21,12 @@ else:
 # Initialize the Groq client
 client = Groq(api_key=api_key)
 
-# Fetch models and strictly filter out non-chat models (like whisper, audio, embeddings)
+# Fetch models and strictly keep only Llama chat models
 try:
     models_response = client.models.list()
     available_models = [
         m.id for m in models_response.data 
-        if "whisper" not in m.id and "embed" not in m.id and "audio" not in m.id
+        if m.id.startswith("llama")
     ]
 except Exception as e:
     available_models = []
