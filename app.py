@@ -21,14 +21,21 @@ else:
 # Initialize the Groq client
 client = Groq(api_key=api_key)
 
+# Dynamically fetch available models so it never gives model_not_found/decommissioned error
+try:
+    models_response = client.models.list()
+    available_models = [m.id for m in models_response.data if "embedding" not in m.id]
+except Exception as e:
+    available_models = []
+
 # Sidebar for controls
 with st.sidebar:
     st.header("⚙️ Settings")
-    model_choice = st.selectbox(
-        "Choose Model",
-        ["llama3-8b-8192"],
-        index=0
-    )
+    if available_models:
+        model_choice = st.selectbox("Choose Model", available_models, index=0)
+    else:
+        model_choice = "llama-3.3-70b-versatile"
+        st.warning("मॉडल लिस्ट लोड नहीं हो पाई, डिफ़ॉल्ट उपयोग हो रहा है।")
     
     if st.button("Clear Chat History", type="primary"):
         st.session_state.messages = []
