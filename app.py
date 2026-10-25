@@ -120,7 +120,6 @@ st.markdown(f"""
     }}
 
     /* Custom Chat Container Layouts */
-    /* User Message: Aligned Left Box */
     .user-box {{
         background: rgba(255, 255, 255, 0.05);
         border: 1px solid rgba(255, 255, 255, 0.08);
@@ -133,7 +132,6 @@ st.markdown(f"""
         line-height: 1.5;
     }}
 
-    /* AI Answer Box: Expands in Center */
     .assistant-box {{
         background: transparent;
         border-left: 2px solid #FF4B4B;
@@ -145,7 +143,6 @@ st.markdown(f"""
         line-height: 1.6;
     }}
 
-    /* Inline Response Disclaimer right under answer */
     .inline-disclaimer {{
         color: #6E716F;
         font-size: 0.78rem;
@@ -210,7 +207,7 @@ st.markdown(f"""
     </style>
 """, unsafe_allow_html=True)
 
-# Header Section (Clean White Pyrox, Red AI, Metallic Silver Harshit)
+# Header Section
 st.markdown(
     '<div class="main-header">'
     'Pyrox <span class="ai-red">AI</span> Studio'
@@ -277,9 +274,18 @@ if prompt := st.chat_input("यहाँ अपना संदेश टाइ�
     try:
         recent_messages = st.session_state.messages[-4:]
         
+        # Supercharged Human-Like Conversational Persona System Prompt
         system_prompt = {
             "role": "system",
-            "content": "You are Pyrox AI Studio, a super-fast and intelligent AI assistant crafted and created by Harshit. If anyone asks who created you, who made you, or who is your creator, always proudly state that you were created by Harshit."
+            "content": (
+                "You are Pyrox AI Studio, a super-fast, ultra-intelligent, and warm AI assistant crafted and created by Harshit. "
+                "CRITICAL INSTRUCTION ON TONE: Never talk like a cold, rigid manual or robot. "
+                "Always talk like a smart, friendly, and engaging human expert companion. "
+                "When a user asks to learn something (like Python, coding, or any topic), do NOT jump straight into dry technical steps or installations. "
+                "Instead, start with a natural, conversational greeting or hook, explain what the concept actually is in simple, relatable human terms, build context first, and then guide them step-by-step with warmth and clarity. "
+                "Match the user's language style naturally (Hindi, Hinglish, or English), keep sentences flowing, avoid weird robotic grammar or spelling mix-ups, and make the conversation feel alive. "
+                "If anyone asks who created you, proudly state that you were created by Harshit."
+            )
         }
         
         chat_messages = [system_prompt] + [
