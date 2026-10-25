@@ -8,10 +8,10 @@ st.set_page_config(
     layout="centered"
 )
 
-# Custom CSS for styling, fonts, colors, and 3D atom animation
+# Custom CSS for styling, fonts, colors, badge, and 3D atom animation
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
     
     html, body, [class*="css"] {
         font-family: 'Inter', sans-serif;
@@ -36,14 +36,23 @@ st.markdown("""
     .sub-header {
         color: #a0a0a0;
         font-size: 0.95rem;
-        margin-bottom: 2px;
+        margin-bottom: 10px;
     }
     
-    .made-by {
+    /* Professional Sleek Creator Badge */
+    .creator-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(255, 145, 77, 0.1);
+        border: 1px solid rgba(255, 145, 77, 0.3);
         color: #FF914D;
-        font-size: 0.85rem;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.8rem;
         font-weight: 600;
-        margin-bottom: 20px;
+        margin-bottom: 25px;
+        letter-spacing: 0.5px;
     }
     
     .footer-disclaimer {
@@ -81,10 +90,10 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Header Section
+# Header Section with Professional Badge
 st.markdown('<div class="main-header">Pyrox <span class="ai-highlight">AI</span> Studio</div>', unsafe_allow_html=True)
 st.markdown('<div class="sub-header">Groq API द्वारा संचालित हाई-स्पीड असिस्टेंट</div>', unsafe_allow_html=True)
-st.markdown('<div class="made-by">Made by Harshit</div>', unsafe_allow_html=True)
+st.markdown('<div class="creator-badge">✨ Crafted by Harshit</div>', unsafe_allow_html=True)
 
 # Check API key from secrets
 if "GROQ_API_KEY" in st.secrets:
@@ -96,11 +105,10 @@ else:
 # Initialize Groq client
 client = Groq(api_key=api_key)
 
-# Strictly fetch ONLY valid chat models (Llama, Mixtral, Gemma) to avoid classification errors
+# Safely fetch chat models
 available_models = []
 try:
     models_response = client.models.list()
-    # Filter to ensure only streaming-compatible chat models are selected
     available_models = [
         m.id for m in models_response.data 
         if any(keyword in m.id.lower() for keyword in ["llama", "mixtral", "gemma"])
@@ -118,8 +126,9 @@ with st.sidebar:
     if available_models:
         model_choice = st.selectbox("मॉडल चुनें", available_models)
     else:
-        # Safe fallback if API model list fails
-        model_choice = st.text_input("मॉडल का नाम दर्ज करें", value="llama-3.3-70b-versatile")
+        # Robust fallback options if dynamic fetching fails
+        fallback_options = ["llama-3.1-8b-instant", "llama3-8b-8192", "gemma2-9b-it", "mixtral-8x7b-32768"]
+        model_choice = st.selectbox("मॉडल चुनें (डिफ़ॉल्ट)", fallback_options)
     
     if st.button("चैट इतिहास साफ़ करें", type="primary"):
         st.session_state.messages = []
