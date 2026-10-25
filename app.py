@@ -8,7 +8,7 @@ st.set_page_config(
     layout="centered"
 )
 
-# Custom CSS for Pure Pitch-Black, Red AI, Shining Gold on Harshit, and Normal White Text
+# Custom CSS for Pure Pitch-Black, Red AI, and Shining Gold on Harshit's name
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -20,6 +20,7 @@ st.markdown("""
     /* Pure Pitch Black Background */
     .stApp {
         background-color: #000000;
+        color: #E3E3E3;
     }
     
     /* Header Aesthetics */
@@ -153,16 +154,28 @@ else:
 # Initialize Groq client
 client = Groq(api_key=api_key)
 
-# Sidebar Controls with Full Manual Model Control
+# Automatically fetch available chat models dynamically from YOUR specific key
+dynamic_models = []
+try:
+    models_response = client.models.list()
+    # Filter out audio/embedding/whisper models, keep chat models
+    dynamic_models = [
+        m.id for m in models_response.data 
+        if not any(x in m.id.lower() for x in ["embed", "whisper", "audio", "guard", "moderation"])
+    ]
+except Exception:
+    dynamic_models = []
+
+# Sidebar Controls
 with st.sidebar:
     st.header("⚙️ सेटिंग्स")
-    st.markdown("अपने Groq कंसोल से मॉडल का नाम यहाँ दर्ज करें:")
     
-    if "model_name" not in st.session_state:
-        st.session_state.model_name = "llama-3.1-8b-instant"
-        
-    model_choice = st.text_input("Model Name", value=st.session_state.model_name)
-    st.session_state.model_name = model_choice
+    if dynamic_models:
+        # Automatically pick the first valid live model from your account
+        model_choice = st.selectbox("एक्टिव मॉडल (ऑटो-डिटेक्टेड)", dynamic_models)
+    else:
+        # Fallback if auto-fetch fails
+        model_choice = st.text_input("मॉडल का नाम दर्ज करें", value="llama-3.1-8b-instant")
     
     if st.button("🗑️ चैट इतिहास साफ़ करें", type="primary", use_container_width=True):
         st.session_state.messages = []
@@ -187,7 +200,7 @@ for message in st.session_state.messages:
         st.markdown(message["content"])
 
 # User Input Box
-if prompt := st.chat_input("यहाँ अपना संदेश टाइप करें..."):
+if prompt := st.chat_input("यहाँ अपना संदेश टाइप करके देखें..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     
     with st.chat_message("user"):
@@ -229,7 +242,7 @@ if prompt := st.chat_input("यहाँ अपना संदेश टाइ�
             
         except Exception as e:
             loader_placeholder.empty()
-            full_response = f"कनेक्शन एरर: {e}\n\n👉 **सुझाव:** साइडबार में मॉडल का नाम (जैसे `llama-3.1-8b-instant` या `llama3-8b-8192`) बदलकर देख लें।"
+            full_response = f"कनेक्शन एरर: {e}"
             message_placeholder.error(full_response)
             
         st.session_state.messages.append({"role": "assistant", "content": full_response})
