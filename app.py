@@ -8,58 +8,81 @@ st.set_page_config(
     layout="centered"
 )
 
-# Custom CSS for Pure Pitch-Black, Clean White Header, Shining Gold on Harshit, and Multi-Ring Atom Spinner
-st.markdown("""
+# Sidebar - Settings & Dynamic Theme Engine
+with st.sidebar:
+    st.header("⚙️ सेटिंग्स")
+    
+    # Custom Theme Engine
+    selected_theme = st.selectbox(
+        "🎨 थीम चुनें (Theme)",
+        ["Pure OLED Black", "Deep Charcoal", "Midnight Navy"]
+    )
+    
+    model_choice = st.text_input("एक्टिव मॉडल", value="qwen/qwen3.8-27b")
+    
+    if st.button("🗑️ चैट इतिहास साफ़ करें", type="primary", use_container_width=True):
+        st.session_state.messages = []
+        st.rerun()
+
+# Determine background color based on selected theme
+bg_color = "#000000"
+if selected_theme == "Deep Charcoal":
+    bg_color = "#121212"
+elif selected_theme == "Midnight Navy":
+    bg_color = "#0A0E17"
+
+# Custom CSS for Professional Layout & Metallic Silver Harshit Glow
+st.markdown(f"""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
     
-    html, body, [class*="css"] {
+    html, body, [class*="css"] {{
         font-family: 'Inter', sans-serif;
-    }
+    }}
     
-    /* Pure Pitch Black Background */
-    .stApp {
-        background-color: #000000;
+    /* Dynamic Pure Black / Selected Theme Background */
+    .stApp {{
+        background-color: {bg_color} !important;
         color: #E3E3E3;
-    }
+    }}
     
-    /* Header Aesthetics - All Clean White, No Yellow P */
-    .main-header {
-        font-size: 2.4rem;
+    /* Header Aesthetics - Pure White Pyrox */
+    .main-header {{
+        font-size: 2.5rem;
         font-weight: 700;
-        color: #FFFFFF;
+        color: #FFFFFF !important;
         margin-bottom: 2px;
         letter-spacing: -0.8px;
-    }
+    }}
     
-    /* Pure Red for AI word */
-    .ai-red {
+    /* Pure Red for AI */
+    .ai-red {{
         color: #FF4B4B;
         font-weight: 700;
-    }
+    }}
     
-    /* Only Harshit's name shines metallic gold */
-    .shining-gold {
-        background: linear-gradient(135deg, #FFE55C 0%, #FFB703 50%, #F18701 100%);
+    /* Ultra Shining Metallic Liquid Silver Glow for Harshit */
+    .shining-silver {{
+        background: linear-gradient(135deg, #FFFFFF 0%, #C0C0C0 40%, #E8E8E8 70%, #999999 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
-        text-shadow: 0 0 10px rgba(255, 215, 0, 0.4);
+        text-shadow: 0 0 12px rgba(255, 255, 255, 0.6), 0 0 20px rgba(192, 192, 192, 0.4);
         font-weight: 700;
-    }
+    }}
     
-    .sub-header {
+    .sub-header {{
         color: #8E918F;
         font-size: 0.95rem;
         margin-bottom: 12px;
-    }
+    }}
     
     /* Creator Badge */
-    .creator-badge {
+    .creator-badge {{
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        background: rgba(255, 255, 255, 0.04);
-        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.08);
         color: #C4C7C5;
         padding: 5px 14px;
         border-radius: 20px;
@@ -67,41 +90,73 @@ st.markdown("""
         font-weight: 500;
         margin-bottom: 25px;
         letter-spacing: 0.3px;
-    }
+    }}
     
     /* Gemini Inspired Hero Intro Card */
-    .gemini-intro-card {
-        background: #0A0A0A;
-        border: 1px solid #1A1A1A;
+    .gemini-intro-card {{
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255, 255, 255, 0.06);
         border-radius: 20px;
         padding: 28px 24px;
         margin: 20px 0 30px 0;
-    }
+    }}
     
-    .gemini-greeting {
+    .gemini-greeting {{
         font-size: 2rem;
         font-weight: 600;
         color: #FFFFFF;
         margin-bottom: 10px;
-    }
+    }}
     
-    .gemini-subtitle {
+    .gemini-subtitle {{
         color: #8E918F;
         font-size: 1.05rem;
         line-height: 1.5;
-    }
+    }}
 
-    /* Footer Disclaimer */
-    .footer-disclaimer {
-        text-align: center;
-        color: #8E918F;
-        font-size: 0.8rem;
-        margin-top: 25px;
+    /* Remove standard Streamlit Chat Avatars completely */
+    [data-testid="stChatMessageAvatar"] {{
+        display: none !important;
+    }}
+
+    /* Custom Chat Container Layouts */
+    /* User Message: Aligned Left Box */
+    .user-box {{
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 14px;
+        padding: 14px 18px;
+        margin: 12px 0;
+        max-width: 85%;
+        color: #FFFFFF;
+        font-size: 1rem;
+        line-height: 1.5;
+    }}
+
+    /* AI Answer Box: Expands in Center */
+    .assistant-box {{
+        background: transparent;
+        border-left: 2px solid #FF4B4B;
+        padding: 4px 0 4px 18px;
+        margin: 16px 0 6px 0;
+        width: 100%;
+        color: #E3E3E3;
+        font-size: 1.02rem;
+        line-height: 1.6;
+    }}
+
+    /* Inline Response Disclaimer right under answer */
+    .inline-disclaimer {{
+        color: #6E716F;
+        font-size: 0.78rem;
         font-style: italic;
-    }
+        margin-top: 6px;
+        margin-bottom: 20px;
+        padding-left: 18px;
+    }}
     
     /* Stunning Multi-Ring 3D Atom Spinner */
-    .loader-container {
+    .loader-container {{
         display: flex;
         align-items: center;
         gap: 14px;
@@ -109,15 +164,15 @@ st.markdown("""
         color: #FF4B4B;
         font-weight: 500;
         font-size: 0.95rem;
-    }
+    }}
     
-    .multi-atom {
+    .multi-atom {{
         position: relative;
-        width: 28px;
-        height: 28px;
-    }
+        width: 26px;
+        height: 26px;
+    }}
     
-    .orbit {
+    .orbit {{
         position: absolute;
         top: 0;
         left: 0;
@@ -127,35 +182,35 @@ st.markdown("""
         border-top: 2px solid #FF4B4B;
         border-radius: 50%;
         animation: spin 0.8s linear infinite;
-    }
+    }}
     
-    .orbit:nth-child(2) {
+    .orbit:nth-child(2) {{
         animation: spin-reverse 0.6s linear infinite;
         transform: rotate(60deg);
         border-color: rgba(255, 75, 75, 0.15);
         border-bottom: 2px solid #FF4B4B;
-    }
+    }}
     
-    .orbit:nth-child(3) {
+    .orbit:nth-child(3) {{
         animation: spin 1s linear infinite;
         transform: rotate(120deg);
         border-color: rgba(255, 75, 75, 0.1);
         border-left: 2px solid #FF4B4B;
-    }
+    }}
     
-    @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-    }
+    @keyframes spin {{
+        0% {{ transform: rotate(0deg); }}
+        100% {{ transform: rotate(360deg); }}
+    }}
     
-    @keyframes spin-reverse {
-        0% { transform: rotate(360deg); }
-        100% { transform: rotate(0deg); }
-    }
+    @keyframes spin-reverse {{
+        0% {{ transform: rotate(360deg); }}
+        100% {{ transform: rotate(0deg); }}
+    }}
     </style>
 """, unsafe_allow_html=True)
 
-# Header Section (Clean White Pyrox, Red AI)
+# Header Section (Clean White Pyrox, Red AI, Metallic Silver Harshit)
 st.markdown(
     '<div class="main-header">'
     'Pyrox <span class="ai-red">AI</span> Studio'
@@ -163,7 +218,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 st.markdown('<div class="sub-header">Groq API द्वारा संचालित हाई-स्पीड इंटेलिजेंट असिस्टेंट</div>', unsafe_allow_html=True)
-st.markdown('<div class="creator-badge">✨ Crafted by <span class="shining-gold">Harshit</span></div>', unsafe_allow_html=True)
+st.markdown('<div class="creator-badge">✨ Crafted by <span class="shining-silver">Harshit</span></div>', unsafe_allow_html=True)
 
 # Check API key from secrets
 if "GROQ_API_KEY" in st.secrets:
@@ -174,15 +229,6 @@ else:
 
 # Initialize Groq client
 client = Groq(api_key=api_key)
-
-# Sidebar Controls
-with st.sidebar:
-    st.header("⚙️ सेटिंग्स")
-    model_choice = st.text_input("एक्टिव मॉडल", value="qwen/qwen3.8-27b")
-    
-    if st.button("🗑️ चैट इतिहास साफ़ करें", type="primary", use_container_width=True):
-        st.session_state.messages = []
-        st.rerun()
 
 # Initialize chat history
 if "messages" not in st.session_state:
@@ -197,65 +243,72 @@ if not st.session_state.messages:
         </div>
     """, unsafe_allow_html=True)
 
-# Display prior chat messages with clean custom avatars
+# Display prior chat messages cleanly without avatars
 for message in st.session_state.messages:
-    avatar_icon = "👤" if message["role"] == "user" else "⚡"
-    with st.chat_message(message["role"], avatar=avatar_icon):
-        st.markdown(message["content"])
+    if message["role"] == "user":
+        st.markdown(f'<div class="user-box">{message["content"]}</div>', unsafe_allow_html=True)
+    else:
+        st.markdown(f'<div class="assistant-box">{message["content"]}</div>', unsafe_allow_html=True)
+        st.markdown('<div class="inline-disclaimer">Pyrox is AI and can make mistakes.</div>', unsafe_allow_html=True)
 
 # User Input Box
 if prompt := st.chat_input("यहाँ अपना संदेश टाइप करें..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     
-    with st.chat_message("user", avatar="👤"):
-        st.markdown(prompt)
+    # Render User Question on Left Box
+    st.markdown(f'<div class="user-box">{prompt}</div>', unsafe_allow_html=True)
 
-    with st.chat_message("assistant", avatar="⚡"):
-        # Stunning Multi-Ring Atom Loader
-        loader_placeholder = st.empty()
-        loader_placeholder.markdown("""
-            <div class="loader-container">
-                <div class="multi-atom">
-                    <div class="orbit"></div>
-                    <div class="orbit"></div>
-                    <div class="orbit"></div>
-                </div>
-                <span>Pyrox आपका जवाब तैयार कर रहा है...</span>
+    # Loader Placeholder
+    loader_placeholder = st.empty()
+    loader_placeholder.markdown("""
+        <div class="loader-container">
+            <div class="multi-atom">
+                <div class="orbit"></div>
+                <div class="orbit"></div>
+                <div class="orbit"></div>
             </div>
-        """, unsafe_allow_html=True)
+            <span>Pyrox आपका जवाब तैयार कर रहा है...</span>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    message_placeholder = st.empty()
+    full_response = ""
+    
+    try:
+        recent_messages = st.session_state.messages[-4:]
         
-        message_placeholder = st.empty()
-        full_response = ""
+        system_prompt = {
+            "role": "system",
+            "content": "You are Pyrox AI Studio, a super-fast and intelligent AI assistant crafted and created by Harshit. If anyone asks who created you, who made you, or who is your creator, always proudly state that you were created by Harshit."
+        }
         
-        try:
-            # Keep history short (last 4 messages) to prevent 429 token limit errors
-            recent_messages = st.session_state.messages[-4:]
-            
-            completion = client.chat.completions.create(
-                model=model_choice,
-                messages=[
-                    {"role": m["role"], "content": m["content"]}
-                    for m in recent_messages
-                ],
-                stream=True,
-                max_tokens=600  # Strictly bounded to stay well within Groq OTPM limit
-            )
-            
-            loader_placeholder.empty()
-            
-            for chunk in completion:
-                if chunk.choices[0].delta.content is not None:
-                    full_response += chunk.choices[0].delta.content
-                    message_placeholder.markdown(full_response + "▌")
-                    
-            message_placeholder.markdown(full_response)
-            
-        except Exception as e:
-            loader_placeholder.empty()
-            full_response = f"कनेक्शन एरर: {e}"
-            message_placeholder.error(full_response)
-            
-        st.session_state.messages.append({"role": "assistant", "content": full_response})
-
-# Footer Disclaimer
-st.markdown('<div class="footer-disclaimer">Pyrox is AI and can make mistakes.</div>', unsafe_allow_html=True)
+        chat_messages = [system_prompt] + [
+            {"role": m["role"], "content": m["content"]}
+            for m in recent_messages
+        ]
+        
+        completion = client.chat.completions.create(
+            model=model_choice,
+            messages=chat_messages,
+            stream=True,
+            max_tokens=600
+        )
+        
+        loader_placeholder.empty()
+        
+        for chunk in completion:
+            if chunk.choices[0].delta.content is not None:
+                full_response += chunk.choices[0].delta.content
+                message_placeholder.markdown(f'<div class="assistant-box">{full_response}▌</div>', unsafe_allow_html=True)
+                
+        message_placeholder.markdown(f'<div class="assistant-box">{full_response}</div>', unsafe_allow_html=True)
+        
+        # Immediate Inline Disclaimer under the answer
+        st.markdown('<div class="inline-disclaimer">Pyrox is AI and can make mistakes.</div>', unsafe_allow_html=True)
+        
+    except Exception as e:
+        loader_placeholder.empty()
+        full_response = f"कनेक्शन एरर: {e}"
+        message_placeholder.error(full_response)
+        
+    st.session_state.messages.append({"role": "assistant", "content": full_response})
