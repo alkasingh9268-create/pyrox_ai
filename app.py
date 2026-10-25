@@ -20,14 +20,31 @@ else:
 # Initialize Groq client
 client = Groq(api_key=api_key)
 
+# Directly fetch available models for YOUR API key
+available_models = []
+fetch_error = ""
+try:
+    models_response = client.models.list()
+    # Filter out audio/embedding models, keep text chat models
+    available_models = [
+        m.id for m in models_response.data 
+        if "embed" not in m.id and "whisper" not in m.id and "audio" not in m.id and "orpheus" not in m.id
+    ]
+except Exception as e:
+    fetch_error = str(e)
+
 # Sidebar for controls
 with st.sidebar:
     st.header("⚙️ Settings")
-    model_choice = st.selectbox(
-        "Choose Model",
-        ["llama-3.1-8b-instant", "llama-3.3-70b-versatile"],
-        index=0
-    )
+    
+    if available_models:
+        # Show dropdown of models actually available on your key
+        model_choice = st.selectbox("Select Your Active Model", available_models)
+    else:
+        st.warning("ऑटो-लिस्ट नहीं आई। अपने Groq डैशबोर्ड से सही मॉडल नाम यहाँ टाइप करें:")
+        model_choice = st.text_input("Enter Model Name Manually", value="llama-3.1-8b-instant")
+        if fetch_error:
+            st.caption(f"Debug: {fetch_error}")
     
     if st.button("Clear Chat History", type="primary"):
         st.session_state.messages = []
@@ -54,7 +71,7 @@ if prompt := st.chat_input("यहाँ अपना संदेश टाइ�
         full_response = ""
         
         try:
-            # Keep only the last 10 messages to prevent "Request too large" error
+            # Keep only the last 10 messages to prevent size errors
             recent_messages = st.session_state.messages[-10:]
             
             completion = client.chat.completions.create(
