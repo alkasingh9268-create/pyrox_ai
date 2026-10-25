@@ -165,10 +165,10 @@ if prompt := st.chat_input("Pyrox se kuch bhi poochho..."):
             </div>
         """, unsafe_allow_html=True)
         
-        # Function to call API safely
+        # Function to call API safely with latest gemini-3.8-flash model
         def fetch_ai_response():
             response = client.models.generate_content(
-                model="gemini-2.5-flash",
+                model="gemini-3.8-flash",
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     system_instruction=(
@@ -185,13 +185,13 @@ if prompt := st.chat_input("Pyrox se kuch bhi poochho..."):
             )
             return response.text
 
-        # Using ThreadPoolExecutor with 7-second Hard Timeout so it NEVER hangs infinitely
+        # Using ThreadPoolExecutor with 7-second Hard Timeout
         try:
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 future = executor.submit(fetch_ai_response)
-                response_text = future.result(timeout=7)  # 7 seconds max wait
+                response_text = future.result(timeout=7)
         except concurrent.futures.TimeoutError:
-            response_text = "Bhai, Google server se connection timeout ho gaya (bahut slow chal raha hai). Ek baar page refresh karke dobara try kar!"
+            response_text = "Bhai, server thoda busy hai. Ek baar page refresh karke dobara try kar!"
         except Exception as e:
             response_text = f"Bhai, ye error aa gaya: `{str(e)}`"
 
