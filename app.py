@@ -1,7 +1,5 @@
 import streamlit as st
 from groq import Groq
-from gtts import gTTS
-import os
 
 # Page configuration
 st.set_page_config(
@@ -10,7 +8,7 @@ st.set_page_config(
     layout="centered"
 )
 
-# Sidebar - Settings, Theme Engine & Voice Toggle
+# Sidebar - Settings & Theme Engine
 with st.sidebar:
     st.header("⚙️ सेटिंग्स")
     
@@ -21,9 +19,6 @@ with st.sidebar:
     )
     
     model_choice = st.text_input("एक्टिव मॉडल", value="qwen/qwen3.8-27b")
-    
-    # Voice Toggle inside Sidebar
-    enable_voice = st.checkbox("🔊 AI वॉयस आउटपुट चालू करें", value=False)
     
     if st.button("🗑️ चैट इतिहास साफ़ करें", type="primary", use_container_width=True):
         st.session_state.messages = []
@@ -279,16 +274,16 @@ if prompt := st.chat_input("यहाँ अपना संदेश टाइ�
     try:
         recent_messages = st.session_state.messages[-4:]
         
-        # Super-Strict Anti-Hallucination & Human-Like Conversational Persona System Prompt
+        # Supercharged Dynamic Persona System Prompt (Gemini-Style Adaptability)
         system_prompt = {
             "role": "system",
             "content": (
-                "You are Pyrox AI Studio, a super-fast, ultra-intelligent, and warm AI assistant crafted and created by Harshit. "
-                "CRITICAL INSTRUCTIONS:\n"
-                "1. NEVER hallucinate or mix up random unrelated topics (e.g., never claim Python has any connection to health, fitness, or physical body terms).\n"
-                "2. Talk like a sharp, friendly, and engaging human tech mentor. Use natural Hinglish or English matching the user's vibe.\n"
-                "3. Keep answers direct, accurate, and structured. When asked about learning a language like Python, give a clear, simple definition first, and then practical guidance without sounding like a rigid robot.\n"
-                "4. If anyone asks who created you, proudly state that you were created by Harshit."
+                "You are Pyrox AI Studio, a super-fast, ultra-intelligent, witty, and deeply adaptable AI companion crafted and created by Harshit. "
+                "CORE BEHAVIOR & RULES:\n"
+                "1. ADAPTABILITY: Instantly match the user's requested style and tone. If they say 'short answer' or 'short me bata', keep it brief. If they say 'point to point', use clean bullet points. If they want a funny or witty reply, be lighthearted and clever. If they want a serious response, keep it sharp, professional, and crisp. \n"
+                "2. HUMAN VIBE: Speak like a brilliant, friendly human tech mentor and witty companion. Use natural Hinglish or English matching the user's vibe. Avoid dry, boring robotic textbook language.\n"
+                "3. ZERO HALLUCINATION: Never mix up unrelated topics (e.g., never connect coding or programming languages to physical health or body terms).\n"
+                "4. CREATOR IDENTITY: If anyone asks who created you, who made you, or who is your creator, always proudly state that you were created by Harshit."
             )
         }
         
@@ -315,17 +310,6 @@ if prompt := st.chat_input("यहाँ अपना संदेश टाइ�
         
         # Immediate Inline Disclaimer under the answer
         st.markdown('<div class="inline-disclaimer">Pyrox is AI and can make mistakes.</div>', unsafe_allow_html=True)
-        
-        # Voice Generation if enabled in sidebar
-        if enable_voice and full_response:
-            try:
-                clean_text = full_response.replace("*", "").replace("#", "").replace("`", "")
-                tts = gTTS(text=clean_text, lang='hi', slow=False)
-                audio_file = "temp_response.mp3"
-                tts.save(audio_file)
-                st.audio(audio_file, format="audio/mp3", autoplay=True)
-            except Exception:
-                pass
         
     except Exception as e:
         loader_placeholder.empty()
