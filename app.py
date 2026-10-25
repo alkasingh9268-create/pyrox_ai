@@ -8,7 +8,7 @@ st.set_page_config(
     layout="centered"
 )
 
-# Custom CSS for styling, font, colors, and animations
+# Custom CSS for styling, fonts, colors, and 3D atom animation
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
@@ -39,10 +39,18 @@ st.markdown("""
         margin-bottom: 2px;
     }
     
-    .disclaimer {
+    .made-by {
+        color: #FF914D;
+        font-size: 0.85rem;
+        font-weight: 600;
+        margin-bottom: 20px;
+    }
+    
+    .footer-disclaimer {
+        text-align: center;
         color: #6c757d;
         font-size: 0.8rem;
-        margin-bottom: 25px;
+        margin-top: 15px;
         font-style: italic;
     }
     
@@ -76,7 +84,7 @@ st.markdown("""
 # Header Section
 st.markdown('<div class="main-header">Pyrox <span class="ai-highlight">AI</span> Studio</div>', unsafe_allow_html=True)
 st.markdown('<div class="sub-header">Groq API द्वारा संचालित हाई-स्पीड असिस्टेंट</div>', unsafe_allow_html=True)
-st.markdown('<div class="disclaimer">Pyrox is AI and can make mistakes.</div>', unsafe_allow_html=True)
+st.markdown('<div class="made-by">Made by Harshit</div>', unsafe_allow_html=True)
 
 # Check API key from secrets
 if "GROQ_API_KEY" in st.secrets:
@@ -88,13 +96,17 @@ else:
 # Initialize Groq client
 client = Groq(api_key=api_key)
 
-# Dynamically fetch available models from user's account
+# Strictly fetch ONLY valid chat models (Llama, Mixtral, Gemma) to avoid classification errors
 available_models = []
 try:
     models_response = client.models.list()
+    # Filter to ensure only streaming-compatible chat models are selected
     available_models = [
         m.id for m in models_response.data 
-        if "embed" not in m.id and "whisper" not in m.id and "audio" not in m.id
+        if any(keyword in m.id.lower() for keyword in ["llama", "mixtral", "gemma"])
+        and "embed" not in m.id.lower() 
+        and "whisper" not in m.id.lower()
+        and "guard" not in m.id.lower()
     ]
 except Exception:
     pass
@@ -106,8 +118,8 @@ with st.sidebar:
     if available_models:
         model_choice = st.selectbox("मॉडल चुनें", available_models)
     else:
-        # Fallback manual input if API listing fails
-        model_choice = st.text_input("मॉडल का नाम मैनुअली दर्ज करें (कंसोल से)", value="llama3-70b-8192")
+        # Safe fallback if API model list fails
+        model_choice = st.text_input("मॉडल का नाम दर्ज करें", value="llama-3.3-70b-versatile")
     
     if st.button("चैट इतिहास साफ़ करें", type="primary"):
         st.session_state.messages = []
@@ -130,7 +142,7 @@ if prompt := st.chat_input("यहाँ अपना संदेश टाइ�
         st.markdown(prompt)
 
     with st.chat_message("assistant"):
-        # Cool 3D animated loader while processing
+        # 3D animated loader while processing
         loader_placeholder = st.empty()
         loader_placeholder.markdown("""
             <div class="loader-container">
@@ -170,3 +182,6 @@ if prompt := st.chat_input("यहाँ अपना संदेश टाइ�
             message_placeholder.error(full_response)
             
         st.session_state.messages.append({"role": "assistant", "content": full_response})
+
+# Footer Disclaimer
+st.markdown('<div class="footer-disclaimer">Pyrox is AI and can make mistakes.</div>', unsafe_allow_html=True)
