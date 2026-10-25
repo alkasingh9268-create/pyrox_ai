@@ -1,7 +1,6 @@
 import streamlit as st
-from google import genai
-from google.genai import types
-import concurrent.futures
+import urllib.request
+import json
 
 # Page Configuration
 st.set_page_config(page_title="Pyrox AI", page_icon="✨", layout="centered")
@@ -128,9 +127,6 @@ except Exception:
     st.error("API Key not found in Streamlit Secrets! Please configure it.")
     st.stop()
 
-# Client initialize
-client = genai.Client(api_key=api_key)
-
 # Initialize Chat History
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -165,35 +161,40 @@ if prompt := st.chat_input("Pyrox se kuch bhi poochho..."):
             </div>
         """, unsafe_allow_html=True)
         
-        # Function to call API safely with latest gemini-3.8-flash model
-        def fetch_ai_response():
-            response = client.models.generate_content(
-                model="gemini-3.8-flash",
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    system_instruction=(
-                        "Your name is Pyrox AI, and you are developed and created by Harshit. "
-                        "If anyone asks who made you, who created you, or who your developer is, "
-                        "you must proudly and clearly state that you were developed by Harshit. "
-                        "Your personality is extremely friendly, chill, conversational, and like a close buddy (dostana tone). "
-                        "NEVER include meta-commentary, introductory filler like 'Here is your answer', 'I am generating', or robotic phrases. "
-                        "Get straight to the point with natural, clean language and a warm tone. "
-                        "If the user makes spelling mistakes, typos, or sends random meaningless letters (like 'jj' or 'hhhh' or gibberish), "
-                        "do not throw a technical error. Politely and playfully ask the user in a friendly tone to type a proper question."
-                    )
-                )
-            )
-            return response.text
-
-        # Using ThreadPoolExecutor with 7-second Hard Timeout
+        # Direct REST API call with a hard 6-second timeout (Guaranteed not to hang infinitely)
         try:
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                future = executor.submit(fetch_ai_response)
-                response_text = future.result(timeout=7)
-        except concurrent.futures.TimeoutError:
-            response_text = "Bhai, server thoda busy hai. Ek baar page refresh karke dobara try kar!"
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+            
+            payload = {
+                "contents": [{"parts": [{"text": prompt}]}],
+                "systemInstruction": {
+                    "parts": [{
+                        "text": (
+                            "Your name is Pyrox AI, and you are developed and created by Harshit. "
+                            "If anyone asks who made you, who created you, or who your developer is, "
+                            "you must proudly and clearly state that you were developed by Harshit. "
+                            "Your personality is extremely friendly, chill, conversational, and like a close buddy (dostana tone). "
+                            "NEVER include meta-commentary, introductory filler like 'Here is your answer', 'I am generating', or robotic phrases. "
+                            "Get straight to the point with natural, clean language and a warm tone. "
+                            "If the user makes spelling mistakes, typos, or sends random meaningless letters (like 'jj' or 'hhhh' or gibberish), "
+                            "do not throw a technical error. Politely and playfully ask the user in a friendly tone to type a proper question."
+                        )
+                    }]
+                }
+            }
+            
+            data = json.dumps(payload).encode('utf-8')
+            req = urllib.request.Request(url, data=data, headers={'Content-Type': 'application/json'})
+            
+            # urllib urlopen with a strict 6-second timeout
+            with urllib.request.urlopen(req, timeout=6) as response:
+                res_json = json.loads(response.read().decode('utf-8'))
+                response_text = res_json['candidates'][0]['content']['parts'][0]['text']
+                
+        except urllib.error.URLError as e:
+            response_text = "Bhai, Google server ka connection timeout ho gaya. Ek baar page refresh karke dobara try kar!"
         except Exception as e:
-            response_text = f"Bhai, ye error aa gaya: `{str(e)}`"
+            response_text = f"Bhai, ye chhota sa issue aa gaya: `{str(e)}`"
 
         # Loader hata kar output dikhayenge
         loader_placeholder.empty()
