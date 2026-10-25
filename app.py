@@ -3,7 +3,7 @@ from google import genai
 
 st.title("My AI App Pyrox")
 
-# Streamlit secrets से सुरक्षित तरीके से API key ले रहे हैं
+# Streamlit secrets se secure API key le rahe hain
 api_key = st.secrets["GEMINI_API_KEY"]
 
 client = genai.Client(api_key=api_key)
@@ -25,22 +25,28 @@ if prompt := st.chat_input("Ask anything..."):
 
     with st.chat_message("assistant"):
         try:
+            # Model ko smart banaya hai jo spelling mistakes/typos ko khud samajh lega
             response = client.models.generate_content(
                 model="gemini-3.5-flash",
                 config={
                     "system_instruction": (
-                        "Your name is Pyrox AI, developed and created by Harshit. "
-                        "You are a smart AI assistant focused on Education and Health. "
-                        "If the user makes spelling mistakes, typos, or misses letters "
-                        "in their prompt (for example writing 'moton' instead of 'motion'), "
-                        "do not throw an error. Understand their intent naturally, correct "
-                        "the spelling implicitly, and answer their question helpfully and accurately."
+                        "Your name is Pyrox AI, and you are developed and created by Harshit. "
+                        "If anyone asks who made you or who your developer is, you must proudly say that you were developed by Harshit. "
+                        "If the user makes spelling mistakes, typos, or misses letters in their prompt, "
+                        "do not throw an error. Understand their intent naturally, correct the spelling implicitly, "
+                        "and answer their question helpfully and accurately."
                     )
                 },
                 contents=prompt
-            )            
             )
             st.markdown(response.text)
             st.session_state.messages.append({"role": "assistant", "content": response.text})
         except Exception as e:
-            st.error(f"API Error: {e}")
+            # High demand ya server error ke liye safe message
+            if "500" in str(e) or "overloaded" in str(e) or "high demand" in str(e):
+                err_msg = "Arre bhai! Abhi Google ka server thoda busy chal raha hai. Aap bas 10 second baad dobara message bhejiye, ekdum badhiya kaam karega!"
+            else:
+                err_msg = f"API Error: {e}"
+            
+            st.warning(err_msg)
+            st.session_state.messages.append({"role": "assistant", "content": err_msg})
