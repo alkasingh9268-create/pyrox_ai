@@ -26,7 +26,7 @@ with st.sidebar:
     st.header("⚙️ Settings")
     model_choice = st.selectbox(
         "Choose Model",
-        ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"],
+        ["llama-3.1-8b-instant"],
         index=0
     )
     
@@ -81,4 +81,3 @@ if prompt := st.chat_input("यहाँ अपना संदेश टाइ�
             
         # Add assistant response to session state
         st.session_state.messages.append({"role": "assistant", "content": full_response})
-        
