@@ -5,6 +5,64 @@ import time
 # Page Configuration
 st.set_page_config(page_title="Pyrox AI", page_icon="🧮", layout="centered")
 
+# CSS for Spinning Atoms and Smooth UI
+st.markdown("""
+<style>
+    .atom-loader-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        margin: 20px 0;
+    }
+    .atom-spinner {
+        position: relative;
+        width: 60px;
+        height: 60px;
+    }
+    .nucleus {
+        position: absolute;
+        top: 23px;
+        left: 23px;
+        width: 14px;
+        height: 14px;
+        background-color: #00ffcc;
+        border-radius: 50%;
+        box-shadow: 0 0 10px #00ffcc;
+    }
+    .orbit {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        border: 2px dashed rgba(0, 255, 204, 0.4);
+        border-radius: 50%;
+        animation: spin 2s linear infinite;
+    }
+    .orbit:nth-child(2) {
+        animation: spin-reverse 1.5s linear infinite;
+        border-color: rgba(255, 0, 128, 0.4);
+    }
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    @keyframes spin-reverse {
+        0% { transform: rotate(360deg); }
+        100% { transform: rotate(0deg); }
+    }
+    .loading-text {
+        margin-top: 12px;
+        font-family: sans-serif;
+        font-size: 14px;
+        color: #00ffcc;
+        font-weight: 500;
+        letter-spacing: 0.5px;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 st.title("Pyrox AI")
 
 # Streamlit secrets se secure API key le rahe hain
@@ -33,9 +91,22 @@ if prompt := st.chat_input("Ask Pyrox anything..."):
 
     with st.chat_message("assistant"):
         response_text = None
-        error_occurred = False
         
-        # Automatic Retry Logic: Server busy hone par 3 baar koshish karega
+        # Custom Atoms Spinner with Dynamic Text Placeholder
+        placeholder = st.empty()
+        
+        with placeholder.container():
+            st.markdown("""
+                <div class="atom-loader-container">
+                    <div class="atom-spinner">
+                        <div class="orbit"></div>
+                        <div class="orbit"></div>
+                        <div class="nucleus"></div>
+                    </div>
+                    <div class="loading-text">Atoms align ho rahe hain, Pyrox soch raha hai...</div>
+                </div>
+            """, unsafe_allow_html=True)
+            
         for attempt in range(3):
             try:
                 response = client.models.generate_content(
@@ -54,22 +125,14 @@ if prompt := st.chat_input("Ask Pyrox anything..."):
                     contents=prompt
                 )
                 response_text = response.text
-                break  # Response mil gaya toh loop se bahar
+                break
             except Exception as e:
-                err_str = str(e)
-                if attempt == 2:
-                    error_occurred = True
-                    if "500" in err_str or "overloaded" in err_str or "high demand" in err_str or "RESOURCE_EXHAUSTED" in err_str:
-                        err_msg = "⚠️ Arre bhai! Abhi Google ke server par thoda load chal raha hai. Ek second ruk kar dobara bhej, ekdam fatfat chalega!"
-                    else:
-                        err_msg = "🤖 Bhai, server se connect hone mein thoda lafda ho gaya. Ek baar apna sawal fir se bhej ke dekh!"
+                if attempt < 2:
+                    time.sleep(2)
                 else:
-                    # Thoda sa ruk kar agli koshish karega
-                    time.sleep(1.5)
+                    response_text = "Arre bhai, thoda sa traffic zyada ho gaya hai. Ek second ruk ke dobara likh na, ekdam mast chalega!"
 
-        if response_text:
-            st.markdown(response_text)
-            st.session_state.messages.append({"role": "assistant", "content": response_text})
-        elif error_occurred:
-            st.warning(err_msg)
-            st.session_state.messages.append({"role": "assistant", "content": err_msg})
+        # Purane loader ko hata kar seedha output dikhayenge
+        placeholder.empty()
+        st.markdown(response_text)
+        st.session_state.messages.append({"role": "assistant", "content": response_text})
