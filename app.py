@@ -8,7 +8,7 @@ st.set_page_config(
     layout="centered"
 )
 
-# Custom CSS for Pure Pitch-Black & Modern Gemini UI Style with Gold Accents
+# Custom CSS for Pure Pitch-Black, Red AI, and Shining Gold only on Harshit's name
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -17,7 +17,7 @@ st.markdown("""
         font-family: 'Inter', sans-serif;
     }
     
-    /* Pure Pitch Black Theme */
+    /* Pure Pitch Black Background */
     .stApp {
         background-color: #000000;
         color: #E3E3E3;
@@ -32,14 +32,25 @@ st.markdown("""
         letter-spacing: -0.8px;
     }
     
-    .ai-gradient {
-        background: linear-gradient(135deg, #A8C7FA 0%, #7CACF8 50%, #4C8DF6 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
+    /* Pyrox P in Gold */
+    .gold-letter {
+        color: #FFB703;
+        font-weight: 700;
     }
     
-    .gold-accent {
-        color: #FFD700;
+    /* Pure Red for AI */
+    .ai-red {
+        color: #FF4B4B;
+        font-weight: 700;
+    }
+    
+    /* Only Harshit's name shines metallic gold */
+    .shining-gold {
+        background: linear-gradient(135deg, #FFE55C 0%, #FFB703 50%, #F18701 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        text-shadow: 0 0 10px rgba(255, 215, 0, 0.4);
+        font-weight: 700;
     }
     
     .sub-header {
@@ -48,13 +59,13 @@ st.markdown("""
         margin-bottom: 12px;
     }
     
-    /* Premium Gemini-style Creator Badge with Full Gold Name */
+    /* Creator Badge */
     .creator-badge {
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        background: rgba(255, 255, 255, 0.05);
-        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.1);
         color: #C4C7C5;
         padding: 5px 14px;
         border-radius: 20px;
@@ -64,15 +75,10 @@ st.markdown("""
         letter-spacing: 0.3px;
     }
     
-    .gold-name {
-        color: #FFD700;
-        font-weight: 700;
-    }
-    
     /* Gemini Inspired Hero Intro Card */
     .gemini-intro-card {
-        background: #111318;
-        border: 1px solid #1F222A;
+        background: #0A0A0A;
+        border: 1px solid #1A1A1A;
         border-radius: 20px;
         padding: 28px 24px;
         margin: 20px 0 30px 0;
@@ -81,14 +87,12 @@ st.markdown("""
     .gemini-greeting {
         font-size: 2rem;
         font-weight: 600;
-        background: linear-gradient(90deg, #A8C7FA, #E3E3E3);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
+        color: #FFFFFF;
         margin-bottom: 10px;
     }
     
     .gemini-subtitle {
-        color: #C4C7C5;
+        color: #8E918F;
         font-size: 1.05rem;
         line-height: 1.5;
     }
@@ -102,13 +106,13 @@ st.markdown("""
         font-style: italic;
     }
     
-    /* 3D Orbit / Atom Loading Animation */
+    /* Red Loading Spinner */
     .loader-container {
         display: flex;
         align-items: center;
         gap: 12px;
         padding: 14px 0;
-        color: #A8C7FA;
+        color: #FF4B4B;
         font-weight: 500;
         font-size: 0.95rem;
     }
@@ -116,8 +120,8 @@ st.markdown("""
     .atom-spinner {
         width: 24px;
         height: 24px;
-        border: 3px solid rgba(168, 199, 250, 0.2);
-        border-top: 3px solid #A8C7FA;
+        border: 3px solid rgba(255, 75, 75, 0.2);
+        border-top: 3px solid #FF4B4B;
         border-radius: 50%;
         animation: spin 0.8s linear infinite;
     }
@@ -129,15 +133,16 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Header Section with Gold Highlights on P and the dot of I
+# Header Section
 st.markdown(
-    '<div class="main-header"><span class="gold-accent">P</span>yrox <span'
-    ' class="ai-gradient">A<span'
-    ' class="gold-accent">i</span></span> Studio</div>',
+    '<div class="main-header">'
+    '<span class="gold-letter">P</span>yrox '
+    '<span class="ai-red">AI</span> Studio'
+    '</div>',
     unsafe_allow_html=True,
 )
 st.markdown('<div class="sub-header">Groq API द्वारा संचालित हाई-स्पीड इंटेलिजेंट असिस्टेंट</div>', unsafe_allow_html=True)
-st.markdown('<div class="creator-badge">✨ Crafted by <span class="gold-name">Harshit</span></div>', unsafe_allow_html=True)
+st.markdown('<div class="creator-badge">✨ Crafted by <span class="shining-gold">Harshit</span></div>', unsafe_allow_html=True)
 
 # Check API key from secrets
 if "GROQ_API_KEY" in st.secrets:
@@ -149,19 +154,22 @@ else:
 # Initialize Groq client
 client = Groq(api_key=api_key)
 
-# Strictly Active & Decommission-Safe Groq Models
+# 100% Active & Verified Models Only
 active_models = [
     "llama-3.3-70b-versatile",
     "llama-3.1-8b-instant",
-    "gemma2-9b-it",
-    "deepseek-r1-distill-llama-70b"
+    "gemma2-9b-it"
 ]
 
-# Sidebar Controls
+# Sidebar Controls with Decommissioned-Model Protection
 with st.sidebar:
     st.header("⚙️ सेटिंग्स")
     model_choice = st.selectbox("एक्टिव मॉडल चुनें", active_models, index=0)
     
+    # Bulletproof guard against old cached models
+    if "deepseek" in model_choice.lower() or model_choice not in active_models:
+        model_choice = "llama-3.3-70b-versatile"
+        
     if st.button("🗑️ चैट इतिहास साफ़ करें", type="primary", use_container_width=True):
         st.session_state.messages = []
         st.rerun()
@@ -192,7 +200,7 @@ if prompt := st.chat_input("यहाँ अपना संदेश टाइ�
         st.markdown(prompt)
 
     with st.chat_message("assistant"):
-        # 3D Animated Loader
+        # Red Animated Loader
         loader_placeholder = st.empty()
         loader_placeholder.markdown("""
             <div class="loader-container">
@@ -204,8 +212,9 @@ if prompt := st.chat_input("यहाँ अपना संदेश टाइ�
         message_placeholder = st.empty()
         full_response = ""
         
-        # Robust Fallback Mechanism across Active Models
-        models_to_try = [model_choice] + [m for m in active_models if m != model_choice]
+        # Ensure only safe active models are targeted
+        current_model = model_choice if model_choice in active_models else "llama-3.3-70b-versatile"
+        models_to_try = [current_model] + [m for m in active_models if m != current_model]
         success = False
         last_error = ""
         
