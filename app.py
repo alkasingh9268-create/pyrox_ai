@@ -1,249 +1,36 @@
 import streamlit as st
 from groq import Groq
 
-# Page configuration
-st.set_page_config(
-    page_title="Pyrox AI Studio",
-    page_icon="⚡",
-    layout="centered"
-)
+st.set_page_config(page_title="Model Checker", layout="centered")
 
-# Custom CSS for Pure Pitch-Black, Red AI, and Shining Gold only on Harshit's name
-st.markdown("""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-    
-    html, body, [class*="css"] {
-        font-family: 'Inter', sans-serif;
-    }
-    
-    /* Pure Pitch Black Background */
-    .stApp {
-        background-color: #000000;
-        color: #E3E3E3;
-    }
-    
-    /* Header Aesthetics */
-    .main-header {
-        font-size: 2.4rem;
-        font-weight: 700;
-        color: #FFFFFF;
-        margin-bottom: 2px;
-        letter-spacing: -0.8px;
-    }
-    
-    /* Pyrox P in Gold */
-    .gold-letter {
-        color: #FFB703;
-        font-weight: 700;
-    }
-    
-    /* Pure Red for AI */
-    .ai-red {
-        color: #FF4B4B;
-        font-weight: 700;
-    }
-    
-    /* Only Harshit's name shines metallic gold */
-    .shining-gold {
-        background: linear-gradient(135deg, #FFE55C 0%, #FFB703 50%, #F18701 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        text-shadow: 0 0 10px rgba(255, 215, 0, 0.4);
-        font-weight: 700;
-    }
-    
-    .sub-header {
-        color: #8E918F;
-        font-size: 0.95rem;
-        margin-bottom: 12px;
-    }
-    
-    /* Creator Badge */
-    .creator-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        background: rgba(255, 255, 255, 0.04);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        color: #C4C7C5;
-        padding: 5px 14px;
-        border-radius: 20px;
-        font-size: 0.82rem;
-        font-weight: 500;
-        margin-bottom: 25px;
-        letter-spacing: 0.3px;
-    }
-    
-    /* Gemini Inspired Hero Intro Card */
-    .gemini-intro-card {
-        background: #0A0A0A;
-        border: 1px solid #1A1A1A;
-        border-radius: 20px;
-        padding: 28px 24px;
-        margin: 20px 0 30px 0;
-    }
-    
-    .gemini-greeting {
-        font-size: 2rem;
-        font-weight: 600;
-        color: #FFFFFF;
-        margin-bottom: 10px;
-    }
-    
-    .gemini-subtitle {
-        color: #8E918F;
-        font-size: 1.05rem;
-        line-height: 1.5;
-    }
-
-    /* Footer Disclaimer */
-    .footer-disclaimer {
-        text-align: center;
-        color: #8E918F;
-        font-size: 0.8rem;
-        margin-top: 25px;
-        font-style: italic;
-    }
-    
-    /* Red Loading Spinner */
-    .loader-container {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 14px 0;
-        color: #FF4B4B;
-        font-weight: 500;
-        font-size: 0.95rem;
-    }
-    
-    .atom-spinner {
-        width: 24px;
-        height: 24px;
-        border: 3px solid rgba(255, 75, 75, 0.2);
-        border-top: 3px solid #FF4B4B;
-        border-radius: 50%;
-        animation: spin 0.8s linear infinite;
-    }
-    
-    @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-    }
-    </style>
-""", unsafe_allow_html=True)
-
-# Header Section
-st.markdown(
-    '<div class="main-header">'
-    '<span class="gold-letter">P</span>yrox '
-    '<span class="ai-red">AI</span> Studio'
-    '</div>',
-    unsafe_allow_html=True,
-)
-st.markdown('<div class="sub-header">Groq API द्वारा संचालित हाई-स्पीड इंटेलिजेंट असिस्टेंट</div>', unsafe_allow_html=True)
-st.markdown('<div class="creator-badge">✨ Crafted by <span class="shining-gold">Harshit</span></div>', unsafe_allow_html=True)
+st.title("🔍 Groq Model Inspector")
 
 # Check API key from secrets
 if "GROQ_API_KEY" in st.secrets:
     api_key = st.secrets["GROQ_API_KEY"]
 else:
-    st.error("त्रुटि: Streamlit Secrets में 'GROQ_API_KEY' नहीं मिली!")
+    st.error("Streamlit Secrets में 'GROQ_API_KEY' नहीं मिली!")
     st.stop()
 
 # Initialize Groq client
 client = Groq(api_key=api_key)
 
-# Strictly fetch ONLY valid Llama/Gemma text models and filter out audio/canopy terms models
-dynamic_models = []
+st.subheader("📋 आपकी API Key पर उपलब्ध सभी मॉडल्स की सूची:")
+
 try:
-    models_response = client.models.list()
-    dynamic_models = [
-        m.id for m in models_response.data 
-        if any(keyword in m.id.lower() for keyword in ["llama", "gemma"])
-        and not any(x in m.id.lower() for x in ["embed", "whisper", "audio", "guard", "moderation", "canopy", "orpheus"])
-    ]
-except Exception:
-    dynamic_models = []
-
-# Fallback if list is empty
-if not dynamic_models:
-    dynamic_models = ["llama-3.1-8b-instant", "llama3-8b-8192"]
-
-# Sidebar Controls
-with st.sidebar:
-    st.header("⚙️ सेटिंग्स")
-    model_choice = st.selectbox("एक्टिव मॉडल (ऑटो-डिटेक्टेड)", dynamic_models)
+    # Fetching exact models allowed for this specific key
+    response = client.models.list()
     
-    if st.button("🗑️ चैट इतिहास साफ़ करें", type="primary", use_container_width=True):
-        st.session_state.messages = []
-        st.rerun()
-
-# Initialize chat history
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-# Display Gemini-Style Welcome Intro if Chat History is Empty
-if not st.session_state.messages:
-    st.markdown("""
-        <div class="gemini-intro-card">
-            <div class="gemini-greeting">नमस्ते, मैं Pyrox हूँ।</div>
-            <div class="gemini-subtitle">आज मैं आपकी किस प्रकार सहायता कर सकता हूँ? कोडिंग, रिसर्च या रचनात्मक कार्यों के लिए नीचे संदेश लिखें।</div>
-        </div>
-    """, unsafe_allow_html=True)
-
-# Display prior chat messages
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
-
-# User Input Box
-if prompt := st.chat_input("यहाँ अपना संदेश टाइप करें..."):
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    
-    with st.chat_message("user"):
-        st.markdown(prompt)
-
-    with st.chat_message("assistant"):
-        # Red Animated Loader
-        loader_placeholder = st.empty()
-        loader_placeholder.markdown("""
-            <div class="loader-container">
-                <div class="atom-spinner"></div>
-                <span>Pyrox आपका जवाब तैयार कर रहा है...</span>
-            </div>
-        """, unsafe_allow_html=True)
+    if response and response.data:
+        model_names = [m.id for m in response.data]
         
-        message_placeholder = st.empty()
-        full_response = ""
-        
-        try:
-            recent_messages = st.session_state.messages[-10:]
+        # Display each model cleanly on the screen
+        for idx, m_name in enumerate(model_names, 1):
+            st.markdown(f"**{idx}.** `{m_name}`")
             
-            completion = client.chat.completions.create(
-                model=model_choice,
-                messages=[
-                    {"role": m["role"], "content": m["content"]}
-                    for m in recent_messages
-                ],
-                stream=True,
-            )
-            
-            loader_placeholder.empty()
-            
-            for chunk in completion:
-                if chunk.choices[0].delta.content is not None:
-                    full_response += chunk.choices[0].delta.content
-                    message_placeholder.markdown(full_response + "▌")
-                    
-            message_placeholder.markdown(full_response)
-            
-        except Exception as e:
-            loader_placeholder.empty()
-            full_response = f"कनेक्शन एरर: {e}"
-            message_placeholder.error(full_response)
-            
-        st.session_state.messages.append({"role": "assistant", "content": full_response})
+        st.success(f"कुल {len(model_names)} मॉडल मिले हैं जो आपकी चाबी पर काम कर सकते हैं!")
+    else:
+        st.warning("कोई मॉडल नहीं मिला।")
 
-# Footer Disclaimer
-st.markdown('<div class="footer-disclaimer">Pyrox is AI and can make mistakes.</div>', unsafe_allow_html=True)
+except Exception as e:
+    st.error(f"कनेक्शन या ऑथेंटिकेशन में दिक्कत है: {e}")
