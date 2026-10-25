@@ -26,7 +26,7 @@ with st.sidebar:
     st.header("⚙️ Settings")
     model_choice = st.selectbox(
         "Choose Model",
-        ["llama-3.3-70b-versatile", "llama-3.1-70b-versatile"],
+        ["llama-3.1-70b-versatile", "llama-3.1-8b-instant"],
         index=0
     )
     
