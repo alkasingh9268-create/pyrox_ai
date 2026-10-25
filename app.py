@@ -1,14 +1,49 @@
 import streamlit as st
 from groq import Groq
 
-# Page configuration
+# Page configuration with custom title and icon (No "chatbot" word)
 st.set_page_config(
-    page_title="Pyrox AI Chatbot",
-    page_icon="🤖",
+    page_title="Pyrox AI Studio",
+    page_icon="⚡",
     layout="centered"
 )
 
-st.title("🤖 Pyrox AI Chatbot")
+# Custom CSS for colors, fonts, and styling
+st.markdown("""
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+    
+    html, body, [class*="css"] {
+        font-family: 'Inter', sans-serif;
+    }
+    
+    /* Background and text colors */
+    .stApp {
+        background-color: #0e1117;
+        color: #fafafa;
+    }
+    
+    /* Custom Header Styling */
+    .main-header {
+        font-size: 2.2rem;
+        font-weight: 700;
+        background: linear-gradient(90deg, #FF4B4B, #FF914D);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 0px;
+    }
+    
+    .sub-header {
+        color: #a0a0a0;
+        font-size: 0.95rem;
+        margin-bottom: 25px;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# App Logo and Header (Without the word chatbot)
+st.markdown('<div class="main-header">⚡ Pyrox AI Studio</div>', unsafe_allow_html=True)
+st.markdown('<div class="sub-header">Groq API और Llama मॉडल्स द्वारा संचालित हाई-स्पीड असिस्टेंट</div>', unsafe_allow_html=True)
 
 # Check API key from secrets
 if "GROQ_API_KEY" in st.secrets:
@@ -20,33 +55,17 @@ else:
 # Initialize Groq client
 client = Groq(api_key=api_key)
 
-# Directly fetch available models for YOUR API key
-available_models = []
-fetch_error = ""
-try:
-    models_response = client.models.list()
-    # Filter out audio/embedding models, keep text chat models
-    available_models = [
-        m.id for m in models_response.data 
-        if "embed" not in m.id and "whisper" not in m.id and "audio" not in m.id and "orpheus" not in m.id
-    ]
-except Exception as e:
-    fetch_error = str(e)
-
 # Sidebar for controls
 with st.sidebar:
-    st.header("⚙️ Settings")
+    st.header("⚙️ सेटिंग्स")
+    # Safe verified chat models dropdown (No classification/audio models)
+    model_choice = st.selectbox(
+        "मॉडल चुनें",
+        ["llama-3.1-8b-instant", "llama-3.3-70b-versatile"],
+        index=0
+    )
     
-    if available_models:
-        # Show dropdown of models actually available on your key
-        model_choice = st.selectbox("Select Your Active Model", available_models)
-    else:
-        st.warning("ऑटो-लिस्ट नहीं आई। अपने Groq डैशबोर्ड से सही मॉडल नाम यहाँ टाइप करें:")
-        model_choice = st.text_input("Enter Model Name Manually", value="llama-3.1-8b-instant")
-        if fetch_error:
-            st.caption(f"Debug: {fetch_error}")
-    
-    if st.button("Clear Chat History", type="primary"):
+    if st.button("चैट इतिहास साफ़ करें", type="primary"):
         st.session_state.messages = []
         st.rerun()
 
@@ -71,7 +90,7 @@ if prompt := st.chat_input("यहाँ अपना संदेश टाइ�
         full_response = ""
         
         try:
-            # Keep only the last 10 messages to prevent size errors
+            # Keep only the last 10 messages to avoid token limit errors
             recent_messages = st.session_state.messages[-10:]
             
             completion = client.chat.completions.create(
