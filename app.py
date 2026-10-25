@@ -8,7 +8,7 @@ st.set_page_config(
     layout="centered"
 )
 
-# Custom CSS for styling, fonts, colors, badge, and 3D atom animation
+# Custom CSS for soothing eye-friendly dark theme, fonts, badges, and 3D atom animation
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -17,9 +17,10 @@ st.markdown("""
         font-family: 'Inter', sans-serif;
     }
     
+    /* Soothing, eye-relaxing deep dark slate theme */
     .stApp {
-        background-color: #0e1117;
-        color: #fafafa;
+        background-color: #13171F;
+        color: #E6EDF3;
     }
     
     .main-header {
@@ -29,12 +30,13 @@ st.markdown("""
         margin-bottom: 0px;
     }
     
+    /* Eye-friendly calm blue accent */
     .ai-highlight {
-        color: #FF4B4B;
+        color: #58A6FF;
     }
     
     .sub-header {
-        color: #a0a0a0;
+        color: #8B949E;
         font-size: 0.95rem;
         margin-bottom: 10px;
     }
@@ -44,9 +46,9 @@ st.markdown("""
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        background: rgba(255, 145, 77, 0.1);
-        border: 1px solid rgba(255, 145, 77, 0.3);
-        color: #FF914D;
+        background: rgba(88, 166, 255, 0.1);
+        border: 1px solid rgba(88, 166, 255, 0.3);
+        color: #58A6FF;
         padding: 4px 12px;
         border-radius: 20px;
         font-size: 0.8rem;
@@ -57,19 +59,19 @@ st.markdown("""
     
     .footer-disclaimer {
         text-align: center;
-        color: #6c757d;
+        color: #8B949E;
         font-size: 0.8rem;
         margin-top: 15px;
         font-style: italic;
     }
     
-    /* 3D Orbit / Atom Spinner Animation */
+    /* 3D Orbit / Atom Spinner Animation with calming colors */
     .loader-container {
         display: flex;
         align-items: center;
         gap: 12px;
         padding: 12px 0;
-        color: #FF4B4B;
+        color: #58A6FF;
         font-weight: 600;
         font-size: 0.95rem;
     }
@@ -77,8 +79,8 @@ st.markdown("""
     .atom-spinner {
         width: 26px;
         height: 26px;
-        border: 3px solid rgba(255, 75, 75, 0.2);
-        border-top: 3px solid #FF4B4B;
+        border: 3px solid rgba(88, 166, 255, 0.2);
+        border-top: 3px solid #58A6FF;
         border-radius: 50%;
         animation: spin 0.8s linear infinite;
     }
@@ -105,30 +107,13 @@ else:
 # Initialize Groq client
 client = Groq(api_key=api_key)
 
-# Safely fetch chat models
-available_models = []
-try:
-    models_response = client.models.list()
-    available_models = [
-        m.id for m in models_response.data 
-        if any(keyword in m.id.lower() for keyword in ["llama", "mixtral", "gemma"])
-        and "embed" not in m.id.lower() 
-        and "whisper" not in m.id.lower()
-        and "guard" not in m.id.lower()
-    ]
-except Exception:
-    pass
-
-# Sidebar for model controls
+# Sidebar for manual model control (No more guesswork)
 with st.sidebar:
     st.header("⚙️ सेटिंग्स")
+    st.markdown("अपने Groq कंसोल से मॉडल का नाम यहाँ सीधे दर्ज करें:")
     
-    if available_models:
-        model_choice = st.selectbox("मॉडल चुनें", available_models)
-    else:
-        # Robust fallback options if dynamic fetching fails
-        fallback_options = ["llama-3.1-8b-instant", "llama3-8b-8192", "gemma2-9b-it", "mixtral-8x7b-32768"]
-        model_choice = st.selectbox("मॉडल चुनें (डिफ़ॉल्ट)", fallback_options)
+    # Manual text input box giving you absolute control
+    model_choice = st.text_input("Model Name", value="llama-3.1-8b-instant")
     
     if st.button("चैट इतिहास साफ़ करें", type="primary"):
         st.session_state.messages = []
@@ -151,7 +136,7 @@ if prompt := st.chat_input("यहाँ अपना संदेश टाइ�
         st.markdown(prompt)
 
     with st.chat_message("assistant"):
-        # 3D animated loader while processing
+        # 3D animated eye-friendly loader while processing
         loader_placeholder = st.empty()
         loader_placeholder.markdown("""
             <div class="loader-container">
