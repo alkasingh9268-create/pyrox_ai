@@ -8,7 +8,7 @@ st.set_page_config(
     layout="centered"
 )
 
-# Custom CSS for Pure Pitch-Black, Red AI, and Shining Gold only on Harshit's name
+# Custom CSS for Pure Pitch-Black, Clean White Header, Shining Gold on Harshit, and Multi-Ring Atom Spinner
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -23,7 +23,7 @@ st.markdown("""
         color: #E3E3E3;
     }
     
-    /* Header Aesthetics */
+    /* Header Aesthetics - All Clean White, No Yellow P */
     .main-header {
         font-size: 2.4rem;
         font-weight: 700;
@@ -32,13 +32,7 @@ st.markdown("""
         letter-spacing: -0.8px;
     }
     
-    /* Pyrox P in Gold */
-    .gold-letter {
-        color: #FFB703;
-        font-weight: 700;
-    }
-    
-    /* Pure Red for AI */
+    /* Pure Red for AI word */
     .ai-red {
         color: #FF4B4B;
         font-weight: 700;
@@ -106,38 +100,65 @@ st.markdown("""
         font-style: italic;
     }
     
-    /* Red Loading Spinner */
+    /* Stunning Multi-Ring 3D Atom Spinner */
     .loader-container {
         display: flex;
         align-items: center;
-        gap: 12px;
+        gap: 14px;
         padding: 14px 0;
         color: #FF4B4B;
         font-weight: 500;
         font-size: 0.95rem;
     }
     
-    .atom-spinner {
-        width: 24px;
-        height: 24px;
-        border: 3px solid rgba(255, 75, 75, 0.2);
-        border-top: 3px solid #FF4B4B;
+    .multi-atom {
+        position: relative;
+        width: 28px;
+        height: 28px;
+    }
+    
+    .orbit {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        border: 2px solid rgba(255, 75, 75, 0.25);
+        border-top: 2px solid #FF4B4B;
         border-radius: 50%;
         animation: spin 0.8s linear infinite;
+    }
+    
+    .orbit:nth-child(2) {
+        animation: spin-reverse 0.6s linear infinite;
+        transform: rotate(60deg);
+        border-color: rgba(255, 75, 75, 0.15);
+        border-bottom: 2px solid #FF4B4B;
+    }
+    
+    .orbit:nth-child(3) {
+        animation: spin 1s linear infinite;
+        transform: rotate(120deg);
+        border-color: rgba(255, 75, 75, 0.1);
+        border-left: 2px solid #FF4B4B;
     }
     
     @keyframes spin {
         0% { transform: rotate(0deg); }
         100% { transform: rotate(360deg); }
     }
+    
+    @keyframes spin-reverse {
+        0% { transform: rotate(360deg); }
+        100% { transform: rotate(0deg); }
+    }
     </style>
 """, unsafe_allow_html=True)
 
-# Header Section
+# Header Section (Clean White Pyrox, Red AI)
 st.markdown(
     '<div class="main-header">'
-    '<span class="gold-letter">P</span>yrox '
-    '<span class="ai-red">AI</span> Studio'
+    'Pyrox <span class="ai-red">AI</span> Studio'
     '</div>',
     unsafe_allow_html=True,
 )
@@ -154,10 +175,9 @@ else:
 # Initialize Groq client
 client = Groq(api_key=api_key)
 
-# Sidebar Controls - Fixed to the exact model found in your key
+# Sidebar Controls
 with st.sidebar:
     st.header("⚙️ सेटिंग्स")
-    st.success("✅ मॉडल वेरीफाइड है!")
     model_choice = st.text_input("एक्टिव मॉडल", value="qwen/qwen3.8-27b")
     
     if st.button("🗑️ चैट इतिहास साफ़ करें", type="primary", use_container_width=True):
@@ -172,38 +192,44 @@ if "messages" not in st.session_state:
 if not st.session_state.messages:
     st.markdown("""
         <div class="gemini-intro-card">
-            <div class="gemini-greeting">नमस्ते, मैं Pyrox हूँ।</div>
+            <div class="gemini-greeting">नमस्ते Harshit, मैं Pyrox हूँ।</div>
             <div class="gemini-subtitle">आज मैं आपकी किस प्रकार सहायता कर सकता हूँ? कोडिंग, रिसर्च या रचनात्मक कार्यों के लिए नीचे संदेश लिखें।</div>
         </div>
     """, unsafe_allow_html=True)
 
-# Display prior chat messages
+# Display prior chat messages with clean custom avatars
 for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
+    avatar_icon = "👤" if message["role"] == "user" else "⚡"
+    with st.chat_message(message["role"], avatar=avatar_icon):
         st.markdown(message["content"])
 
 # User Input Box
 if prompt := st.chat_input("यहाँ अपना संदेश टाइप करें..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     
-    with st.chat_message("user"):
+    with st.chat_message("user", avatar="👤"):
         st.markdown(prompt)
 
-    with st.chat_message("assistant"):
-        # Red Animated Loader
+    with st.chat_message("assistant", avatar="⚡"):
+        # Stunning Multi-Ring Atom Loader
         loader_placeholder = st.empty()
         loader_placeholder.markdown("""
             <div class="loader-container">
-                <div class="atom-spinner"></div>
+                <div class="multi-atom">
+                    <div class="orbit"></div>
+                    <div class="orbit"></div>
+                    <div class="orbit"></div>
+                </div>
                 <span>Pyrox आपका जवाब तैयार कर रहा है...</span>
             </div>
-        """, unsafe_allow_html=Thread if 'Thread' in globals() else 1) # safe fallback
+        """, unsafe_allow_html=True)
         
         message_placeholder = st.empty()
         full_response = ""
         
         try:
-            recent_messages = st.session_state.messages[-10:]
+            # Keep history short (last 4 messages) to prevent 429 token limit errors
+            recent_messages = st.session_state.messages[-4:]
             
             completion = client.chat.completions.create(
                 model=model_choice,
@@ -212,6 +238,7 @@ if prompt := st.chat_input("यहाँ अपना संदेश टाइ�
                     for m in recent_messages
                 ],
                 stream=True,
+                max_tokens=600  # Strictly bounded to stay well within Groq OTPM limit
             )
             
             loader_placeholder.empty()
