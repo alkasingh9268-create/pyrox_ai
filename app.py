@@ -154,22 +154,17 @@ else:
 # Initialize Groq client
 client = Groq(api_key=api_key)
 
-# 100% Active & Verified Models Only
+# Only 100% stable, active models (No decommissioned models allowed)
 active_models = [
     "llama-3.3-70b-versatile",
-    "llama-3.1-8b-instant",
-    "gemma2-9b-it"
+    "llama-3.1-8b-instant"
 ]
 
-# Sidebar Controls with Decommissioned-Model Protection
+# Sidebar Controls
 with st.sidebar:
     st.header("⚙️ सेटिंग्स")
     model_choice = st.selectbox("एक्टिव मॉडल चुनें", active_models, index=0)
     
-    # Bulletproof guard against old cached models
-    if "deepseek" in model_choice.lower() or model_choice not in active_models:
-        model_choice = "llama-3.3-70b-versatile"
-        
     if st.button("🗑️ चैट इतिहास साफ़ करें", type="primary", use_container_width=True):
         st.session_state.messages = []
         st.rerun()
@@ -212,9 +207,7 @@ if prompt := st.chat_input("यहाँ अपना संदेश टाइ�
         message_placeholder = st.empty()
         full_response = ""
         
-        # Ensure only safe active models are targeted
-        current_model = model_choice if model_choice in active_models else "llama-3.3-70b-versatile"
-        models_to_try = [current_model] + [m for m in active_models if m != current_model]
+        models_to_try = [model_choice] + [m for m in active_models if m != model_choice]
         success = False
         last_error = ""
         
