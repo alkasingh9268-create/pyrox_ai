@@ -9,7 +9,7 @@ st.set_page_config(
 )
 
 st.title("🤖 Pyrox AI Chatbot")
-st.markdown("Groq API और Llama मॉडल्स द्वारा संचालित।")
+st.markdown("Groq API द्वारा संचालित।")
 
 # Check and initialize Groq client using Streamlit secrets
 if "GROQ_API_KEY" in st.secrets:
@@ -26,7 +26,7 @@ with st.sidebar:
     st.header("⚙️ Settings")
     model_choice = st.selectbox(
         "Choose Model",
-        ["llama-3.1-8b-instant"],
+        ["llama3-8b-8192"],
         index=0
     )
     
