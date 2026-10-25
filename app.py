@@ -1,100 +1,83 @@
 import streamlit as st
 from groq import Groq
 
-# Page Configuration
+# Page configuration
 st.set_page_config(
-    page_title="Pyrox AI",
+    page_title="Pyrox AI Chatbot",
     page_icon="🤖",
     layout="centered"
 )
 
-st.title("🤖 Pyrox AI")
-st.caption("Powered by Groq API & Streamlit")
+st.title("🤖 Pyrox AI Chatbot")
+st.markdown("Groq API और सुपर-फास्ट Llama मॉडल्स द्वारा संचालित।")
 
-# Initialize Groq Client securely from Streamlit Secrets
-try:
-    groq_api_key = st.secrets["GROQ_API_KEY"]
-    client = Groq(api_key=groq_api_key)
-except Exception as e:
-    st.error(f"Secret Configuration Error: {e}. Please ensure GROQ_API_KEY is correctly set in Streamlit Secrets.")
+# Check and initialize Groq client using Streamlit secrets
+if "GROQ_API_KEY" in st.secrets:
+    api_key = st.secrets["GROQ_API_KEY"]
+else:
+    st.error("त्रुटि: Streamlit Secrets में 'GROQ_API_KEY' नहीं मिली!")
     st.stop()
 
-# Sidebar Controls & Settings
+# Initialize the Groq client
+client = Groq(api_key=api_key)
+
+# Sidebar for controls
 with st.sidebar:
-    st.header("⚙️ Controls & Settings")
-    
-    # Model selection
-    model_name = st.selectbox(
-        "Select Groq Model",
-        ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"],
+    st.header("⚙️ Settings")
+    model_choice = st.selectbox(
+        "Choose Model",
+        ["llama-3.3-70b-versatile", "llama-3.1-70b-versatile"],
         index=0
     )
     
-    # AI Persona / Tone selection
-    tone = st.selectbox(
-        "AI Tone / Persona",
-        ["Friendly & Helpful", "Professional Expert", "Technical Developer", "Witty & Creative"]
-    )
-    
-    system_prompts = {
-        "Friendly & Helpful": "You are Pyrox AI, a warm, engaging, and helpful AI assistant.",
-        "Professional Expert": "You are Pyrox AI, a professional, concise, and structured expert assistant.",
-        "Technical Developer": "You are Pyrox AI, a direct, highly technical coding and development assistant.",
-        "Witty & Creative": "You are Pyrox AI, a creative, witty, and engaging conversational partner."
-    }
-    
-    system_prompt = system_prompts[tone]
-    temperature = st.slider("Temperature (Creativity)", 0.0, 1.0, 0.7, 0.1)
-    
-    if st.button("Clear Chat History"):
+    if st.button("Clear Chat History", type="primary"):
         st.session_state.messages = []
         st.rerun()
 
-# Initialize Chat History in Session State
+# Initialize chat history in session state
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Display Prior Chat Messages
+# Display prior chat messages from history
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# Handle User Input & Chat Stream
-if prompt := st.chat_input("Pyrox AI से कुछ भी पूछें..."):
-    # Add user message to session
+# Accept user input from chat box
+if prompt := st.chat_input("यहाँ अपना संदेश टाइप करें..."):
+    # Add user message to session state
     st.session_state.messages.append({"role": "user", "content": prompt})
+    
+    # Display user message in chat container
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # Generate Assistant Response
+    # Generate assistant response
     with st.chat_message("assistant"):
         message_placeholder = st.empty()
         full_response = ""
         
         try:
-            # Construct messages payload including system prompt
-            messages_payload = [{"role": "system", "content": system_prompt}] + [
-                {"role": m["role"], "content": m["content"]} for m in st.session_state.messages
-            ]
-            
-            # Call Groq API with streaming enabled
-            stream = client.chat.completions.create(
-                model=model_name,
-                messages=messages_payload,
-                temperature=temperature,
-                stream=True
+            # Request completion from Groq API with streaming enabled
+            completion = client.chat.completions.create(
+                model=model_choice,
+                messages=[
+                    {"role": m["role"], "content": m["content"]}
+                    for m in st.session_state.messages
+                ],
+                stream=True,
             )
             
-            for chunk in stream:
-                content = chunk.choices[0].delta.content
-                if content:
-                    full_response += content
+            for chunk in completion:
+                if chunk.choices[0].delta.content is not None:
+                    full_response += chunk.choices[0].delta.content
                     message_placeholder.markdown(full_response + "▌")
+                    
             message_placeholder.markdown(full_response)
             
         except Exception as e:
-            full_response = f"⚠️ API Connection Error: {e}"
+            full_response = f"कनेक्शन एरर: {e}"
             message_placeholder.error(full_response)
             
-        # Save assistant response to session state
+        # Add assistant response to session state
         st.session_state.messages.append({"role": "assistant", "content": full_response})
