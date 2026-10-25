@@ -1,7 +1,7 @@
 import streamlit as st
 from google import genai
 from google.genai import types
-import time
+import concurrent.futures
 
 # Page Configuration
 st.set_page_config(page_title="Pyrox AI", page_icon="✨", layout="centered")
@@ -165,10 +165,10 @@ if prompt := st.chat_input("Pyrox se kuch bhi poochho..."):
             </div>
         """, unsafe_allow_html=True)
         
-        # Fast single attempt with strict fallback so it never hangs infinitely
-        try:
+        # Function to call API safely
+        def fetch_ai_response():
             response = client.models.generate_content(
-                model="gemini-3.8-flash",
+                model="gemini-2.5-flash",
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     system_instruction=(
@@ -183,9 +183,17 @@ if prompt := st.chat_input("Pyrox se kuch bhi poochho..."):
                     )
                 )
             )
-            response_text = response.text
+            return response.text
+
+        # Using ThreadPoolExecutor with 7-second Hard Timeout so it NEVER hangs infinitely
+        try:
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(fetch_ai_response)
+                response_text = future.result(timeout=7)  # 7 seconds max wait
+        except concurrent.futures.TimeoutError:
+            response_text = "Bhai, Google server se connection timeout ho gaya (bahut slow chal raha hai). Ek baar page refresh karke dobara try kar!"
         except Exception as e:
-            response_text = "Bhai, abhi Google server thoda zyada hi slow response de raha hai. Ek baar page ko refresh karke dobara try kar na!"
+            response_text = f"Bhai, ye error aa gaya: `{str(e)}`"
 
         # Loader hata kar output dikhayenge
         loader_placeholder.empty()
