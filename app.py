@@ -27,7 +27,18 @@ if prompt := st.chat_input("Ask anything..."):
         try:
             response = client.models.generate_content(
                 model="gemini-3.5-flash",
+                config={
+                    "system_instruction": (
+                        "Your name is Pyrox AI, developed and created by Harshit. "
+                        "You are a smart AI assistant focused on Education and Health. "
+                        "If the user makes spelling mistakes, typos, or misses letters "
+                        "in their prompt (for example writing 'moton' instead of 'motion'), "
+                        "do not throw an error. Understand their intent naturally, correct "
+                        "the spelling implicitly, and answer their question helpfully and accurately."
+                    )
+                },
                 contents=prompt
+            )            
             )
             st.markdown(response.text)
             st.session_state.messages.append({"role": "assistant", "content": response.text})
