@@ -154,16 +154,10 @@ else:
 # Initialize Groq client
 client = Groq(api_key=api_key)
 
-# Only 100% stable, active models (No decommissioned models allowed)
-active_models = [
-    "llama-3.3-70b-versatile",
-    "llama-3.1-8b-instant"
-]
-
-# Sidebar Controls
+# Sidebar Controls (No Model Dropdown Needed Anymore)
 with st.sidebar:
     st.header("⚙️ सेटिंग्स")
-    model_choice = st.selectbox("एक्टिव मॉडल चुनें", active_models, index=0)
+    st.info("💡 सिस्टम डायरेक्ट परमानेंट मॉडल पर सेट है।")
     
     if st.button("🗑️ चैट इतिहास साफ़ करें", type="primary", use_container_width=True):
         st.session_state.messages = []
@@ -207,41 +201,31 @@ if prompt := st.chat_input("यहाँ अपना संदेश टाइ�
         message_placeholder = st.empty()
         full_response = ""
         
-        models_to_try = [model_choice] + [m for m in active_models if m != model_choice]
-        success = False
-        last_error = ""
-        
-        for trial_model in models_to_try:
-            try:
-                recent_messages = st.session_state.messages[-10:]
-                
-                completion = client.chat.completions.create(
-                    model=trial_model,
-                    messages=[
-                        {"role": m["role"], "content": m["content"]}
-                        for m in recent_messages
-                    ],
-                    stream=True,
-                )
-                
-                loader_placeholder.empty()
-                
-                for chunk in completion:
-                    if chunk.choices[0].delta.content is not None:
-                        full_response += chunk.choices[0].delta.content
-                        message_placeholder.markdown(full_response + "▌")
-                        
-                message_placeholder.markdown(full_response)
-                success = True
-                break
-                
-            except Exception as e:
-                last_error = str(e)
-                continue
-        
-        if not success:
+        try:
+            recent_messages = st.session_state.messages[-10:]
+            
+            # Using the absolute best and permanent Groq model directly
+            completion = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[
+                    {"role": m["role"], "content": m["content"]}
+                    for m in recent_messages
+                ],
+                stream=True,
+            )
+            
             loader_placeholder.empty()
-            full_response = f"कनेक्शन एरर: {last_error}"
+            
+            for chunk in completion:
+                if chunk.choices[0].delta.content is not None:
+                    full_response += chunk.choices[0].delta.content
+                    message_placeholder.markdown(full_response + "▌")
+                    
+            message_placeholder.markdown(full_response)
+            
+        except Exception as e:
+            loader_placeholder.empty()
+            full_response = f"कनेक्शन एरर: {e}"
             message_placeholder.error(full_response)
             
         st.session_state.messages.append({"role": "assistant", "content": full_response})
