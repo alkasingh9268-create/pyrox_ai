@@ -21,10 +21,13 @@ else:
 # Initialize the Groq client
 client = Groq(api_key=api_key)
 
-# Dynamically fetch available models so it never gives model_not_found/decommissioned error
+# Fetch models and strictly filter out non-chat models (like whisper, audio, embeddings)
 try:
     models_response = client.models.list()
-    available_models = [m.id for m in models_response.data if "embedding" not in m.id]
+    available_models = [
+        m.id for m in models_response.data 
+        if "whisper" not in m.id and "embed" not in m.id and "audio" not in m.id
+    ]
 except Exception as e:
     available_models = []
 
@@ -34,7 +37,7 @@ with st.sidebar:
     if available_models:
         model_choice = st.selectbox("Choose Model", available_models, index=0)
     else:
-        model_choice = "llama-3.3-70b-versatile"
+        model_choice = "llama-3.1-8b-instant"
         st.warning("मॉडल लिस्ट लोड नहीं हो पाई, डिफ़ॉल्ट उपयोग हो रहा है।")
     
     if st.button("Clear Chat History", type="primary"):
