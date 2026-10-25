@@ -8,7 +8,7 @@ st.set_page_config(
     layout="centered"
 )
 
-# Custom CSS for Pure Pitch-Black, Red AI, and Shining Gold on Harshit's name
+# Custom CSS for Pure Pitch-Black, Red AI, and Shining Gold only on Harshit's name
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -154,28 +154,26 @@ else:
 # Initialize Groq client
 client = Groq(api_key=api_key)
 
-# Automatically fetch available chat models dynamically from YOUR specific key
+# Strictly fetch ONLY valid Llama/Gemma text models and filter out audio/canopy terms models
 dynamic_models = []
 try:
     models_response = client.models.list()
-    # Filter out audio/embedding/whisper models, keep chat models
     dynamic_models = [
         m.id for m in models_response.data 
-        if not any(x in m.id.lower() for x in ["embed", "whisper", "audio", "guard", "moderation"])
+        if any(keyword in m.id.lower() for keyword in ["llama", "gemma"])
+        and not any(x in m.id.lower() for x in ["embed", "whisper", "audio", "guard", "moderation", "canopy", "orpheus"])
     ]
 except Exception:
     dynamic_models = []
 
+# Fallback if list is empty
+if not dynamic_models:
+    dynamic_models = ["llama-3.1-8b-instant", "llama3-8b-8192"]
+
 # Sidebar Controls
 with st.sidebar:
     st.header("⚙️ सेटिंग्स")
-    
-    if dynamic_models:
-        # Automatically pick the first valid live model from your account
-        model_choice = st.selectbox("एक्टिव मॉडल (ऑटो-डिटेक्टेड)", dynamic_models)
-    else:
-        # Fallback if auto-fetch fails
-        model_choice = st.text_input("मॉडल का नाम दर्ज करें", value="llama-3.1-8b-instant")
+    model_choice = st.selectbox("एक्टिव मॉडल (ऑटो-डिटेक्टेड)", dynamic_models)
     
     if st.button("🗑️ चैट इतिहास साफ़ करें", type="primary", use_container_width=True):
         st.session_state.messages = []
@@ -200,7 +198,7 @@ for message in st.session_state.messages:
         st.markdown(message["content"])
 
 # User Input Box
-if prompt := st.chat_input("यहाँ अपना संदेश टाइप करके देखें..."):
+if prompt := st.chat_input("यहाँ अपना संदेश टाइप करें..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     
     with st.chat_message("user"):
