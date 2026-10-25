@@ -8,7 +8,7 @@ st.set_page_config(
     layout="centered"
 )
 
-# Custom CSS for Pure Pitch-Black, Red AI, and Shining Gold only on Harshit's name
+# Custom CSS for Pure Pitch-Black, Red AI, Shining Gold on Harshit, and Normal White Text
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -20,7 +20,6 @@ st.markdown("""
     /* Pure Pitch Black Background */
     .stApp {
         background-color: #000000;
-        color: #E3E3E3;
     }
     
     /* Header Aesthetics */
@@ -154,10 +153,16 @@ else:
 # Initialize Groq client
 client = Groq(api_key=api_key)
 
-# Sidebar Controls (No Model Dropdown Needed Anymore)
+# Sidebar Controls with Full Manual Model Control
 with st.sidebar:
     st.header("⚙️ सेटिंग्स")
-    st.info("💡 सिस्टम डायरेक्ट परमानेंट मॉडल पर सेट है।")
+    st.markdown("अपने Groq कंसोल से मॉडल का नाम यहाँ दर्ज करें:")
+    
+    if "model_name" not in st.session_state:
+        st.session_state.model_name = "llama-3.1-8b-instant"
+        
+    model_choice = st.text_input("Model Name", value=st.session_state.model_name)
+    st.session_state.model_name = model_choice
     
     if st.button("🗑️ चैट इतिहास साफ़ करें", type="primary", use_container_width=True):
         st.session_state.messages = []
@@ -204,9 +209,8 @@ if prompt := st.chat_input("यहाँ अपना संदेश टाइ�
         try:
             recent_messages = st.session_state.messages[-10:]
             
-            # Using the absolute best and permanent Groq model directly
             completion = client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
+                model=model_choice,
                 messages=[
                     {"role": m["role"], "content": m["content"]}
                     for m in recent_messages
@@ -225,7 +229,7 @@ if prompt := st.chat_input("यहाँ अपना संदेश टाइ�
             
         except Exception as e:
             loader_placeholder.empty()
-            full_response = f"कनेक्शन एरर: {e}"
+            full_response = f"कनेक्शन एरर: {e}\n\n👉 **सुझाव:** साइडबार में मॉडल का नाम (जैसे `llama-3.1-8b-instant` या `llama3-8b-8192`) बदलकर देख लें।"
             message_placeholder.error(full_response)
             
         st.session_state.messages.append({"role": "assistant", "content": full_response})
