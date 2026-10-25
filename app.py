@@ -35,7 +35,7 @@ if prompt := st.chat_input("Ask Pyrox anything..."):
         response_text = None
         error_occurred = False
         
-        # Automatic Retry Logic: Agar pehli baar mein server load mile, toh 3 baar koshish kareगा
+        # Automatic Retry Logic: Server busy hone par 3 baar koshish karega
         for attempt in range(3):
             try:
                 response = client.models.generate_content(
@@ -54,10 +54,9 @@ if prompt := st.chat_input("Ask Pyrox anything..."):
                     contents=prompt
                 )
                 response_text = response.text
-                break  # Agar response mil gaya toh loop tod do
+                break  # Response mil gaya toh loop se bahar
             except Exception as e:
                 err_str = str(e)
-                # Agar last attempt bhi fail ho gaya tabhi error dikhayenge
                 if attempt == 2:
                     error_occurred = True
                     if "500" in err_str or "overloaded" in err_str or "high demand" in err_str or "RESOURCE_EXHAUSTED" in err_str:
@@ -66,7 +65,7 @@ if prompt := st.chat_input("Ask Pyrox anything..."):
                         err_msg = "🤖 Bhai, server se connect hone mein thoda lafda ho gaya. Ek baar apna sawal fir se bhej ke dekh!"
                 else:
                     # Thoda sa ruk kar agli koshish karega
-                    time.sleep(1)
+                    time.sleep(1.5)
 
         if response_text:
             st.markdown(response_text)
