@@ -98,12 +98,12 @@ st.markdown("""
     }
 
     @keyframes spin-3d-1 {
-        0% { transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) rotateZ(0deg); }
-        100% { transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) rotateZ(360deg); }
+        0% { transform: rotateX(0deg) rotateY(0deg) rotateZ(0deg); }
+        100% { transform: rotateX(0deg) rotateY(0deg) rotateZ(360deg); }
     }
     @keyframes spin-3d-2 {
-        0% { transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) rotateZ(360deg); }
-        100% { transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) rotateZ(0deg); }
+        0% { transform: rotateX(0deg) rotateY(0deg) rotateZ(360deg); }
+        100% { transform: rotateX(0deg) rotateY(0deg) rotateZ(0deg); }
     }
 
     .status-text {
@@ -165,37 +165,29 @@ if prompt := st.chat_input("Pyrox se kuch bhi poochho..."):
             </div>
         """, unsafe_allow_html=True)
         
-        # Robust API Call with Updated Gemini 3.8 Flash Model
-        for attempt in range(3):
-            try:
-                response = client.models.generate_content(
-                    model="gemini-3.8-flash",
-                    contents=prompt,
-                    config=types.GenerateContentConfig(
-                        system_instruction=(
-                            "Your name is Pyrox AI, and you are developed and created by Harshit. "
-                            "If anyone asks who made you, who created you, or who your developer is, "
-                            "you must proudly and clearly state that you were developed by Harshit. "
-                            "Your personality is extremely friendly, chill, conversational, and like a close buddy (dostana tone). "
-                            "NEVER include meta-commentary, introductory filler like 'Here is your answer', 'I am generating', or robotic phrases. "
-                            "Get straight to the point with natural, clean language and a warm tone. "
-                            "If the user makes spelling mistakes, typos, or sends random meaningless letters (like 'jj' or 'hhhh' or gibberish), "
-                            "do not throw a technical error. Politely and playfully ask the user in a friendly tone to type a proper question."
-                        )
+        # Fast single attempt with strict fallback so it never hangs infinitely
+        try:
+            response = client.models.generate_content(
+                model="gemini-3.8-flash",
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=(
+                        "Your name is Pyrox AI, and you are developed and created by Harshit. "
+                        "If anyone asks who made you, who created you, or who your developer is, "
+                        "you must proudly and clearly state that you were developed by Harshit. "
+                        "Your personality is extremely friendly, chill, conversational, and like a close buddy (dostana tone). "
+                        "NEVER include meta-commentary, introductory filler like 'Here is your answer', 'I am generating', or robotic phrases. "
+                        "Get straight to the point with natural, clean language and a warm tone. "
+                        "If the user makes spelling mistakes, typos, or sends random meaningless letters (like 'jj' or 'hhhh' or gibberish), "
+                        "do not throw a technical error. Politely and playfully ask the user in a friendly tone to type a proper question."
                     )
                 )
-                response_text = response.text
-                break
-            except Exception as e:
-                if attempt == 0:
-                    time.sleep(2)
-                elif attempt == 1:
-                    time.sleep(4)
-                else:
-                    response_text = f"Bhai, API mein ye issue aa raha hai: `{str(e)}`. Ek baar check kar le!"
+            )
+            response_text = response.text
+        except Exception as e:
+            response_text = "Bhai, abhi Google server thoda zyada hi slow response de raha hai. Ek baar page ko refresh karke dobara try kar na!"
 
         # Loader hata kar output dikhayenge
         loader_placeholder.empty()
         st.markdown(response_text)
         st.session_state.messages.append({"role": "assistant", "content": response_text})
-
