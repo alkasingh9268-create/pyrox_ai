@@ -165,11 +165,11 @@ if prompt := st.chat_input("Pyrox se kuch bhi poochho..."):
             </div>
         """, unsafe_allow_html=True)
         
-        # Robust API Call with Proper SDK Config Structure
+        # Robust API Call with Updated Gemini 3.8 Flash Model
         for attempt in range(3):
             try:
                 response = client.models.generate_content(
-                    model="gemini-2.0-flash",
+                    model="gemini-3.8-flash",
                     contents=prompt,
                     config=types.GenerateContentConfig(
                         system_instruction=(
@@ -192,10 +192,10 @@ if prompt := st.chat_input("Pyrox se kuch bhi poochho..."):
                 elif attempt == 1:
                     time.sleep(4)
                 else:
-                    # Agar tab bhi error aaye, toh asli error print karega taaki pata chale
                     response_text = f"Bhai, API mein ye issue aa raha hai: `{str(e)}`. Ek baar check kar le!"
 
         # Loader hata kar output dikhayenge
         loader_placeholder.empty()
         st.markdown(response_text)
         st.session_state.messages.append({"role": "assistant", "content": response_text})
+
