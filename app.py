@@ -3,67 +3,109 @@ from google import genai
 import time
 
 # Page Configuration
-st.set_page_config(page_title="Pyrox AI", page_icon="🧮", layout="centered")
+st.set_page_config(page_title="Pyrox AI", page_icon="⚡", layout="centered")
 
-# CSS for Spinning Atoms and Smooth UI
+# Custom CSS for Real Atom Spinner and Clean UI
 st.markdown("""
 <style>
-    .atom-loader-container {
+    /* Sleek Modern Header */
+    .pyrox-header {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-size: 32px;
+        font-weight: 700;
+        color: #ffffff;
+        letter-spacing: -0.5px;
+        margin-bottom: 20px;
+        border-bottom: 2px solid #262626;
+        padding-bottom: 10px;
+    }
+    .pyrox-header span {
+        color: #00ffcc;
+    }
+
+    /* Real Atom Spinner Container */
+    .atom-container {
         display: flex;
-        flex-direction: column;
         align-items: center;
-        justify-content: center;
-        margin: 20px 0;
+        gap: 14px;
+        margin: 12px 0;
+        padding: 10px 14px;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 10px;
+        width: fit-content;
     }
-    .atom-spinner {
+
+    .atom-model {
         position: relative;
-        width: 60px;
-        height: 60px;
+        width: 32px;
+        height: 32px;
     }
+
+    /* Central Nucleus */
     .nucleus {
         position: absolute;
-        top: 23px;
-        left: 23px;
-        width: 14px;
-        height: 14px;
+        top: 12px;
+        left: 12px;
+        width: 8px;
+        height: 8px;
         background-color: #00ffcc;
         border-radius: 50%;
-        box-shadow: 0 0 10px #00ffcc;
+        box-shadow: 0 0 6px #00ffcc;
     }
-    .orbit {
+
+    /* Orbit Rings with Fast Orbiting Electrons */
+    .orbit-1, .orbit-2, .orbit-3 {
         position: absolute;
         top: 0;
         left: 0;
         width: 100%;
         height: 100%;
-        border: 2px dashed rgba(0, 255, 204, 0.4);
+        border: 1.5px solid rgba(0, 255, 204, 0.25);
         border-radius: 50%;
-        animation: spin 2s linear infinite;
     }
-    .orbit:nth-child(2) {
-        animation: spin-reverse 1.5s linear infinite;
-        border-color: rgba(255, 0, 128, 0.4);
+
+    .orbit-1 {
+        animation: spin-fast 0.8s linear infinite;
     }
-    @keyframes spin {
+    .orbit-2 {
+        transform: rotate(60deg);
+        animation: spin-fast 0.6s linear infinite reverse;
+    }
+    .orbit-3 {
+        transform: rotate(120deg);
+        animation: spin-fast 1s linear infinite;
+    }
+
+    /* Electrons on the boundary */
+    .electron {
+        position: absolute;
+        top: -2px;
+        left: 13px;
+        width: 5px;
+        height: 5px;
+        background-color: #ffffff;
+        border-radius: 50%;
+        box-shadow: 0 0 5px #00ffcc;
+    }
+
+    @keyframes spin-fast {
         0% { transform: rotate(0deg); }
         100% { transform: rotate(360deg); }
     }
-    @keyframes spin-reverse {
-        0% { transform: rotate(360deg); }
-        100% { transform: rotate(0deg); }
-    }
-    .loading-text {
-        margin-top: 12px;
-        font-family: sans-serif;
-        font-size: 14px;
+
+    .status-text {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-size: 13px;
         color: #00ffcc;
         font-weight: 500;
-        letter-spacing: 0.5px;
+        letter-spacing: 0.3px;
     }
 </style>
 """, unsafe_allow_html=True)
 
-st.title("Pyrox AI")
+# Sleek Title Render
+st.markdown('<div class="pyrox-header">Pyrox <span>AI</span></div>', unsafe_allow_html=True)
 
 # Streamlit secrets se secure API key le rahe hain
 try:
@@ -72,6 +114,7 @@ except Exception:
     st.error("API Key not found in Streamlit Secrets! Please configure it.")
     st.stop()
 
+# Client initialize
 client = genai.Client(api_key=api_key)
 
 # Initialize Chat History
@@ -84,7 +127,7 @@ for msg in st.session_state.messages:
         st.markdown(msg["content"])
 
 # User Input and AI Response Logic
-if prompt := st.chat_input("Ask Pyrox anything..."):
+if prompt := st.chat_input("Pyrox से कुछ भी पूछो..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
@@ -92,34 +135,33 @@ if prompt := st.chat_input("Ask Pyrox anything..."):
     with st.chat_message("assistant"):
         response_text = None
         
-        # Custom Atoms Spinner with Dynamic Text Placeholder
-        placeholder = st.empty()
-        
-        with placeholder.container():
-            st.markdown("""
-                <div class="atom-loader-container">
-                    <div class="atom-spinner">
-                        <div class="orbit"></div>
-                        <div class="orbit"></div>
-                        <div class="nucleus"></div>
-                    </div>
-                    <div class="loading-text">Atoms align ho rahe hain, Pyrox soch raha hai...</div>
+        # Real Atom Loader with English Status Text
+        loader_placeholder = st.empty()
+        loader_placeholder.markdown("""
+            <div class="atom-container">
+                <div class="atom-model">
+                    <div class="nucleus"></div>
+                    <div class="orbit-1"><div class="electron"></div></div>
+                    <div class="orbit-2"><div class="electron"></div></div>
+                    <div class="orbit-3"><div class="electron"></div></div>
                 </div>
-            """, unsafe_allow_html=True)
-            
+                <div class="status-text">Pyrox is making your answer...</div>
+            </div>
+        """, unsafe_allow_html=True)
+        
         for attempt in range(3):
             try:
                 response = client.models.generate_content(
-                    model="gemini-3.5-flash",
+                    model="gemini-2.0-flash",
                     config={
                         "system_instruction": (
                             "Your name is Pyrox AI, and you are developed and created by Harshit. "
                             "If anyone asks who made you or who your developer is, you must proudly say that you were developed by Harshit. "
                             "Your personality is extremely friendly, chill, conversational, and like a close buddy (dostana tone). "
-                            "Do not sound robotic, formal, or like a boring textbook. Use casual, engaging language, and talk warmly. "
-                            "If the user makes spelling mistakes, typos, or sends random meaningless letters (like 'hhhh' or gibberish), "
-                            "do not throw a technical error. Politely and playfully ask the user in a friendly, conversational tone to type a proper question, "
-                            "and implicitly correct spelling mistakes when a valid query is provided."
+                            "NEVER include meta-commentary, introductory filler like 'Here is your answer', 'I am generating', or robotic phrases. "
+                            "Get straight to the point with natural, clean English and a warm tone. "
+                            "If the user makes spelling mistakes, typos, or sends random meaningless letters (like 'jj' or 'hhhh' or gibberish), "
+                            "do not throw a technical error. Politely and playfully ask the user in a friendly tone to type a proper question."
                         )
                     },
                     contents=prompt
@@ -128,11 +170,11 @@ if prompt := st.chat_input("Ask Pyrox anything..."):
                 break
             except Exception as e:
                 if attempt < 2:
-                    time.sleep(2)
+                    time.sleep(1.5)
                 else:
-                    response_text = "Arre bhai, thoda sa traffic zyada ho gaya hai. Ek second ruk ke dobara likh na, ekdam mast chalega!"
+                    response_text = "भाई, अभी सर्वर थोड़ा सुस्त हो गया है। एक बार रिफ्रेश करके दोबारा ट्राई कर, एकदम ठीक चलेगा!"
 
-        # Purane loader ko hata kar seedha output dikhayenge
-        placeholder.empty()
+        # Loader hata kar output dikhayenge
+        loader_placeholder.empty()
         st.markdown(response_text)
         st.session_state.messages.append({"role": "assistant", "content": response_text})
