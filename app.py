@@ -3,7 +3,7 @@ from groq import Groq
 
 # Page configuration
 st.set_page_config(
-    page_title="Pyrox AI Studio",
+    page_title="Pyrox",
     page_icon="⚡",
     layout="centered"
 )
@@ -31,7 +31,7 @@ if selected_theme == "Deep Charcoal":
 elif selected_theme == "Midnight Navy":
     bg_color = "#0A0E17"
 
-# Custom CSS for Professional Unified Chat Bar, Metallic Silver Harshit Glow, and Circular Triangle Icon
+# Custom CSS for Professional Unified Chat Bar, Metallic Silver Glow, and Clean UI
 st.markdown(f"""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -183,7 +183,7 @@ st.markdown(f"""
 # Header Section
 st.markdown(
     '<div class="main-header">'
-    'Pyrox <span class="ai-red">AI</span> Studio'
+    'Pyrox <span class="ai-red">AI</span>'
     '</div>',
     unsafe_allow_html=True,
 )
@@ -209,11 +209,11 @@ if not st.session_state.messages:
     st.markdown("""
         <div class="gemini-intro-card">
             <div class="gemini-greeting">नमस्ते Harshit, मैं Pyrox हूँ।</div>
-            <div class="gemini-subtitle">आज मैं आपकी किस प्रकार सहायता कर सकता हूँ? कोडिंग, रिसर्च या किसी भी बात के लिए नीचे संदेश लिखें।</div>
+            <div class="gemini-subtitle">आज बता, क्या सीन है? कोडिंग, रिसर्च या किसी भी बात पर चर्चा करनी हो, नीचे संदेश लिख।</div>
         </div>
     """, unsafe_allow_html=True)
 
-# Professional Voice Output Button (Smooth, Mature, Natural Tone)
+# Deep, Mature, Indian Voice Output Button (Optimized for Desi Tone)
 def render_speak_button(text, key_id):
     safe_text = text.replace("'", "\\'").replace('"', '\\"').replace('\n', ' ')
     html_code = f"""
@@ -227,12 +227,12 @@ def render_speak_button(text, key_id):
                 window.speechSynthesis.cancel();
                 var utterance = new SpeechSynthesisUtterance("{safe_text}");
                 utterance.lang = 'hi-IN';
-                utterance.pitch = 0.95;
-                utterance.rate = 1.02;
+                utterance.pitch = 0.82;  /* Deep, masculine, mature Indian tone */
+                utterance.rate = 1.05;   /* Natural fluent speed */
                 
                 var voices = window.speechSynthesis.getVoices();
                 for(var i = 0; i < voices.length; i++) {{
-                    if(voices[i].lang.includes('hi') || voices[i].lang.includes('en-IN')) {{
+                    if(voices[i].lang.includes('hi') || voices[i].name.includes('Google हिन्दी') || voices[i].name.includes('Hindi')) {{
                         utterance.voice = voices[i];
                         break;
                     }}
@@ -256,48 +256,53 @@ for idx, message in enumerate(st.session_state.messages):
         render_speak_button(message["content"], f"hist_{idx}")
         st.markdown('<div class="inline-disclaimer">Pyrox is AI and can make mistakes.</div>', unsafe_allow_html=True)
 
-# --- UNIFIED PROFESSIONAL INPUT BAR (ChatGPT/Gemini Style) ---
-# We use columns to place the circular attachment button, chat input, and voice mic cleanly in one row.
-col_btn1, col_input, col_btn2 = st.columns([0.08, 0.84, 0.08])
+# --- PROFESSIONAL UNIFIED CHAT BAR WITH CIRCULAR ATTACHMENT & WORKING MIC ---
+col_plus, col_input, col_mic = st.columns([0.08, 0.84, 0.08])
 
-with col_btn1:
-    # Circular Triangle/Plus button for attachments
+with col_plus:
+    # Circular Plus Button for File/Photo Attachment
     if st.button("➕", help="फाइल या फोटो जोड़ें"):
         st.session_state.show_uploader = not st.session_state.get("show_uploader", False)
 
-# Expandable file uploader right above if toggled
+# Expandable file uploader if plus is clicked
 if st.session_state.get("show_uploader", False):
-    uploaded_file = st.file_uploader("📁 फाइल या इमेज चुनें", type=["png", "jpg", "jpeg", "pdf", "txt"])
+    uploaded_file = st.file_uploader("📁 फाइल या इमेज यहाँ ड्रॉप करें", type=["png", "jpg", "jpeg", "pdf", "txt"])
     if uploaded_file is not None:
         st.success(f"फाइल अटैच हो गई: {uploaded_file.name}")
 
-with col_btn2:
-    # Voice-to-Text Microphone Button
-    if st.button("🎙️", help="बोलकर टाइप करें"):
-        st.components.v1.html("""
-        <script>
-        if (window.hasOwnProperty('webkitSpeechRecognition')) {
-            var recognition = new webkitSpeechRecognition();
+with col_mic:
+    # Working Web Speech-to-Text Mic Button
+    st.markdown("""
+    <button onclick="startVoiceInput()" title="बोलकर टाइप करें" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #FFFFFF; width: 38px; height: 38px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1rem; margin-top: 26px;">🎙️</button>
+    <script>
+    function startVoiceInput() {
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            var recognition = new SpeechRecognition();
             recognition.continuous = false;
             recognition.interimResults = false;
             recognition.lang = "hi-IN";
-            recognition.onresult = function(e) {
-                var text = e.results[0][0].transcript;
+            
+            recognition.onresult = function(event) {
+                var transcript = event.results[0][0].transcript;
                 var chatInput = document.querySelector('textarea[aria-label*="chat"], textarea');
                 if (chatInput) {
-                    chatInput.value = text;
+                    chatInput.value = transcript;
                     chatInput.dispatchEvent(new Event('input', { bubbles: true }));
                 }
-                recognition.stop();
+            };
+            recognition.onerror = function(event) {
+                alert("माइक्रोफोन एरर: " + event.error);
             };
             recognition.start();
         } else {
-            alert("कृपया क्रोम (Chrome) ब्राउज़र का उपयोग करें।");
+            alert("आपका ब्राउज़र वॉइस रिकग्निशन को सपोर्ट नहीं करता। कृपया क्रोम (Chrome) का उपयोग करें।");
         }
-        </script>
-        """, height=0)
+    }
+    </script>
+    """, unsafe_allow_html=True)
 
-# Standard Unified Chat Input at the bottom
+# Standard Chat Input Box
 prompt = st.chat_input("यहाँ अपना संदेश टाइप करें...")
 
 if prompt:
@@ -321,16 +326,16 @@ if prompt:
     try:
         recent_messages = st.session_state.messages[-4:]
         
-        # Master-Level Context & Human Persona System Prompt
+        # Super-Natural Desi Hinglish Persona System Prompt
         system_prompt = {
             "role": "system",
             "content": (
-                "You are Pyrox AI Studio, a cutting-edge, ultra-intelligent, sharp, and down-to-earth AI companion crafted and created by Harshit. "
+                "You are Pyrox, a super-fast, street-smart, and sharp AI assistant. "
                 "CORE RULES:\n"
-                "1. NO WEIRD HALLUCINATIONS OR OVER-ACTING: Speak like a smart, cool tech friend. Keep your answers natural, logical, grounded, and precise. Never write long, confusing, or fake philosophical rants unless specifically asked.\n"
-                "2. VIBE & ADAPTABILITY: Match the user's exact mood and language (Hinglish/English). Keep answers crisp and point-to-point.\n"
-                "3. ZERO META-COMMENTARY: Never lecture the user, never point out typos, and never act robotic.\n"
-                "4. CREATOR IDENTITY: If anyone asks who created you, who made you, or who is your creator, always proudly state that you were created by Harshit."
+                "1. NATURAL DESI INDIAN VIBE: Speak like a cool, brilliant Indian tech friend in natural Hinglish or clear Hindi/English matching the user's vibe. Avoid sounding like a stiff British or American robot. Talk with warmth and practical street-smart logic.\n"
+                "2. ZERO UNPROMPTED ANNOUNCEMENTS: Never introduce yourself unprompted, and never mention who created you unless the user explicitly asks 'Who made you?' or 'Tumhe kisne banaya hai?'. If asked, state proudly that you were created by Harshit.\n"
+                "3. ZERO ROBOTIC JARGON OR SPELLING MISTAKES: Keep your answers crystal-clear, accurate, perfectly spelled, and point-to-point.\n"
+                "4. NO META-COMMENTARY: Never lecture the user or point out typos."
             )
         }
         
