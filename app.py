@@ -213,7 +213,7 @@ if not st.session_state.messages:
         </div>
     """, unsafe_allow_html=True)
 
-# Deep, Mature, Indian Voice Output Button (Optimized for Desi Tone)
+# Ultra-Natural, Deep Male Voice Output Button (Optimized for Heavy Indian Tone)
 def render_speak_button(text, key_id):
     safe_text = text.replace("'", "\\'").replace('"', '\\"').replace('\n', ' ')
     html_code = f"""
@@ -227,12 +227,13 @@ def render_speak_button(text, key_id):
                 window.speechSynthesis.cancel();
                 var utterance = new SpeechSynthesisUtterance("{safe_text}");
                 utterance.lang = 'hi-IN';
-                utterance.pitch = 0.82;  /* Deep, masculine, mature Indian tone */
-                utterance.rate = 1.05;   /* Natural fluent speed */
+                utterance.pitch = 0.65;  /* Much deeper, solid male masculine tone */
+                utterance.rate = 0.95;   /* Slower, natural breathing speed so it doesn't sound rushed */
                 
                 var voices = window.speechSynthesis.getVoices();
+                // Search specifically for male or Indian male voice profiles
                 for(var i = 0; i < voices.length; i++) {{
-                    if(voices[i].lang.includes('hi') || voices[i].name.includes('Google हिन्दी') || voices[i].name.includes('Hindi')) {{
+                    if((voices[i].lang.includes('hi') || voices[i].lang.includes('en-IN')) && (voices[i].name.toLowerCase().includes('male') || voices[i].name.toLowerCase().includes('natural') || voices[i].name.toLowerCase().includes('google'))) {{
                         utterance.voice = voices[i];
                         break;
                     }}
