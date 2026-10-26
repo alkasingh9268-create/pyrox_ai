@@ -31,7 +31,7 @@ if selected_theme == "Deep Charcoal":
 elif selected_theme == "Midnight Navy":
     bg_color = "#0A0E17"
 
-# Custom CSS for Professional Layout, Metallic Silver Harshit Glow, and Speaker Button
+# Custom CSS for Professional Layout, Metallic Silver Harshit Glow, and UI Elements
 st.markdown(f"""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -240,7 +240,7 @@ if not st.session_state.messages:
         </div>
     """, unsafe_allow_html=True)
 
-# Function to render JavaScript browser text-to-speech button safely
+# Professional Voice Output Button (Smooth, Mature, Natural Tone)
 def render_speak_button(text, key_id):
     safe_text = text.replace("'", "\\'").replace('"', '\\"').replace('\n', ' ')
     html_code = f"""
@@ -254,6 +254,18 @@ def render_speak_button(text, key_id):
                 window.speechSynthesis.cancel();
                 var utterance = new SpeechSynthesisUtterance("{safe_text}");
                 utterance.lang = 'hi-IN';
+                utterance.pitch = 0.9;  /* Professional deeper pitch */
+                utterance.rate = 1.05;  /* Natural fluent speed */
+                
+                /* Try to pick a smooth professional voice if available */
+                var voices = window.speechSynthesis.getVoices();
+                for(var i = 0; i < voices.length; i++) {{
+                    if(voices[i].lang.includes('hi') || voices[i].lang.includes('en-IN')) {{
+                        utterance.voice = voices[i];
+                        break;
+                    }}
+                }}
+                
                 window.speechSynthesis.speak(utterance);
             }} else {{
                 alert('आपका ब्राउज़र स्पीच को सपोर्ट नहीं करता है।');
@@ -273,8 +285,33 @@ for idx, message in enumerate(st.session_state.messages):
         render_speak_button(message["content"], f"hist_{idx}")
         st.markdown('<div class="inline-disclaimer">Pyrox is AI and can make mistakes.</div>', unsafe_allow_html=True)
 
-# User Input Box
-if prompt := st.chat_input("यहाँ अपना संदेश टाइप करें..."):
+# Attachment & Audio Input Section (Plus '+' button & Mic functionality)
+with st.expander("➕ फाइल या फोटो जोड़ें (Attach File/Photo)", expanded=False):
+    uploaded_file = st.file_uploader("यहाँ फाइल या इमेज ड्रॉप करें", type=["png", "jpg", "jpeg", "pdf", "txt"], label_visibility="collapsed")
+    if uploaded_file is not None:
+        st.success(f"फाइल सफलतापूर्वक अपलोड हो गई: {uploaded_file.name}")
+
+# Audio Input (Microphone / Voice recording option)
+audio_data = st.audio_input("🎤 बोलकर पूछें (Voice Input)")
+
+prompt = None
+if audio_data is not None:
+    with st.spinner("आवाज़ को टेक्स्ट में बदला जा रहा है..."):
+        try:
+            transcription = client.audio.transcriptions.create(
+                model="whisper-large-v3",
+                file=("audio.wav", audio_data.read())
+            )
+            prompt = transcription.text
+            st.info(transcription.text)
+        except Exception as e:
+            st.error(f"वॉइस ट्रांसक्रिप्शन एरर: {e}")
+
+# Standard Text Chat Input
+if not prompt:
+    prompt = st.chat_input("यहाँ अपना संदेश टाइप करें...")
+
+if prompt:
     st.session_state.messages.append({"role": "user", "content": prompt})
     
     # Render User Question on Left Box
@@ -344,4 +381,4 @@ if prompt := st.chat_input("यहाँ अपना संदेश टाइ�
         full_response = f"कनेक्शन एरर: {e}"
         message_placeholder.error(full_response)
         
-    st.session_state.messages.append({"role": "assistant", "content": full_response})
+    st.session_state.messages.append({"role": "assistant", "content": full_response})         
