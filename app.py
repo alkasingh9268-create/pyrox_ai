@@ -31,7 +31,7 @@ if selected_theme == "Deep Charcoal":
 elif selected_theme == "Midnight Navy":
     bg_color = "#0A0E17"
 
-# Custom CSS for Professional Layout, Metallic Silver Harshit Glow, and "Jalebi" Circular Loader
+# Custom CSS for Professional Unified Chat Bar, Metallic Silver Harshit Glow, and Circular Triangle Icon
 st.markdown(f"""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -227,8 +227,8 @@ def render_speak_button(text, key_id):
                 window.speechSynthesis.cancel();
                 var utterance = new SpeechSynthesisUtterance("{safe_text}");
                 utterance.lang = 'hi-IN';
-                utterance.pitch = 0.95;  /* Mature professional pitch */
-                utterance.rate = 1.02;   /* Fluent natural speed */
+                utterance.pitch = 0.95;
+                utterance.rate = 1.02;
                 
                 var voices = window.speechSynthesis.getVoices();
                 for(var i = 0; i < voices.length; i++) {{
@@ -256,37 +256,33 @@ for idx, message in enumerate(st.session_state.messages):
         render_speak_button(message["content"], f"hist_{idx}")
         st.markdown('<div class="inline-disclaimer">Pyrox is AI and can make mistakes.</div>', unsafe_allow_html=True)
 
-# Attachment Section (Plus '+' button functionality for files/photos)
-with st.expander("➕ फाइल या फोटो जोड़ें (Attach File/Photo)", expanded=False):
-    uploaded_file = st.file_uploader("यहाँ फाइल या इमेज ड्रॉप करें", type=["png", "jpg", "jpeg", "pdf", "txt"], label_visibility="collapsed")
-    if uploaded_file is not None:
-        st.success(f"फाइल सफलतापूर्वक अपलोड हो गई: {uploaded_file.name}")
+# --- UNIFIED PROFESSIONAL INPUT BAR (ChatGPT/Gemini Style) ---
+# We use columns to place the circular attachment button, chat input, and voice mic cleanly in one row.
+col_btn1, col_input, col_btn2 = st.columns([0.08, 0.84, 0.08])
 
-# Browser Speech-to-Text Microphone Integration Component (Direct Speech into Text)
-st.markdown("""
-    <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); padding: 12px 16px; border-radius: 12px; margin-bottom: 15px; display: flex; align-items: center; justify-content: space-between;">
-        <span style="font-size: 0.9rem; color: #C4C7C5;">🎙️ बोलकर टाइप करें (Voice-to-Text):</span>
-        <button onclick="startDictation()" style="background: #FF4B4B; color: white; border: none; padding: 6px 14px; border-radius: 20px; cursor: pointer; font-size: 0.85rem; font-weight: 600;">बोलना शुरू करें</button>
-    </div>
-    <script>
-    function startDictation() {
+with col_btn1:
+    # Circular Triangle/Plus button for attachments
+    if st.button("➕", help="फाइल या फोटो जोड़ें"):
+        st.session_state.show_uploader = not st.session_state.get("show_uploader", False)
+
+# Expandable file uploader right above if toggled
+if st.session_state.get("show_uploader", False):
+    uploaded_file = st.file_uploader("📁 फाइल या इमेज चुनें", type=["png", "jpg", "jpeg", "pdf", "txt"])
+    if uploaded_file is not None:
+        st.success(f"फाइल अटैच हो गई: {uploaded_file.name}")
+
+with col_btn2:
+    # Voice-to-Text Microphone Button
+    if st.button("🎙️", help="बोलकर टाइप करें"):
+        st.components.v1.html("""
+        <script>
         if (window.hasOwnProperty('webkitSpeechRecognition')) {
             var recognition = new webkitSpeechRecognition();
             recognition.continuous = false;
             recognition.interimResults = false;
             recognition.lang = "hi-IN";
-            recognition.onstart = function() {
-                console.log("Listening...");
-            };
-            recognition.onerror = function(e) {
-                console.log("Speech recognition error", e);
-            };
-            recognition.onend = function() {
-                console.log("Speech recognition ended.");
-            };
             recognition.onresult = function(e) {
                 var text = e.results[0][0].transcript;
-                // Find chat input box textarea in Streamlit and set its value
                 var chatInput = document.querySelector('textarea[aria-label*="chat"], textarea');
                 if (chatInput) {
                     chatInput.value = text;
@@ -296,13 +292,12 @@ st.markdown("""
             };
             recognition.start();
         } else {
-            alert("आपका ब्राउज़र वॉइस रिकग्निशन को सपोर्ट नहीं करता है। कृपया क्रोम (Chrome) का उपयोग करें।");
+            alert("कृपया क्रोम (Chrome) ब्राउज़र का उपयोग करें।");
         }
-    }
-    </script>
-""", unsafe_allow_html=True)
+        </script>
+        """, height=0)
 
-# Standard Text Chat Input
+# Standard Unified Chat Input at the bottom
 prompt = st.chat_input("यहाँ अपना संदेश टाइप करें...")
 
 if prompt:
