@@ -31,7 +31,7 @@ if selected_theme == "Deep Charcoal":
 elif selected_theme == "Midnight Navy":
     bg_color = "#0A0E17"
 
-# Custom CSS for Professional Layout, Metallic Silver Harshit Glow, and UI Elements
+# Custom CSS for Professional Layout, Metallic Silver Harshit Glow, and "Jalebi" Circular Loader
 st.markdown(f"""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -152,57 +152,30 @@ st.markdown(f"""
         padding-left: 18px;
     }}
     
-    /* Stunning Multi-Ring 3D Atom Spinner */
-    .loader-container {{
+    /* 🌀 "Jalebi" Style Hypnotic Circular Glowing Loader */
+    .jalebi-loader-container {{
         display: flex;
         align-items: center;
-        gap: 14px;
-        padding: 14px 0;
+        gap: 16px;
+        padding: 16px 0;
         color: #FF4B4B;
         font-weight: 500;
         font-size: 0.95rem;
     }}
     
-    .multi-atom {{
-        position: relative;
-        width: 26px;
-        height: 26px;
-    }}
-    
-    .orbit {{
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        border: 2px solid rgba(255, 75, 75, 0.25);
-        border-top: 2px solid #FF4B4B;
+    .jalebi-ring {{
+        width: 28px;
+        height: 28px;
+        border: 3px solid rgba(255, 75, 75, 0.2);
+        border-top: 3px solid #FF4B4B;
+        border-right: 3px solid #FFFFFF;
         border-radius: 50%;
-        animation: spin 0.8s linear infinite;
+        animation: jalebi-spin 0.7s cubic-bezier(0.68, -0.55, 0.27, 1.55) infinite;
     }}
     
-    .orbit:nth-child(2) {{
-        animation: spin-reverse 0.6s linear infinite;
-        transform: rotate(60deg);
-        border-color: rgba(255, 75, 75, 0.15);
-        border-bottom: 2px solid #FF4B4B;
-    }}
-    
-    .orbit:nth-child(3) {{
-        animation: spin 1s linear infinite;
-        transform: rotate(120deg);
-        border-color: rgba(255, 75, 75, 0.1);
-        border-left: 2px solid #FF4B4B;
-    }}
-    
-    @keyframes spin {{
+    @keyframes jalebi-spin {{
         0% {{ transform: rotate(0deg); }}
         100% {{ transform: rotate(360deg); }}
-    }}
-    
-    @keyframes spin-reverse {{
-        0% {{ transform: rotate(360deg); }}
-        100% {{ transform: rotate(0deg); }}
     }}
     </style>
 """, unsafe_allow_html=True)
@@ -254,10 +227,9 @@ def render_speak_button(text, key_id):
                 window.speechSynthesis.cancel();
                 var utterance = new SpeechSynthesisUtterance("{safe_text}");
                 utterance.lang = 'hi-IN';
-                utterance.pitch = 0.9;  /* Professional deeper pitch */
-                utterance.rate = 1.05;  /* Natural fluent speed */
+                utterance.pitch = 0.95;  /* Mature professional pitch */
+                utterance.rate = 1.02;   /* Fluent natural speed */
                 
-                /* Try to pick a smooth professional voice if available */
                 var voices = window.speechSynthesis.getVoices();
                 for(var i = 0; i < voices.length; i++) {{
                     if(voices[i].lang.includes('hi') || voices[i].lang.includes('en-IN')) {{
@@ -265,7 +237,6 @@ def render_speak_button(text, key_id):
                         break;
                     }}
                 }}
-                
                 window.speechSynthesis.speak(utterance);
             }} else {{
                 alert('आपका ब्राउज़र स्पीच को सपोर्ट नहीं करता है।');
@@ -285,31 +256,54 @@ for idx, message in enumerate(st.session_state.messages):
         render_speak_button(message["content"], f"hist_{idx}")
         st.markdown('<div class="inline-disclaimer">Pyrox is AI and can make mistakes.</div>', unsafe_allow_html=True)
 
-# Attachment & Audio Input Section (Plus '+' button & Mic functionality)
+# Attachment Section (Plus '+' button functionality for files/photos)
 with st.expander("➕ फाइल या फोटो जोड़ें (Attach File/Photo)", expanded=False):
     uploaded_file = st.file_uploader("यहाँ फाइल या इमेज ड्रॉप करें", type=["png", "jpg", "jpeg", "pdf", "txt"], label_visibility="collapsed")
     if uploaded_file is not None:
         st.success(f"फाइल सफलतापूर्वक अपलोड हो गई: {uploaded_file.name}")
 
-# Audio Input (Microphone / Voice recording option)
-audio_data = st.audio_input("🎤 बोलकर पूछें (Voice Input)")
-
-prompt = None
-if audio_data is not None:
-    with st.spinner("आवाज़ को टेक्स्ट में बदला जा रहा है..."):
-        try:
-            transcription = client.audio.transcriptions.create(
-                model="whisper-large-v3",
-                file=("audio.wav", audio_data.read())
-            )
-            prompt = transcription.text
-            st.info(transcription.text)
-        except Exception as e:
-            st.error(f"वॉइस ट्रांसक्रिप्शन एरर: {e}")
+# Browser Speech-to-Text Microphone Integration Component (Direct Speech into Text)
+st.markdown("""
+    <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); padding: 12px 16px; border-radius: 12px; margin-bottom: 15px; display: flex; align-items: center; justify-content: space-between;">
+        <span style="font-size: 0.9rem; color: #C4C7C5;">🎙️ बोलकर टाइप करें (Voice-to-Text):</span>
+        <button onclick="startDictation()" style="background: #FF4B4B; color: white; border: none; padding: 6px 14px; border-radius: 20px; cursor: pointer; font-size: 0.85rem; font-weight: 600;">बोलना शुरू करें</button>
+    </div>
+    <script>
+    function startDictation() {
+        if (window.hasOwnProperty('webkitSpeechRecognition')) {
+            var recognition = new webkitSpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.lang = "hi-IN";
+            recognition.onstart = function() {
+                console.log("Listening...");
+            };
+            recognition.onerror = function(e) {
+                console.log("Speech recognition error", e);
+            };
+            recognition.onend = function() {
+                console.log("Speech recognition ended.");
+            };
+            recognition.onresult = function(e) {
+                var text = e.results[0][0].transcript;
+                // Find chat input box textarea in Streamlit and set its value
+                var chatInput = document.querySelector('textarea[aria-label*="chat"], textarea');
+                if (chatInput) {
+                    chatInput.value = text;
+                    chatInput.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+                recognition.stop();
+            };
+            recognition.start();
+        } else {
+            alert("आपका ब्राउज़र वॉइस रिकग्निशन को सपोर्ट नहीं करता है। कृपया क्रोम (Chrome) का उपयोग करें।");
+        }
+    }
+    </script>
+""", unsafe_allow_html=True)
 
 # Standard Text Chat Input
-if not prompt:
-    prompt = st.chat_input("यहाँ अपना संदेश टाइप करें...")
+prompt = st.chat_input("यहाँ अपना संदेश टाइप करें...")
 
 if prompt:
     st.session_state.messages.append({"role": "user", "content": prompt})
@@ -317,16 +311,12 @@ if prompt:
     # Render User Question on Left Box
     st.markdown(f'<div class="user-box">{prompt}</div>', unsafe_allow_html=True)
 
-    # Loader Placeholder
+    # Loader Placeholder with "Jalebi" Circular Ring
     loader_placeholder = st.empty()
     loader_placeholder.markdown("""
-        <div class="loader-container">
-            <div class="multi-atom">
-                <div class="orbit"></div>
-                <div class="orbit"></div>
-                <div class="orbit"></div>
-            </div>
-            <span>Pyrox आपका जवाब तैयार कर रहा है...</span>
+        <div class="jalebi-loader-container">
+            <div class="jalebi-ring"></div>
+            <span>Pyrox जलेबी जैसी फुर्ती से जवाब तैयार कर रहा है...</span>
         </div>
     """, unsafe_allow_html=True)
     
@@ -381,4 +371,4 @@ if prompt:
         full_response = f"कनेक्शन एरर: {e}"
         message_placeholder.error(full_response)
         
-    st.session_state.messages.append({"role": "assistant", "content": full_response})         
+    st.session_state.messages.append({"role": "assistant", "content": full_response})
