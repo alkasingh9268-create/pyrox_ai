@@ -1,3 +1,22 @@
+import os
+import json
+import streamlit as st
+import streamlit.components.v1 as components
+from groq import Groq
+
+# Page Config
+st.set_page_config(
+    page_title="Pyrox AI",
+    page_icon="🤖",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
+
+# Groq API Key Fetch
+api_key = os.environ.get("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY", "")
+
+# HTML / CSS / JS Unified Template
+html_code = """
 <!DOCTYPE html>
 <html lang="hi">
 <head>
@@ -20,7 +39,7 @@
             overflow: hidden;
         }
 
-        /* Sidebar Styles */
+        /* Side Menu Bar */
         .sidebar {
             width: 80px;
             background-color: #050505;
@@ -76,7 +95,7 @@
             height: 100vh;
         }
 
-        /* Top Header Logo */
+        /* Top Header / Brand Logo */
         .top-header {
             display: flex;
             align-items: center;
@@ -85,18 +104,18 @@
         }
 
         .pyrox-logo-small {
-            width: 38px;
-            height: 38px;
+            width: 40px;
+            height: 40px;
         }
 
         .app-title {
-            font-size: 1.4rem;
+            font-size: 1.5rem;
             font-weight: 700;
             letter-spacing: 1px;
             color: #ffffff;
         }
 
-        /* Chat Messages Box */
+        /* Chat Messages Container */
         .chat-container {
             width: 100%;
             max-width: 720px;
@@ -112,7 +131,7 @@
         .message {
             display: flex;
             flex-direction: column;
-            max-width: 82%;
+            max-width: 80%;
             line-height: 1.5;
             font-size: 0.95rem;
             animation: fadeIn 0.3s ease;
@@ -148,7 +167,7 @@
             font-weight: 600;
         }
 
-        /* Input Bar */
+        /* Bottom Input Bar Area */
         .input-container {
             width: 100%;
             max-width: 720px;
@@ -198,12 +217,11 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: all 0.2s;
+            transition: color 0.2s;
         }
 
-        .action-btn.recording {
-            color: #ff4d4d;
-            transform: scale(1.15);
+        .action-btn:hover {
+            color: #ffffff;
         }
 
         .send-btn {
@@ -220,24 +238,25 @@
             transition: opacity 0.2s;
         }
 
-        /* Audio Frequency Animation */
+        .send-btn:hover {
+            opacity: 0.8;
+        }
+
+        /* Audio Frequency Visualizer */
         .frequency-visualizer {
             position: absolute;
             bottom: -22px;
             right: 60px;
-            display: none;
+            display: flex;
             align-items: flex-end;
             gap: 3px;
             height: 14px;
-        }
-
-        .frequency-visualizer.active {
-            display: flex;
+            opacity: 0.7;
         }
 
         .freq-bar {
             width: 2px;
-            background-color: #00e5ff;
+            background-color: #ffffff;
             border-radius: 2px;
             animation: pulse 1.2s infinite ease-in-out;
         }
@@ -255,7 +274,7 @@
 </head>
 <body>
 
-    <!-- Navigation Bar -->
+    <!-- Left Navigation Bar -->
     <div class="sidebar">
         <div class="menu-top">
             <div class="menu-item" onclick="clearChat()">
@@ -286,6 +305,7 @@
     <!-- Main Workspace Area -->
     <div class="main-container">
         
+        <!-- Top Small Brand Header -->
         <div class="top-header">
             <svg class="pyrox-logo-small" viewBox="0 0 200 200">
                 <circle cx="100" cy="100" r="80" fill="none" stroke="#ffffff" stroke-width="4" />
@@ -295,13 +315,15 @@
             <h1 class="app-title">Pyrox AI</h1>
         </div>
 
+        <!-- Chat Container -->
         <div class="chat-container" id="chatContainer">
             <div class="message ai-message">
                 <span class="sender-name">Pyrox AI</span>
-                Hello! Main Pyrox AI hoon. Aap bolkar ya type karke mujhse kuch bhi pooch sakte hain!
+                Namaste! Main Pyrox AI hoon. Bataiye, aaj main aapki kya मदद kar sakta hoon?
             </div>
         </div>
 
+        <!-- Input Bar Area -->
         <div class="input-container">
             <svg class="star-icon" viewBox="0 0 24 24">
                 <defs>
@@ -315,10 +337,10 @@
                 <path d="M12 0C12 6.627 6.627 12 0 12C6.627 12 12 17.373 12 24C12 17.373 17.373 12 24 12C17.373 12 12 6.627 12 0Z" fill="url(#starGrad)"/>
             </svg>
 
-            <input type="text" id="chatInput" class="chat-input" placeholder="Type or speak your question..." onkeypress="handleKeyPress(event)" />
+            <input type="text" id="chatInput" class="chat-input" placeholder="Type your question..." onkeypress="handleKeyPress(event)" />
 
             <div class="input-actions">
-                <button class="action-btn" id="micBtn" title="Voice Input" onclick="toggleVoiceInput()">
+                <button class="action-btn" title="Voice Input" onclick="startVoiceInput()">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
                         <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
@@ -334,7 +356,7 @@
                 </button>
             </div>
 
-            <div class="frequency-visualizer" id="visualizer">
+            <div class="frequency-visualizer">
                 <div class="freq-bar"></div>
                 <div class="freq-bar"></div>
                 <div class="freq-bar"></div>
@@ -343,68 +365,48 @@
         </div>
     </div>
 
-    <!-- JAVASCRIPT: Professional Speech & Messaging Logic -->
+    <!-- JAVASCRIPT & SPEECH SYNTHESIS LOGIC -->
     <script>
         const inputField = document.getElementById('chatInput');
         const chatContainer = document.getElementById('chatContainer');
-        const micBtn = document.getElementById('micBtn');
-        const visualizer = document.getElementById('visualizer');
 
-        // Professional Voice Speech Recognition Setup
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        let recognition = null;
-        let isListening = false;
-
-        if (SpeechRecognition) {
-            recognition = new SpeechRecognition();
-            recognition.continuous = false;
-            recognition.lang = 'hi-IN'; // Hindi/English auto input support
-
-            recognition.onstart = () => {
-                isListening = true;
-                micBtn.classList.add('recording');
-                visualizer.classList.add('active');
-            };
-
-            recognition.onresult = (event) => {
-                const transcript = event.results[0][0].transcript;
-                inputField.value = transcript;
-                sendMessage(); // Auto send after speaking
-            };
-
-            recognition.onerror = () => {
-                stopListening();
-            };
-
-            recognition.onend = () => {
-                stopListening();
-            };
+        function speakText(text) {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                let cleanText = text.replace(/[`*_#\\[\\]()]/g, '');
+                let utterance = new SpeechSynthesisUtterance(cleanText);
+                utterance.rate = 1.0;
+                utterance.pitch = 1.0;
+                
+                let voices = window.speechSynthesis.getVoices();
+                let targetVoice = voices.find(v => v.lang.includes('hi-IN') || v.lang.includes('en-IN') || v.lang.includes('en-US')) || voices[0];
+                if (targetVoice) utterance.voice = targetVoice;
+                
+                window.speechSynthesis.speak(utterance);
+            }
         }
 
-        function toggleVoiceInput() {
-            if (!recognition) {
-                alert('Aapke browser mein Voice feature support nahi karta. Please Chrome browser use kariye.');
-                return;
-            }
-
-            if (isListening) {
-                recognition.stop();
-            } else {
+        function startVoiceInput() {
+            if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                const recognition = new SpeechRecognition();
+                recognition.lang = 'hi-IN';
                 recognition.start();
-            }
-        }
 
-        function stopListening() {
-            isListening = false;
-            micBtn.classList.remove('recording');
-            visualizer.classList.remove('active');
+                recognition.onresult = function(event) {
+                    inputField.value = event.results[0][0].transcript;
+                    sendMessage();
+                };
+            } else {
+                alert("Aapke browser me Voice Recognition support nahi hai.");
+            }
         }
 
         async function sendMessage() {
             const text = inputField.value.trim();
             if (text === '') return;
 
-            // User Message Display
+            // User Message UI
             const userMsgDiv = document.createElement('div');
             userMsgDiv.className = 'message user-message';
             userMsgDiv.innerText = text;
@@ -413,32 +415,33 @@
             inputField.value = '';
             chatContainer.scrollTop = chatContainer.scrollHeight;
 
-            // Placeholder AI Response
+            // Loading AI State
             const aiMsgDiv = document.createElement('div');
             aiMsgDiv.className = 'message ai-message';
-            aiMsgDiv.innerHTML = `<span class="sender-name">Pyrox AI</span>Thinking...`;
+            aiMsgDiv.innerHTML = `<span class="sender-name">Pyrox AI</span>Soch raha hoon...`;
             chatContainer.appendChild(aiMsgDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
 
-            // Backend Fetch Request (Change URL with Streamlit / FastAPI link)
             try {
-                /* 
-                // UNCOMMENT THIS WHEN BACKEND IS READY:
-                const response = await fetch('http://localhost:5000/api/chat', {
+                // Call Streamlit Backend API
+                const response = await fetch('/api/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: text })
+                    body: JSON.stringify({ prompt: text })
                 });
+                
                 const data = await response.json();
-                aiMsgDiv.innerHTML = `<span class="sender-name">Pyrox AI</span>${data.reply}`;
-                */
+                const aiReply = data.reply || "Kuch dikkat aayi, kripya dobara koshish karein.";
 
-                setTimeout(() => {
-                    aiMsgDiv.innerHTML = `<span class="sender-name">Pyrox AI</span>Aapka sawaal mil gaya: "${text}". Abhi Streamlit API link hote hi ye real Python AI response dene lagega!`;
-                    chatContainer.scrollTop = chatContainer.scrollHeight;
-                }, 600);
+                aiMsgDiv.innerHTML = `<span class="sender-name">Pyrox AI</span>${aiReply}`;
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+
+                // Voice Response Speak
+                speakText(aiReply);
 
             } catch (err) {
-                aiMsgDiv.innerHTML = `<span class="sender-name">Pyrox AI</span>Backend connection Error. Please try again!`;
+                aiMsgDiv.innerHTML = `<span class="sender-name">Pyrox AI</span>Namaste! Aapka sawaal mil gaya: "${text}". Groq API backend se jawab milne me thodi dikkat aayi.`;
+                chatContainer.scrollTop = chatContainer.scrollHeight;
             }
         }
 
@@ -452,10 +455,15 @@
             chatContainer.innerHTML = `
                 <div class="message ai-message">
                     <span class="sender-name">Pyrox AI</span>
-                    Nayi chat shuru ho chuki hai. Bolie, main aapki kya madad karoon?
+                    Nayi chat shuru ho chuki hai. Bataiye kya karna hai?
                 </div>
             `;
+            if ('speechSynthesis' in window) window.speechSynthesis.cancel();
         }
     </script>
 </body>
 </html>
+"""
+
+# Render Full HTML UI in Streamlit Component
+components.html(html_code, height=800, scrolling=False)
