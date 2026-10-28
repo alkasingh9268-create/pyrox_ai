@@ -12,6 +12,7 @@ st.set_page_config(
 with st.sidebar:
     st.header("⚙️ सेटिंग्स")
     
+    # Custom Theme Engine
     selected_theme = st.selectbox(
         "🎨 थीम चुनें (Theme)",
         ["Pure OLED Black", "Deep Charcoal", "Midnight Navy"]
@@ -23,12 +24,14 @@ with st.sidebar:
         st.session_state.messages = []
         st.rerun()
 
+# Determine background color based on selected theme
 bg_color = "#000000"
 if selected_theme == "Deep Charcoal":
     bg_color = "#121212"
 elif selected_theme == "Midnight Navy":
     bg_color = "#0A0E17"
 
+# Custom CSS for Professional Unified Chat Bar, Metallic Silver Glow, and Clean UI
 st.markdown(f"""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -81,6 +84,7 @@ st.markdown(f"""
         font-size: 0.82rem;
         font-weight: 500;
         margin-bottom: 25px;
+        letter-spacing: 0.3px;
     }}
     
     .gemini-intro-card {{
@@ -167,6 +171,7 @@ st.markdown(f"""
     </style>
 """, unsafe_allow_html=True)
 
+# Header Section
 st.markdown(
     '<div class="main-header">'
     'Pyrox <span class="ai-red">AI</span>'
@@ -176,17 +181,21 @@ st.markdown(
 st.markdown('<div class="sub-header">Groq API द्वारा संचालित हाई-स्पीड इंटेलिजेंट असिस्टेंट</div>', unsafe_allow_html=True)
 st.markdown('<div class="creator-badge">✨ Crafted by <span class="shining-silver">Harshit</span></div>', unsafe_allow_html=True)
 
+# Check API key from secrets
 if "GROQ_API_KEY" in st.secrets:
     api_key = st.secrets["GROQ_API_KEY"]
 else:
     st.error("त्रुटि: Streamlit Secrets में 'GROQ_API_KEY' नहीं मिली!")
     st.stop()
 
+# Initialize Groq client
 client = Groq(api_key=api_key)
 
+# Initialize chat history
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
+# Display Gemini-Style Welcome Intro if Chat History is Empty
 if not st.session_state.messages:
     st.markdown("""
         <div class="gemini-intro-card">
@@ -195,6 +204,7 @@ if not st.session_state.messages:
         </div>
     """, unsafe_allow_html=True)
 
+# Ultra-Professional, Natural Deep Male Voice Output (Tuned for premium impact)
 def render_speak_button(text, key_id):
     safe_text = text.replace("'", "\\'").replace('"', '\\"').replace('\n', ' ')
     html_code = f"""
@@ -208,8 +218,8 @@ def render_speak_button(text, key_id):
                 window.speechSynthesis.cancel();
                 var utterance = new SpeechSynthesisUtterance("{safe_text}");
                 utterance.lang = 'hi-IN';
-                utterance.pitch = 0.7;
-                utterance.rate = 0.98;
+                utterance.pitch = 0.7;    /* Deep, solid, professional masculine tone */
+                utterance.rate = 0.98;    /* Smooth, elite breathing pace */
                 
                 var voices = window.speechSynthesis.getVoices();
                 for(var i = 0; i < voices.length; i++) {{
@@ -219,6 +229,8 @@ def render_speak_button(text, key_id):
                     }}
                 }}
                 window.speechSynthesis.speak(utterance);
+            }} else {{
+                alert('आपका ब्राउज़र स्पीच को सपोर्ट नहीं करता है।');
             }}
         }}
         </script>
@@ -226,6 +238,7 @@ def render_speak_button(text, key_id):
     """
     st.components.v1.html(html_code, height=40)
 
+# Display prior chat messages cleanly with speaker buttons
 for idx, message in enumerate(st.session_state.messages):
     if message["role"] == "user":
         st.markdown(f'<div class="user-box">{message["content"]}</div>', unsafe_allow_html=True)
@@ -234,10 +247,12 @@ for idx, message in enumerate(st.session_state.messages):
         render_speak_button(message["content"], f"hist_{idx}")
         st.markdown('<div class="inline-disclaimer">Pyrox is AI and can make mistakes.</div>', unsafe_allow_html=True)
 
+# Standard Chat Input Box
 prompt = st.chat_input("यहाँ अपना संदेश टाइप करें...")
 
 if prompt:
     st.session_state.messages.append({"role": "user", "content": prompt})
+    
     st.markdown(f'<div class="user-box">{prompt}</div>', unsafe_allow_html=True)
 
     loader_placeholder = st.empty()
@@ -254,6 +269,7 @@ if prompt:
     try:
         recent_messages = st.session_state.messages[-6:]
         
+        # --- GEMINI-GRADE HIGH PERFECTION SYSTEM PROMPT ---
         system_prompt = {
             "role": "system",
             "content": (
@@ -287,7 +303,8 @@ if prompt:
                 full_response += chunk.choices[0].delta.content
                 message_placeholder.markdown(f'<div class="assistant-box">{full_response}▌</div>', unsafe_allow_html=True)
                 
-        message_placeholder.markdown(f'<div class="assistant_box">{full_response}</div>', unsafe_allow_html=True)
+        message_placeholder.markdown(f'<div class="assistant-box">{full_response}</div>', unsafe_allow_html=True)
+        
         render_speak_button(full_response, "live_new")
         st.markdown('<div class="inline-disclaimer">Pyrox is AI and can make mistakes.</div>', unsafe_allow_html=True)
         
