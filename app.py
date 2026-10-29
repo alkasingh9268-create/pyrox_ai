@@ -2,15 +2,15 @@ import os
 import streamlit as st
 from groq import Groq
 
-# Streamlit Page Config
+# 1. Streamlit Base Config
 st.set_page_config(
-    page_title="Pyrox",
+    page_title="Pyrox Studio",
     page_icon="🤖",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
-# Streamlit Hide Default UI Elements
+# Hide Streamlit Default Headers
 st.markdown("""
     <style>
     .stApp { background-color: #000000; color: #ffffff; }
@@ -19,16 +19,16 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Fetch API Key
 api_key = os.environ.get("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY", "")
 
-# HTML + CSS + JS Complete Studio UI
-full_app_html = """
+# 2. Complete HTML + CSS + JS Unified UI
+app_code = """
 <!DOCTYPE html>
 <html lang="hi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pyrox</title>
     <style>
         * {
             margin: 0;
@@ -43,192 +43,274 @@ full_app_html = """
             height: 100vh;
             overflow: hidden;
         }
-        /* Sidebar */
+
+        /* LEFT SIDEBAR */
         .sidebar {
-            width: 75px;
+            width: 230px;
             background-color: #050505;
             border-right: 1px solid #1a1a1a;
             display: flex;
             flex-direction: column;
-            align-items: center;
-            padding: 20px 0;
             justify-content: space-between;
+            padding: 16px 12px;
+            z-index: 20;
         }
-        .menu-top, .menu-bottom {
+        .sidebar-top {
             display: flex;
             flex-direction: column;
-            gap: 24px;
-            align-items: center;
+            gap: 18px;
         }
-        .menu-item {
+        .sidebar-logo-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 4px 8px;
+        }
+        .sidebar-logo-header svg {
+            width: 26px;
+            height: 26px;
+        }
+        .sidebar-brand-name {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #ffffff;
+            letter-spacing: 0.5px;
+        }
+        .menu-list {
             display: flex;
             flex-direction: column;
+            gap: 4px;
+        }
+        .menu-btn {
+            display: flex;
             align-items: center;
-            gap: 5px;
-            color: #888888;
-            font-size: 10px;
+            gap: 12px;
+            padding: 10px 12px;
+            color: #aaaaaa;
+            font-size: 13.5px;
+            border-radius: 8px;
             cursor: pointer;
-            transition: color 0.2s;
+            transition: background 0.2s, color 0.2s;
         }
-        .menu-item:hover { color: #ffffff; }
-        .menu-icon { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 2; }
+        .menu-btn:hover {
+            background-color: #141414;
+            color: #ffffff;
+        }
+        .menu-btn svg {
+            width: 18px;
+            height: 18px;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 2;
+        }
+        .sidebar-bottom {
+            border-top: 1px solid #1a1a1a;
+            padding-top: 12px;
+        }
 
-        /* Main Workspace */
+        /* MAIN WORKSPACE */
         .main-container {
             flex: 1;
             display: flex;
             flex-direction: column;
-            align-items: center;
             justify-content: space-between;
-            padding: 20px;
-            height: 100vh;
+            align-items: center;
             position: relative;
+            height: 100vh;
         }
 
-        /* Header with Dual Color Logo (Black & Red) */
-        .top-header {
+        /* TOP BAR WITH RIGHT THREE-DOTS MENU */
+        .top-navbar {
+            width: 100%;
             display: flex;
             align-items: center;
-            gap: 12px;
-            margin-top: 5px;
+            justify-content: space-between;
+            padding: 12px 24px;
+            border-bottom: 1px solid #121212;
+            position: relative;
         }
-        .pyrox-logo {
-            width: 42px;
-            height: 42px;
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
-        .app-title {
-            font-size: 1.6rem;
-            font-weight: 800;
-            letter-spacing: 0.5px;
+        .top-logo {
+            width: 32px;
+            height: 32px;
+        }
+        .top-title {
+            font-size: 1.25rem;
+            font-weight: 700;
             color: #ffffff;
         }
 
-        /* Chat Workspace */
+        /* THREE DOTS DROPDOWN MENU */
+        .three-dots-wrapper {
+            position: relative;
+        }
+        .dots-btn {
+            background: transparent;
+            border: none;
+            color: #aaaaaa;
+            cursor: pointer;
+            padding: 6px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.2s, background 0.2s;
+        }
+        .dots-btn:hover {
+            color: #ffffff;
+            background-color: #1a1a1a;
+        }
+        .dropdown-menu {
+            position: absolute;
+            top: 40px;
+            right: 0;
+            width: 210px;
+            background-color: #0d0d0d;
+            border: 1px solid #222222;
+            border-radius: 12px;
+            padding: 6px 0;
+            display: none;
+            flex-direction: column;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            z-index: 100;
+        }
+        .dropdown-menu.show {
+            display: flex;
+        }
+        .dropdown-item {
+            padding: 10px 16px;
+            font-size: 13px;
+            color: #cccccc;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: background 0.2s, color 0.2s;
+        }
+        .dropdown-item:hover {
+            background-color: #1a1a1a;
+            color: #ffffff;
+        }
+        .dropdown-item.danger {
+            color: #ef4444;
+        }
+        .dropdown-item.danger:hover {
+            background-color: rgba(239, 68, 68, 0.1);
+        }
+
+        /* CHAT WORKSPACE AREA */
         .chat-container {
             width: 100%;
-            max-width: 800px;
+            max-width: 820px;
             flex: 1;
             overflow-y: auto;
             display: flex;
             flex-direction: column;
-            gap: 18px;
-            padding: 20px 10px;
+            gap: 20px;
+            padding: 20px 15px;
         }
         .message {
             display: flex;
             flex-direction: column;
-            max-width: 80%;
+            max-width: 82%;
             line-height: 1.6;
-            font-size: 1rem;
+            font-size: 0.98rem;
         }
         .user-message {
             align-self: flex-end;
-            background-color: #1c1c1e;
+            background-color: #1a1a1a;
             color: #ffffff;
-            padding: 14px 20px;
-            border-radius: 20px 20px 4px 20px;
-            border: 1px solid #333;
+            padding: 12px 18px;
+            border-radius: 18px 18px 4px 18px;
+            border: 1px solid #2a2a2a;
         }
         .ai-message {
             align-self: flex-start;
-            background-color: #0d0d0d;
-            color: #f1f1f1;
-            padding: 16px 22px;
-            border-radius: 20px 20px 20px 4px;
-            border: 1px solid #222;
-        }
-        .ai-message .sender-name {
-            font-size: 0.75rem;
-            color: #ff3333;
-            margin-bottom: 6px;
-            font-weight: 700;
+            background-color: #080808;
+            color: #f0f0f0;
+            padding: 14px 20px;
+            border-radius: 18px 18px 18px 4px;
+            border: 1px solid #1a1a1a;
         }
 
-        /* Bottom Input Bar Wrapper */
+        /* INPUT AREA WITH GEMINI-STYLE WAVE */
         .input-wrapper {
             width: 100%;
-            max-width: 800px;
+            max-width: 820px;
             position: relative;
-            margin-bottom: 15px;
+            margin-bottom: 20px;
+            padding: 0 15px;
         }
-        .input-container {
+        .input-box {
             width: 100%;
-            background-color: #0a0a0a;
-            border: 1px solid #262626;
-            border-radius: 32px;
-            padding: 10px 18px;
+            background-color: #080808;
+            border: 1px solid #222222;
+            border-radius: 28px;
+            padding: 10px 16px;
             display: flex;
             align-items: center;
             gap: 12px;
             position: relative;
-            transition: border-color 0.3s, box-shadow 0.3s;
+            transition: border-color 0.3s;
         }
-        .input-container.active-listening {
-            border-color: #ff3333;
-            box-shadow: 0 0 15px rgba(255, 51, 51, 0.25);
+        .input-box.recording {
+            border-color: #ef4444;
+            box-shadow: 0 0 12px rgba(239, 68, 68, 0.2);
         }
-
-        .star-icon {
-            width: 24px;
-            height: 24px;
-            flex-shrink: 0;
+        .star-btn {
             cursor: pointer;
+            width: 22px;
+            height: 22px;
+            flex-shrink: 0;
         }
 
-        /* Long Audio Wave Visualizer Line next to Mic */
-        .long-wave-line {
+        /* GEMINI WAVE ANIMATION */
+        .gemini-wave-container {
             display: flex;
             align-items: center;
             gap: 3px;
-            height: 20px;
-            width: 100px;
-            opacity: 0.2;
-            transition: opacity 0.3s;
+            height: 18px;
+            width: 110px;
+            display: none;
         }
-        .long-wave-line.active {
-            opacity: 1;
+        .gemini-wave-container.active {
+            display: flex;
         }
         .wave-bar {
             flex: 1;
-            background-color: #ff3333;
+            background-color: #ef4444;
             border-radius: 2px;
             height: 20%;
-            transition: height 0.1s ease;
+            animation: waveMotion 0.8s infinite ease-in-out alternate;
         }
-        .long-wave-line.active .wave-bar {
-            animation: wavePulse 0.8s infinite ease-in-out alternate;
-        }
-        .long-wave-line.active .wave-bar:nth-child(1) { animation-delay: 0.0s; }
-        .long-wave-line.active .wave-bar:nth-child(2) { animation-delay: 0.1s; }
-        .long-wave-line.active .wave-bar:nth-child(3) { animation-delay: 0.2s; }
-        .long-wave-line.active .wave-bar:nth-child(4) { animation-delay: 0.3s; }
-        .long-wave-line.active .wave-bar:nth-child(5) { animation-delay: 0.1s; }
-        .long-wave-line.active .wave-bar:nth-child(6) { animation-delay: 0.2s; }
-        .long-wave-line.active .wave-bar:nth-child(7) { animation-delay: 0.4s; }
-        .long-wave-line.active .wave-bar:nth-child(8) { animation-delay: 0.1s; }
+        .wave-bar:nth-child(1) { animation-delay: 0.1s; }
+        .wave-bar:nth-child(2) { animation-delay: 0.3s; }
+        .wave-bar:nth-child(3) { animation-delay: 0.2s; }
+        .wave-bar:nth-child(4) { animation-delay: 0.4s; }
+        .wave-bar:nth-child(5) { animation-delay: 0.15s; }
+        .wave-bar:nth-child(6) { animation-delay: 0.35s; }
 
-        @keyframes wavePulse {
+        @keyframes waveMotion {
             0% { height: 15%; }
             100% { height: 100%; }
         }
 
-        .chat-input {
+        .chat-input-field {
             flex: 1;
             background: transparent;
             border: none;
             outline: none;
             color: #ffffff;
-            font-size: 1.05rem;
+            font-size: 1rem;
             padding: 6px 0;
         }
-        .chat-input::placeholder { color: #555555; }
+        .chat-input-field::placeholder { color: #555555; }
 
-        .input-actions {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-        .action-btn {
+        .mic-btn {
             background: transparent;
             border: none;
             color: #aaaaaa;
@@ -238,80 +320,124 @@ full_app_html = """
             justify-content: center;
             transition: color 0.2s;
         }
-        .action-btn:hover { color: #ffffff; }
-        .action-btn.listening { color: #ff3333; }
+        .mic-btn:hover { color: #ffffff; }
+        .mic-btn.active { color: #ef4444; }
 
-        /* Submit Button with Text & Arrow */
-        .submit-btn {
+        /* CLEAN ARROW SUBMIT BUTTON ONLY */
+        .arrow-submit-btn {
+            width: 34px;
+            height: 34px;
             background-color: #ffffff;
             color: #000000;
             border: none;
-            border-radius: 20px;
-            padding: 8px 16px;
-            font-size: 0.9rem;
-            font-weight: 700;
+            border-radius: 50%;
             display: flex;
             align-items: center;
-            gap: 6px;
+            justify-content: center;
             cursor: pointer;
             transition: transform 0.2s, opacity 0.2s;
         }
-        .submit-btn:hover {
-            transform: scale(1.03);
+        .arrow-submit-btn:hover {
+            transform: scale(1.05);
             opacity: 0.9;
         }
     </style>
 </head>
 <body>
 
-    <!-- Sidebar -->
+    <!-- LEFT SIDEBAR WITH BRAND LOGO & OPTIONS -->
     <div class="sidebar">
-        <div class="menu-top">
-            <div class="menu-item" onclick="clearChat()">
-                <svg class="menu-icon" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4"></path></svg>
-                <span>New Chat</span>
+        <div class="sidebar-top">
+            <div class="sidebar-logo-header">
+                <svg viewBox="0 0 200 200">
+                    <circle cx="100" cy="100" r="85" fill="#050505" stroke="#ffffff" stroke-width="4"/>
+                    <path d="M 100 25 L 70 85 L 110 85 L 90 115 L 130 115 L 100 175" fill="none" stroke="#ffffff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <span class="sidebar-brand-name">Pyrox</span>
+            </div>
+
+            <div class="menu-list">
+                <div class="menu-btn" onclick="clearChat()">
+                    <svg viewBox="0 0 24 24"><path d="M12 4v16m8-8H4"></path></svg>
+                    <span>New Chat</span>
+                </div>
+                <div class="menu-btn">
+                    <svg viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    <span>Search Chat</span>
+                </div>
+                <div class="menu-btn">
+                    <svg viewBox="0 0 24 24"><path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                    <span>Library</span>
+                </div>
+                <div class="menu-btn">
+                    <svg viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                    <span>Images</span>
+                </div>
+                <div class="menu-btn">
+                    <svg viewBox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                    <span>Schedule</span>
+                </div>
+                <div class="menu-btn">
+                    <svg viewBox="0 0 24 24"><path d="M12 14l9-5-9-5-9 5 9 5z"></path><path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0112 20.055a11.952 11.952 0 01-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"></path></svg>
+                    <span>For Students</span>
+                </div>
             </div>
         </div>
-        <div class="menu-bottom">
-            <div class="menu-item">
-                <svg class="menu-icon" viewBox="0 0 24 24"><path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
-                <span>Profile</span>
+
+        <div class="sidebar-bottom">
+            <div class="menu-btn">
+                <svg viewBox="0 0 24 24"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                <span>Settings</span>
             </div>
         </div>
     </div>
 
-    <!-- Main Workspace -->
+    <!-- MAIN WORKSPACE -->
     <div class="main-container">
         
-        <!-- Header with Dual Color Logo (Black & Red) -->
-        <div class="top-header">
-            <svg class="pyrox-logo" viewBox="0 0 200 200">
-                <defs>
-                    <linearGradient id="dualLogoGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="50%" stop-color="#000000" />
-                        <stop offset="50%" stop-color="#ff3333" />
-                    </linearGradient>
-                </defs>
-                <circle cx="100" cy="100" r="85" fill="#111111" stroke="#ff3333" stroke-width="4"/>
-                <path d="M 100 25 L 70 85 L 110 85 L 90 115 L 130 115 L 100 175" fill="none" stroke="url(#dualLogoGrad)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            <h1 class="app-title">Pyrox</h1>
+        <!-- TOP NAVBAR WITH BRAND & RIGHT TRIPLE DOT MENU -->
+        <div class="top-navbar">
+            <div class="header-left">
+                <svg class="top-logo" viewBox="0 0 200 200">
+                    <circle cx="100" cy="100" r="85" fill="#000000" stroke="#ffffff" stroke-width="4"/>
+                    <path d="M 100 25 L 70 85 L 110 85 L 90 115 L 130 115 L 100 175" fill="none" stroke="#ffffff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <span class="top-title">Pyrox</span>
+            </div>
+
+            <!-- THREE DOTS CONTROL MENU -->
+            <div class="three-dots-wrapper">
+                <button class="dots-btn" onclick="toggleDropdown()">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="5" r="1.5"></circle>
+                        <circle cx="12" cy="12" r="1.5"></circle>
+                        <circle cx="12" cy="19" r="1.5"></circle>
+                    </svg>
+                </button>
+                <div class="dropdown-menu" id="dropdownMenu">
+                    <div class="dropdown-item" onclick="alert('Conversation link copied!')">🔗 Share Conversation</div>
+                    <div class="dropdown-item">🔍 Find in Chat</div>
+                    <div class="dropdown-item">📌 Pin Chat</div>
+                    <div class="dropdown-item">✏️ Rename</div>
+                    <div class="dropdown-item">📄 Download PDF / Export</div>
+                    <div class="dropdown-item danger" onclick="clearChat()">🗑️ Delete Chat</div>
+                </div>
+            </div>
         </div>
 
-        <!-- Chat History -->
+        <!-- CHAT MESSAGES -->
         <div class="chat-container" id="chatContainer">
             <div class="message ai-message">
-                <span class="sender-name">Pyrox</span>
                 How can I help you today?
             </div>
         </div>
 
-        <!-- Input Bar Area -->
+        <!-- INPUT BAR AREA -->
         <div class="input-wrapper">
-            <div class="input-container" id="inputContainerBox">
+            <div class="input-box" id="inputBox">
                 
-                <!-- Star / File Icon -->
-                <svg class="star-icon" viewBox="0 0 24 24" title="Attach / Star">
+                <!-- STAR ICON -->
+                <svg class="star-btn" viewBox="0 0 24 24">
                     <defs>
                         <linearGradient id="starGrad" x1="0%" y1="0%" x2="100%" y2="100%">
                             <stop offset="0%" stop-color="#9C27B0"/>
@@ -321,19 +447,17 @@ full_app_html = """
                     <path d="M12 0C12 6.627 6.627 12 0 12C6.627 12 12 17.373 12 24C12 17.373 17.373 12 24 12C17.373 12 12 6.627 12 0Z" fill="url(#starGrad)"/>
                 </svg>
 
-                <!-- Microphone Button -->
-                <button id="micBtn" class="action-btn" title="Voice Input" onclick="toggleVoiceInput()">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <!-- MIC BUTTON -->
+                <button id="micBtn" class="mic-btn" title="Voice Input" onclick="toggleVoice()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
                         <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
                         <line x1="12" y1="19" x2="12" y2="23"></line>
                     </svg>
                 </button>
 
-                <!-- Long Frequency Wave Bar next to Mic -->
-                <div class="long-wave-line" id="longWaveLine">
-                    <div class="wave-bar"></div>
-                    <div class="wave-bar"></div>
+                <!-- GEMINI WAVE BARS -->
+                <div class="gemini-wave-container" id="waveBox">
                     <div class="wave-bar"></div>
                     <div class="wave-bar"></div>
                     <div class="wave-bar"></div>
@@ -342,39 +466,47 @@ full_app_html = """
                     <div class="wave-bar"></div>
                 </div>
 
-                <!-- Text Input Field -->
-                <input type="text" id="chatInput" class="chat-input" placeholder="How can I help you today?" onkeypress="if(event.key==='Enter') sendMessage()" />
+                <!-- TEXT INPUT -->
+                <input type="text" id="chatInput" class="chat-input-field" placeholder="How can I help you today?" onkeypress="if(event.key==='Enter') sendMessage();" />
 
-                <!-- Submit Button with Icon + "Submit" Text -->
-                <div class="input-actions">
-                    <button class="submit-btn" title="Submit" onclick="sendMessage()">
-                        <span>Submit</span>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                            <line x1="5" y1="12" x2="19" y2="12"></line>
-                            <polyline points="12 5 19 12 12 19"></polyline>
-                        </svg>
-                    </button>
-                </div>
+                <!-- CLEAN ARROW BUTTON -->
+                <button class="arrow-submit-btn" title="Send" onclick="sendMessage()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                        <polyline points="12 5 19 12 12 19"></polyline>
+                    </svg>
+                </button>
             </div>
         </div>
     </div>
 
     <script>
+        let isListening = false;
         let recognition = null;
-        let isRecording = false;
 
-        function toggleVoiceInput() {
-            const micBtn = document.getElementById('micBtn');
-            const containerBox = document.getElementById('inputContainerBox');
-            const waveLine = document.getElementById('longWaveLine');
-            const inputField = document.getElementById('chatInput');
+        function toggleDropdown() {
+            const menu = document.getElementById('dropdownMenu');
+            menu.classList.toggle('show');
+        }
 
+        window.onclick = function(event) {
+            if (!event.target.closest('.three-dots-wrapper')) {
+                document.getElementById('dropdownMenu').classList.remove('show');
+            }
+        }
+
+        function toggleVoice() {
             if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
-                alert("Speech recognition is not supported in this browser.");
+                alert("Speech Recognition not supported in browser.");
                 return;
             }
 
-            if (isRecording) {
+            const micBtn = document.getElementById('micBtn');
+            const inputBox = document.getElementById('inputBox');
+            const waveBox = document.getElementById('waveBox');
+            const inputField = document.getElementById('chatInput');
+
+            if (isListening) {
                 recognition.stop();
                 return;
             }
@@ -382,20 +514,17 @@ full_app_html = """
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             recognition = new SpeechRecognition();
             recognition.lang = 'hi-IN';
-            recognition.continuous = false;
-            recognition.interimResults = false;
 
             recognition.onstart = function() {
-                isRecording = true;
-                micBtn.classList.add('listening');
-                containerBox.classList.add('active-listening');
-                waveLine.classList.add('active');
-                inputField.placeholder = "Listening... बोलिए...";
+                isListening = true;
+                micBtn.classList.add('active');
+                inputBox.classList.add('recording');
+                waveBox.classList.add('active');
+                inputField.placeholder = "Listening...";
             };
 
             recognition.onresult = function(event) {
-                const transcript = event.results[0][0].transcript;
-                inputField.value = transcript;
+                inputField.value = event.results[0][0].transcript;
                 stopVoiceUI();
             };
 
@@ -406,23 +535,27 @@ full_app_html = """
         }
 
         function stopVoiceUI() {
-            isRecording = false;
-            document.getElementById('micBtn').classList.remove('listening');
-            document.getElementById('inputContainerBox').classList.remove('active-listening');
-            document.getElementById('longWaveLine').classList.remove('active');
+            isListening = false;
+            document.getElementById('micBtn').classList.remove('active');
+            document.getElementById('inputBox').classList.remove('recording');
+            document.getElementById('waveBox').classList.remove('active');
             document.getElementById('chatInput').placeholder = "How can I help you today?";
         }
 
+        // HIGH QUALITY SHARP & CRISP VOICE ENGINE (Edge Neural Style)
         function speakResponse(text) {
             if ('speechSynthesis' in window) {
                 window.speechSynthesis.cancel();
-                let clean = text.replace(/[`*_#\\[\\]()]/g, '');
-                let utterance = new SpeechSynthesisUtterance(clean);
-                utterance.rate = 0.95;  // Slightly optimized for natural flow
+                let cleanText = text.replace(/[`*_#\\[\\]()]/g, '');
+                let utterance = new SpeechSynthesisUtterance(cleanText);
+                utterance.rate = 1.0;
                 utterance.pitch = 1.0;
+
                 let voices = window.speechSynthesis.getVoices();
-                let v = voices.find(val => val.lang.includes('hi-IN') || val.lang.includes('en-IN') || val.lang.includes('en-US')) || voices[0];
-                if (v) utterance.voice = v;
+                // Select Best Crisp Neural Voice
+                let targetVoice = voices.find(v => v.name.includes("Swara") || v.name.includes("Natural") || v.lang.includes("hi-IN") || v.lang.includes("en-IN")) || voices[0];
+                if (targetVoice) utterance.voice = targetVoice;
+
                 window.speechSynthesis.speak(utterance);
             }
         }
@@ -430,11 +563,11 @@ full_app_html = """
         function sendMessage() {
             const inputField = document.getElementById('chatInput');
             const text = inputField.value.trim();
-            if (text === '') return;
+            if(!text) return;
 
             const chatContainer = document.getElementById('chatContainer');
 
-            // Add User Message
+            // Append User Message
             const userDiv = document.createElement('div');
             userDiv.className = 'message user-message';
             userDiv.innerText = text;
@@ -443,22 +576,38 @@ full_app_html = """
             inputField.value = '';
             chatContainer.scrollTop = chatContainer.scrollHeight;
 
-            // Generate Response
+            // SMART HUMBLE RESPONSE LOGIC (No Spam / No Arrogance)
             setTimeout(() => {
                 const aiDiv = document.createElement('div');
                 aiDiv.className = 'message ai-message';
-                const replyText = "नमस्ते! आपका सवाल '" + text + "' प्राप्त हुआ। मैं Pyrox आपकी सेवा में हाज़िर हूँ।";
-                aiDiv.innerHTML = `<span class="sender-name">Pyrox</span>${replyText}`;
+                
+                let reply = "";
+                const lower = text.toLowerCase();
+
+                // Handling Gibberish / Random letters
+                if (/^[a-z]{5,}$/i.test(text) && !["hello","hi","hey"].includes(lower)) {
+                    reply = "माफ़ कीजिए, मैं आपका प्रश्न समझ नहीं पाया। कृपया स्पष्ट रूप से बताएं कि मैं आपकी क्या सहायता कर सकता हूँ?";
+                } 
+                // Handling Anger / Abusive / Frustration politely
+                else if (lower.includes("stupid") || lower.includes("pagal") || lower.includes("bakwas") || lower.includes("ghatiya")) {
+                    reply = "माफ़ कीजिए, मुझसे कोई गलती हुई होगी। कृपया बताएं कि मैं इसे कैसे सुधार सकता हूँ और आपकी क्या मदद कर सकता हूँ?";
+                } 
+                // General Polite Response
+                else {
+                    reply = "जी, आपकी बात समझ आ गई। बताइए, इसमें आपकी किस प्रकार सहायता की जाए?";
+                }
+
+                aiDiv.innerText = reply;
                 chatContainer.appendChild(aiDiv);
                 chatContainer.scrollTop = chatContainer.scrollHeight;
-                speakResponse(replyText);
-            }, 500);
+
+                speakResponse(reply);
+            }, 400);
         }
 
         function clearChat() {
             document.getElementById('chatContainer').innerHTML = `
                 <div class="message ai-message">
-                    <span class="sender-name">Pyrox</span>
                     How can I help you today?
                 </div>
             `;
@@ -469,5 +618,8 @@ full_app_html = """
 </html>
 """
 
-# Render full screen app
-st.components.v1.html(full_app_html, height=750, scrolling=False)
+# Render Full Studio UI in Streamlit
+st.components.v1.html(app_code, height=760, scrolling=False)
+
+
+        
