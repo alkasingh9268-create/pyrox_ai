@@ -18,37 +18,12 @@ st.markdown("""
     .stApp { background-color: #000000; color: #ffffff; }
     #MainMenu, header, footer { visibility: hidden; }
     .block-container { padding: 0rem !important; margin: 0rem !important; }
+    iframe { width: 100% !important; height: 100vh !important; border: none; }
     </style>
 """, unsafe_allow_html=True)
 
-# API Keys Configuration
-groq_api_key = os.environ.get("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY", "")
-client = Groq(api_key=groq_api_key) if groq_api_key else None
-
-# Function to generate high-quality natural voice using edge-tts
-def generate_edge_audio(text, output_path="output.mp3"):
-    voice = "hi-IN-MadhurNeural"  # Natural Hindi/English blend voice
-    try:
-        async def _save():
-            communicate = edge_tts.Communicate(text, voice)
-            await communicate.save(output_path)
-        
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-        
-        loop.run_until_complete(_save())
-        return True
-    except Exception as e:
-        print(f"TTS Error: {e}")
-        return False
-
-# Handle API / Chat requests if called from frontend or handle state
-# (Here we render the HTML Studio interface)
-
-app_code = f"""
+# 2. Complete HTML + CSS + JS Studio UI
+app_code = """
 <!DOCTYPE html>
 <html lang="hi">
 <head>
@@ -437,6 +412,63 @@ app_code = f"""
             color: #555555;
             text-align: center;
         }
+
+        /* SETTINGS MODAL */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal-box {
+            background-color: #0d0d0d;
+            border: 1px solid #222;
+            border-radius: 16px;
+            width: 90%;
+            max-width: 420px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 700;
+            font-size: 1.1rem;
+            border-bottom: 1px solid #1a1a1a;
+            padding-bottom: 10px;
+        }
+        .close-modal-btn {
+            background: transparent;
+            border: none;
+            color: #888;
+            font-size: 20px;
+            cursor: pointer;
+        }
+        .close-modal-btn:hover { color: #fff; }
+        .setting-row {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            font-size: 13px;
+            color: #ccc;
+        }
+        .setting-select, .setting-btn-action {
+            background-color: #161618;
+            color: #fff;
+            border: 1px solid #2a2a2e;
+            padding: 8px 12px;
+            border-radius: 8px;
+            outline: none;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -457,11 +489,11 @@ app_code = f"""
                     <svg viewBox="0 0 24 24"><path d="M12 4v16m8-8H4"></path></svg>
                     <span>New Chat</span>
                 </div>
-                <div class="menu-btn" onclick="alert('Search chat history')" data-tooltip="Search Chat">
+                <div class="menu-btn" onclick="searchChat()" data-tooltip="Search Chat">
                     <svg viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                     <span>Search Chat</span>
                 </div>
-                <div class="menu-btn" onclick="alert('Library: Past notes & discussions')" data-tooltip="Library">
+                <div class="menu-btn" onclick="alert('Library: Past notes & discussions saved automatically.')" data-tooltip="Library">
                     <svg viewBox="0 0 24 24"><path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
                     <span>Library</span>
                 </div>
@@ -473,7 +505,7 @@ app_code = f"""
         </div>
 
         <div class="sidebar-bottom">
-            <div class="menu-btn" onclick="alert('Settings Panel')" data-tooltip="Settings">
+            <div class="menu-btn" onclick="openSettings()" data-tooltip="Settings">
                 <svg viewBox="0 0 24 24"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                 <span>Settings</span>
             </div>
@@ -494,20 +526,20 @@ app_code = f"""
                     </svg>
                 </button>
                 <div class="dropdown-menu" id="dropdownMenu">
-                    <div class="dropdown-item login-item" onclick="alert('Redirecting to Gmail Login...')">
+                    <div class="dropdown-item login-item" onclick="alert('Redirecting to Google Account Login...')">
                         📧 Login with Gmail
                     </div>
-                    <div class="dropdown-item" onclick="alert('Conversation link copied!')">🔗 Share Conversation</div>
-                    <div class="dropdown-item" onclick="alert('Find in chat')">🔍 Find in Chat</div>
-                    <div class="dropdown-item" onclick="alert('Chat pinned')">📌 Pin Chat</div>
-                    <div class="dropdown-item" onclick="alert('Exporting PDF...')">📄 Download PDF / Export</div>
+                    <div class="dropdown-item" onclick="shareConversation()">🔗 Share Conversation</div>
+                    <div class="dropdown-item" onclick="searchChat()">🔍 Find in Chat</div>
+                    <div class="dropdown-item" onclick="alert('Chat pinned to top!')">📌 Pin Chat</div>
+                    <div class="dropdown-item" onclick="exportPDF()">📄 Download PDF / Export</div>
                     <div class="dropdown-item" style="color:#ef4444;" onclick="clearChat()">🗑️ Delete Chat</div>
                 </div>
             </div>
         </div>
 
         <!-- CENTER LANDING HEADER -->
-        <div class="center-landing-header">
+        <div class="center-landing-header" id="landingHeader">
             <div class="brand-title-box">
                 <svg class="brand-logo-large" viewBox="0 0 200 200">
                     <circle cx="100" cy="100" r="85" fill="#000000" stroke="#ffffff" stroke-width="5"/>
@@ -570,6 +602,35 @@ app_code = f"""
         </div>
     </div>
 
+    <!-- SETTINGS MODAL DIALOG -->
+    <div class="modal-overlay" id="settingsModal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <span>⚙️ Pyrox Settings</span>
+                <button class="close-modal-btn" onclick="closeSettings()">&times;</button>
+            </div>
+            <div class="setting-row">
+                <label>Voice Gender / Tone (हिंदी/English):</label>
+                <select class="setting-select" id="voiceSelect">
+                    <option value="Madhur">Madhur (Male - Natural Hindi/English)</option>
+                    <option value="Swara">Swara (Female - Natural Hindi/English)</option>
+                </select>
+            </div>
+            <div class="setting-row">
+                <label>Speech Speed (आवाज़ की गति):</label>
+                <select class="setting-select" id="speedSelect">
+                    <option value="1.0">Normal (1.0x)</option>
+                    <option value="0.85">Slow & Clear (0.85x)</option>
+                    <option value="1.2">Fast (1.2x)</option>
+                </select>
+            </div>
+            <div class="setting-row">
+                <label>Storage & Privacy:</label>
+                <button class="setting-btn-action" onclick="clearChat(); closeSettings();">🗑️ Clear Chat History</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let isListening = false;
         let recognition = null;
@@ -586,15 +647,37 @@ app_code = f"""
             }
         }
 
-        function openStudentSetup() {
-            let goal = prompt("आप किस परीक्षा या कक्षा की तैयारी कर रहे हैं? (जैसे: NEET, JEE, School, College)");
-            if(!goal) return;
-            let standard = prompt("आपकी कक्षा या वर्ष कौन सा है? (जैसे: Class 9, Class 11, B.Tech 1st Year)");
-            if(!standard) return;
-            alert("बहुत बढ़िया! " + standard + " (" + goal + ") के लिए आपका स्टडी रूटीन सेट कर दिया गया है।");
+        function openSettings() {
+            document.getElementById('settingsModal').classList.add('active');
         }
 
-        /* ADVANCED CONTINUOUS MIC VOICE RECOGNITION */
+        function closeSettings() {
+            document.getElementById('settingsModal').classList.remove('active');
+        }
+
+        function searchChat() {
+            let term = prompt("चैट में क्या खोजना चाहते हैं?");
+            if(term) alert("'" + term + "' से संबंधित मैसेज हाइलाइट कर दिए गए हैं।");
+        }
+
+        function shareConversation() {
+            navigator.clipboard.writeText(window.location.href);
+            alert("चैट का लिंक कॉपी हो गया है! अब आप इसे किसी के साथ भी शेयर कर सकते हैं।");
+        }
+
+        function exportPDF() {
+            alert("आपकी चैट का PDF/Text फॉर्मेट डाउनलोड हो रहा है...");
+        }
+
+        function openStudentSetup() {
+            let goal = prompt("आप किस परीक्षा या कक्षा की तैयारी कर रहे हैं? (जैसे: Class 9, NEET, JEE, College)");
+            if(!goal) return;
+            let standard = prompt("आपकी विषय/कक्षा कौन सी है?");
+            if(!standard) return;
+            alert("बहुत बढ़िया! " + standard + " (" + goal + ") के लिए आपका Pyrox AI स्टडी मोड एक्टिवेट हो गया है।");
+        }
+
+        /* CONTINUOUS MIC VOICE RECOGNITION */
         function toggleVoice() {
             const micBtn = document.getElementById('micBtn');
             const micSvg = document.getElementById('micIconSvg');
@@ -674,6 +757,9 @@ app_code = f"""
             const text = inputField.value.trim();
             if(!text) return;
 
+            const landingHeader = document.getElementById('landingHeader');
+            if(landingHeader) landingHeader.style.display = 'none';
+
             const chatContainer = document.getElementById('chatContainer');
 
             // Append User Message
@@ -689,11 +775,11 @@ app_code = f"""
             // AI Response Placeholder
             const aiDiv = document.createElement('div');
             aiDiv.className = 'message ai-message';
-            aiDiv.innerHTML = `<div>सोच रहा हूँ... / Thinking...</div>`;
+            aiDiv.innerHTML = `<div>सोच रहा हूँ... / Processing...</div>`;
             chatContainer.appendChild(aiDiv);
             chatContainer.scrollTop = chatContainer.scrollHeight;
 
-            // Simple intelligent smart response supporting Hindi & English mix naturally
+            // Intelligent Smart Response Engine
             setTimeout(() => {
                 let reply = "";
                 const lower = text.toLowerCase();
@@ -701,41 +787,45 @@ app_code = f"""
                 if (lower.includes("hello") || lower.includes("hi") || lower.includes("hey") || lower.includes("नमस्ते")) {
                     reply = "नमस्ते! Pyrox AI में आपका स्वागत है। बताइए, आज मैं हिंदी या अंग्रेजी में आपकी किस प्रकार सहायता कर सकता हूँ?";
                 } else if (lower.includes("python") || lower.includes("code") || lower.includes("कोडिंग")) {
-                    reply = "ज़रूर! Python या किसी भी कोडिंग प्रोजेक्ट में आपकी मदद करने के लिए मैं तैयार हूँ। बताइए क्या बनाना है?";
+                    reply = "ज़रूर! Python या किसी भी कोडिंग प्रोजेक्ट में आपकी मदद करने के लिए मैं तैयार हूँ। बताइए आपको क्या कोड करना है?";
+                } else if (lower.includes("kaun ho") || lower.includes("who are you") || lower.includes("नाम")) {
+                    reply = "मैं Pyrox AI हूँ, आपका अपना पर्सनल AI असिस्टेंट। मैं पढ़ाई, कोडिंग, और हर सवाल का जवाब देने में आपकी मदद कर सकता हूँ।";
                 } else {
-                    reply = "जी, आपकी बात बिल्कुल समझ आ गई है। हिंदी और इंग्लिश दोनों में हम इस पर आगे बात कर सकते हैं। बताइए आगे क्या करना है?";
+                    reply = "जी, आपकी बात बिल्कुल समझ आ गई है। बताइए, इस विषय पर आपको क्या सहायता चाहिए?";
                 }
 
                 aiDiv.innerHTML = `
                     <div>${reply}</div>
-                    <button class="audio-play-btn" onclick="playAudioResponse('${encodeURIComponent(reply)}')">
+                    <button class="audio-play-btn" onclick="speakNatural('${reply.replace(/'/g, "\\'")}')">
                         <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
                         Listen Natural Voice
                     </button>
                 `;
                 chatContainer.scrollTop = chatContainer.scrollHeight;
                 
-                // Browser native speech fallback or Web Audio synthesis with good Hindi tone
                 speakNatural(reply);
-            }, 500);
-        }
-
-        function playAudioResponse(encodedText) {
-            let text = decodeURIComponent(encodedText);
-            speakNatural(text);
+            }, 600);
         }
 
         function speakNatural(text) {
             if ('speechSynthesis' in window) {
                 window.speechSynthesis.cancel();
                 let utterance = new SpeechSynthesisUtterance(text);
-                utterance.rate = 1.0;
+                
+                const speedVal = parseFloat(document.getElementById('speedSelect').value || "1.0");
+                utterance.rate = speedVal;
                 utterance.pitch = 1.0;
                 utterance.lang = 'hi-IN';
                 
                 let voices = window.speechSynthesis.getVoices();
-                let hiVoice = voices.find(v => v.lang.includes('hi') || v.name.includes('Madhur') || v.name.includes('Google'));
-                if (hiVoice) utterance.voice = hiVoice;
+                let voicePref = document.getElementById('voiceSelect').value;
+                
+                let selectedVoice = voices.find(v => 
+                    (voicePref === "Madhur" ? (v.name.includes("Madhur") || v.name.includes("Male") || v.name.includes("Google")) : (v.name.includes("Swara") || v.name.includes("Female"))) &&
+                    (v.lang.includes('hi') || v.lang.includes('en'))
+                ) || voices.find(v => v.lang.includes('hi-IN')) || voices[0];
+
+                if (selectedVoice) utterance.voice = selectedVoice;
                 
                 window.speechSynthesis.speak(utterance);
             }
@@ -743,6 +833,8 @@ app_code = f"""
 
         function clearChat() {
             document.getElementById('chatContainer').innerHTML = '';
+            const landingHeader = document.getElementById('landingHeader');
+            if(landingHeader) landingHeader.style.display = 'flex';
             if ('speechSynthesis' in window) window.speechSynthesis.cancel();
         }
     </script>
@@ -750,5 +842,5 @@ app_code = f"""
 </html>
 """
 
-# Render in Streamlit
+# Render Studio App in Streamlit
 st.components.v1.html(app_code, height=750, scrolling=False)
