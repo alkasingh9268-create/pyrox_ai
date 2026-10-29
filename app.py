@@ -128,7 +128,7 @@ app_code = """
             box-shadow: 0 4px 10px rgba(0,0,0,0.5);
         }
 
-        /* MAIN CONTAINER (SHIFTED FULLY UP - ZERO SCROLL) */
+        /* MAIN CONTAINER (ZERO SCROLL) */
         .main-container {
             flex: 1;
             display: flex;
@@ -274,7 +274,7 @@ app_code = """
             gap: 8px;
         }
 
-        /* PROPER AUDIO BUTTON (NOT SMALL TEXT) */
+        /* AUDIO PLAY BUTTON */
         .audio-play-btn {
             background-color: #161618;
             color: #3b82f6;
@@ -618,24 +618,41 @@ app_code = """
             document.getElementById('chatInput').placeholder = "Ask Pyrox anything...";
         }
 
-        // MALE NEURAL VOICE ENGINE
+        // FIXED AND ROBUST MALE SPEECH SYNTHESIS ENGINE
         function speakText(text) {
             if ('speechSynthesis' in window) {
-                window.speechSynthesis.cancel();
-                let clean = text.replace(/[`*_#\\[\\]()]/g, '');
-                let utterance = new SpeechSynthesisUtterance(clean);
-                utterance.rate = 1.0;
-                utterance.pitch = 0.95;
-
-                let voices = window.speechSynthesis.getVoices();
-                let maleVoice = voices.find(v => 
-                    (v.name.includes("Madhur") || v.name.includes("Prabhat") || v.name.includes("Male") || v.name.includes("David") || v.name.includes("George")) &&
-                    (v.lang.includes("hi") || v.lang.includes("en"))
-                ) || voices.find(v => v.lang.includes("hi-IN") || v.lang.includes("en-IN")) || voices[0];
+                window.speechSynthesis.cancel(); // Stop any ongoing speech
                 
-                if (maleVoice) utterance.voice = maleVoice;
-                window.speechSynthesis.speak(utterance);
+                let cleanText = text.replace(/[`*_#\\[\\]()]/g, '');
+                let utterance = new SpeechSynthesisUtterance(cleanText);
+                utterance.rate = 1.0;
+                utterance.pitch = 0.95; // Masculine tone
+
+                // Try to pick a proper voice immediately or wait for voices
+                let voices = window.speechSynthesis.getVoices();
+                if (voices.length === 0) {
+                    window.speechSynthesis.onvoiceschanged = () => {
+                        voices = window.speechSynthesis.getVoices();
+                        assignVoiceAndSpeak(utterance, voices);
+                    };
+                } else {
+                    assignVoiceAndSpeak(utterance, voices);
+                }
+            } else {
+                alert("Speech synthesis not supported in this browser.");
             }
+        }
+
+        function assignVoiceAndSpeak(utterance, voices) {
+            let targetVoice = voices.find(v => 
+                (v.name.includes("Madhur") || v.name.includes("Prabhat") || v.name.includes("Male") || v.name.includes("David") || v.name.includes("George") || v.name.includes("Hemant")) &&
+                (v.lang.includes("hi") || v.lang.includes("en"))
+            ) || voices.find(v => v.lang.includes("hi-IN") || v.lang.includes("en-IN")) || voices[0];
+            
+            if (targetVoice) {
+                utterance.voice = targetVoice;
+            }
+            window.speechSynthesis.speak(utterance);
         }
 
         function sendMessage() {
@@ -654,7 +671,7 @@ app_code = """
             inputField.value = '';
             chatContainer.scrollTop = chatContainer.scrollHeight;
 
-            // AI Response with Proper Audio Button (Not small text)
+            // AI Response with Working Audio Button
             setTimeout(() => {
                 const aiDiv = document.createElement('div');
                 aiDiv.className = 'message ai-message';
@@ -672,12 +689,12 @@ app_code = """
                     reply = "जी, आपकी बात समझ आ गई है। बताइए, इसमें आपकी किस प्रकार सहायता की जाए?";
                 }
 
-                // Properly encoded safe text string for audio button click
-                const encodedText = encodeURIComponent(reply);
+                // Clean string escaping for HTML inline function call
+                const safeReply = reply.replace(/'/g, "\\'").replace(/"/g, '&quot;');
 
                 aiDiv.innerHTML = `
                     <div>${reply}</div>
-                    <button class="audio-play-btn" onclick="speakText(decodeURIComponent('${encodedText}'))">
+                    <button class="audio-play-btn" onclick="speakText('${safeReply}')">
                         <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
                         Listen to audio
                     </button>
