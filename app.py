@@ -2,7 +2,7 @@ import os
 import streamlit as st
 from groq import Groq
 
-# 1. Base Streamlit Page Settings
+# 1. Page Configuration
 st.set_page_config(
     page_title="Pyrox Studio",
     page_icon="🤖",
@@ -10,12 +10,12 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Hide Default Streamlit Chrome
+# Hide Default Streamlit Elements & Force Zero Padding
 st.markdown("""
     <style>
     .stApp { background-color: #000000; color: #ffffff; }
     #MainMenu, header, footer { visibility: hidden; }
-    .block-container { padding: 0rem; margin: 0rem; }
+    .block-container { padding: 0rem !important; margin: 0rem !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -52,19 +52,19 @@ app_code = """
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-            padding: 14px 12px;
+            padding: 12px 10px;
             z-index: 20;
         }
         .sidebar-logo-header {
             display: flex;
             align-items: center;
             gap: 10px;
-            padding: 4px 8px;
-            margin-bottom: 15px;
+            padding: 4px 6px;
+            margin-bottom: 10px;
         }
         .sidebar-logo-header svg {
-            width: 26px;
-            height: 26px;
+            width: 24px;
+            height: 24px;
         }
         .sidebar-brand-name {
             font-size: 1.1rem;
@@ -75,13 +75,13 @@ app_code = """
         .menu-list {
             display: flex;
             flex-direction: column;
-            gap: 4px;
+            gap: 3px;
         }
         .menu-btn {
             display: flex;
             align-items: center;
             gap: 12px;
-            padding: 9px 12px;
+            padding: 8px 10px;
             color: #aaaaaa;
             font-size: 13px;
             border-radius: 8px;
@@ -94,15 +94,15 @@ app_code = """
             color: #ffffff;
         }
         .menu-btn svg {
-            width: 18px;
-            height: 18px;
+            width: 17px;
+            height: 17px;
             stroke: currentColor;
             fill: none;
             stroke-width: 2;
         }
         .sidebar-bottom {
             border-top: 1px solid #1a1a1a;
-            padding-top: 10px;
+            padding-top: 8px;
         }
 
         /* TOOLTIP HOVER HELPER */
@@ -128,7 +128,7 @@ app_code = """
             box-shadow: 0 4px 10px rgba(0,0,0,0.5);
         }
 
-        /* MAIN CONTAINER (COMPACT & HIGH UP) */
+        /* MAIN CONTAINER (SHIFTED FULLY UP - ZERO SCROLL) */
         .main-container {
             flex: 1;
             display: flex;
@@ -136,16 +136,17 @@ app_code = """
             justify-content: space-between;
             align-items: center;
             height: 100vh;
-            padding-bottom: 12px;
+            padding-top: 4px;
+            padding-bottom: 8px;
         }
 
-        /* TOP NAVBAR WITH TRIPLE DOTS & GMAIL LOGIN */
+        /* TOP NAVBAR */
         .top-navbar {
             width: 100%;
             display: flex;
             align-items: center;
             justify-content: flex-end;
-            padding: 10px 24px;
+            padding: 4px 20px;
             position: relative;
         }
         .three-dots-wrapper {
@@ -169,9 +170,9 @@ app_code = """
         }
         .dropdown-menu {
             position: absolute;
-            top: 38px;
+            top: 36px;
             right: 0;
-            width: 220px;
+            width: 210px;
             background-color: #0d0d0d;
             border: 1px solid #222222;
             border-radius: 12px;
@@ -185,7 +186,7 @@ app_code = """
             display: flex;
         }
         .dropdown-item {
-            padding: 10px 16px;
+            padding: 9px 16px;
             font-size: 13px;
             color: #cccccc;
             cursor: pointer;
@@ -204,32 +205,32 @@ app_code = """
             font-weight: 600;
         }
 
-        /* CENTER LANDING HEADER (HIGH UP & CLEAN) */
+        /* CENTER LANDING HEADER */
         .center-landing-header {
             display: flex;
             flex-direction: column;
             align-items: center;
             text-align: center;
-            gap: 8px;
-            margin-top: 15px;
+            gap: 4px;
+            margin-top: 2px;
         }
         .brand-title-box {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
         }
         .brand-logo-large {
-            width: 44px;
-            height: 44px;
+            width: 38px;
+            height: 38px;
         }
         .brand-name-large {
-            font-size: 2.2rem;
+            font-size: 1.9rem;
             font-weight: 800;
             color: #ffffff;
             letter-spacing: -0.5px;
         }
         .greeting-subtext {
-            font-size: 1.35rem;
+            font-size: 1.2rem;
             font-weight: 500;
             color: #d1d5db;
         }
@@ -242,46 +243,63 @@ app_code = """
             overflow-y: auto;
             display: flex;
             flex-direction: column;
-            gap: 16px;
-            padding: 10px 15px;
-            margin-top: 10px;
+            gap: 12px;
+            padding: 5px 15px;
+            margin-top: 5px;
         }
         .message {
             display: flex;
             flex-direction: column;
             max-width: 82%;
-            line-height: 1.55;
-            font-size: 0.96rem;
+            line-height: 1.5;
+            font-size: 0.95rem;
         }
         .user-message {
             align-self: flex-end;
             background-color: #1c1c1e;
             color: #ffffff;
-            padding: 12px 18px;
-            border-radius: 18px 18px 4px 18px;
+            padding: 10px 16px;
+            border-radius: 16px 16px 4px 16px;
             border: 1px solid #2d2d2d;
         }
         .ai-message {
             align-self: flex-start;
             background-color: #080808;
             color: #f0f0f0;
-            padding: 14px 20px;
-            border-radius: 18px 18px 18px 4px;
+            padding: 12px 18px;
+            border-radius: 16px 16px 16px 4px;
             border: 1px solid #1a1a1a;
-        }
-        .speak-btn {
-            background: transparent;
-            border: none;
-            color: #888888;
-            cursor: pointer;
-            margin-top: 6px;
             display: flex;
-            align-items: center;
-            gap: 5px;
-            font-size: 11px;
-            transition: color 0.2s;
+            flex-direction: column;
+            gap: 8px;
         }
-        .speak-btn:hover { color: #ffffff; }
+
+        /* PROPER AUDIO BUTTON (NOT SMALL TEXT) */
+        .audio-play-btn {
+            background-color: #161618;
+            color: #3b82f6;
+            border: 1px solid #2a2a2e;
+            border-radius: 8px;
+            padding: 6px 12px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            align-self: flex-start;
+            transition: background 0.2s, border-color 0.2s;
+        }
+        .audio-play-btn:hover {
+            background-color: #1f1f23;
+            border-color: #3b82f6;
+            color: #60a5fa;
+        }
+        .audio-play-btn svg {
+            width: 14px;
+            height: 14px;
+            fill: currentColor;
+        }
 
         /* INPUT BAR AREA */
         .input-wrapper {
@@ -290,18 +308,18 @@ app_code = """
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 6px;
+            gap: 4px;
             padding: 0 15px;
         }
         .input-box {
             width: 100%;
             background-color: #080808;
             border: 1px solid #222222;
-            border-radius: 28px;
-            padding: 8px 16px;
+            border-radius: 26px;
+            padding: 8px 14px;
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
             position: relative;
             transition: border-color 0.3s;
         }
@@ -311,8 +329,8 @@ app_code = """
         }
         .star-btn {
             cursor: pointer;
-            width: 22px;
-            height: 22px;
+            width: 20px;
+            height: 20px;
             flex-shrink: 0;
         }
 
@@ -320,9 +338,9 @@ app_code = """
         .gemini-wave-container {
             display: flex;
             align-items: center;
-            gap: 3.5px;
-            height: 20px;
-            width: 130px;
+            gap: 3px;
+            height: 18px;
+            width: 120px;
             display: none;
         }
         .gemini-wave-container.active {
@@ -352,8 +370,8 @@ app_code = """
             border: none;
             outline: none;
             color: #ffffff;
-            font-size: 0.98rem;
-            padding: 6px 0;
+            font-size: 0.95rem;
+            padding: 4px 0;
         }
         .chat-input-field::placeholder { color: #555555; }
 
@@ -371,8 +389,8 @@ app_code = """
         .mic-btn.active { color: #3b82f6; }
 
         .arrow-submit-btn {
-            width: 32px;
-            height: 32px;
+            width: 30px;
+            height: 30px;
             background-color: #ffffff;
             color: #000000;
             border: none;
@@ -389,7 +407,7 @@ app_code = """
         }
 
         .footer-disclaimer {
-            font-size: 11px;
+            font-size: 10.5px;
             color: #555555;
             text-align: center;
         }
@@ -421,7 +439,7 @@ app_code = """
                     <svg viewBox="0 0 24 24"><path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
                     <span>Library</span>
                 </div>
-                <div class="menu-btn" onclick="alert('Student Routine setup initialized.')" data-tooltip="For Students">
+                <div class="menu-btn" onclick="openStudentSetup()" data-tooltip="For Students">
                     <svg viewBox="0 0 24 24"><path d="M12 14l9-5-9-5-9 5 9 5z"></path><path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0112 20.055a11.952 11.952 0 01-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"></path></svg>
                     <span>For Students</span>
                 </div>
@@ -541,6 +559,15 @@ app_code = """
             }
         }
 
+        function openStudentSetup() {
+            let goal = prompt("आप किस परीक्षा या कक्षा की तैयारी कर रहे हैं? (जैसे: NEET, JEE, School, College)");
+            if(!goal) return;
+            let standard = prompt("आपकी कक्षा या वर्ष कौन सा है? (जैसे: Class 9, Class 11, B.Tech 1st Year)");
+            if(!standard) return;
+            
+            alert("बहुत बढ़िया! " + standard + " (" + goal + ") के लिए आपका स्टडी रूटीन सेट कर दिया गया है। अब आप मुझसे कोई भी चैप्टर या टॉपिक पूछ सकते हैं!");
+        }
+
         function toggleVoice() {
             if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
                 alert("Speech recognition not supported.");
@@ -591,17 +618,16 @@ app_code = """
             document.getElementById('chatInput').placeholder = "Ask Pyrox anything...";
         }
 
-        // MALE NEURAL VOICE ENGINE (Deep & Professional Tone)
+        // MALE NEURAL VOICE ENGINE
         function speakText(text) {
             if ('speechSynthesis' in window) {
                 window.speechSynthesis.cancel();
                 let clean = text.replace(/[`*_#\\[\\]()]/g, '');
                 let utterance = new SpeechSynthesisUtterance(clean);
                 utterance.rate = 1.0;
-                utterance.pitch = 0.95; // Lower pitch for masculine tone
+                utterance.pitch = 0.95;
 
                 let voices = window.speechSynthesis.getVoices();
-                // Select Best Male Voice
                 let maleVoice = voices.find(v => 
                     (v.name.includes("Madhur") || v.name.includes("Prabhat") || v.name.includes("Male") || v.name.includes("David") || v.name.includes("George")) &&
                     (v.lang.includes("hi") || v.lang.includes("en"))
@@ -628,7 +654,7 @@ app_code = """
             inputField.value = '';
             chatContainer.scrollTop = chatContainer.scrollHeight;
 
-            // AI Response with Humility & Polite Guardrails
+            // AI Response with Proper Audio Button (Not small text)
             setTimeout(() => {
                 const aiDiv = document.createElement('div');
                 aiDiv.className = 'message ai-message';
@@ -646,7 +672,16 @@ app_code = """
                     reply = "जी, आपकी बात समझ आ गई है। बताइए, इसमें आपकी किस प्रकार सहायता की जाए?";
                 }
 
-                aiDiv.innerHTML = `${reply} <button class="speak-btn" onclick="speakText(this.previousSibling.textContent)">🔊 Suno</button>`;
+                // Properly encoded safe text string for audio button click
+                const encodedText = encodeURIComponent(reply);
+
+                aiDiv.innerHTML = `
+                    <div>${reply}</div>
+                    <button class="audio-play-btn" onclick="speakText(decodeURIComponent('${encodedText}'))">
+                        <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+                        Listen to audio
+                    </button>
+                `;
                 chatContainer.appendChild(aiDiv);
                 chatContainer.scrollTop = chatContainer.scrollHeight;
 
@@ -663,5 +698,5 @@ app_code = """
 </html>
 """
 
-# Render in Streamlit
-st.components.v1.html(app_code, height=750, scrolling=False)
+# Render in Streamlit with precise height constraint (620px to prevent any scroll on load)
+st.components.v1.html(app_code, height=620, scrolling=False)
