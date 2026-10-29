@@ -44,11 +44,11 @@ app_code = """
             overflow: hidden;
         }
 
-        /* SIDEBAR */
+        /* SIDEBAR ULTRA MAX DARK */
         .sidebar {
             width: 230px;
             background-color: #050505;
-            border-right: 1px solid #1a1a1a;
+            border-right: 1px solid #141414;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
@@ -101,7 +101,7 @@ app_code = """
             stroke-width: 2;
         }
         .sidebar-bottom {
-            border-top: 1px solid #1a1a1a;
+            border-top: 1px solid #141414;
             padding-top: 8px;
         }
 
@@ -128,7 +128,7 @@ app_code = """
             box-shadow: 0 4px 10px rgba(0,0,0,0.5);
         }
 
-        /* MAIN CONTAINER (ZERO SCROLL) */
+        /* MAIN CONTAINER */
         .main-container {
             flex: 1;
             display: flex;
@@ -321,11 +321,11 @@ app_code = """
             align-items: center;
             gap: 10px;
             position: relative;
-            transition: border-color 0.3s;
+            transition: border-color 0.3s, box-shadow 0.3s;
         }
         .input-box.recording {
-            border-color: #3b82f6;
-            box-shadow: 0 0 12px rgba(59, 130, 246, 0.25);
+            border-color: #ef4444;
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.25);
         }
         .star-btn {
             cursor: pointer;
@@ -334,12 +334,12 @@ app_code = """
             flex-shrink: 0;
         }
 
-        /* GEMINI WAVE BARS */
+        /* ULTRA GEMINI WAVE BARS */
         .gemini-wave-container {
             display: flex;
             align-items: center;
-            gap: 3px;
-            height: 18px;
+            gap: 3.5px;
+            height: 20px;
             width: 120px;
             display: none;
         }
@@ -348,10 +348,10 @@ app_code = """
         }
         .wave-bar {
             flex: 1;
-            background: linear-gradient(180deg, #3b82f6, #ec4899);
+            background: linear-gradient(180deg, #ef4444, #3b82f6);
             border-radius: 3px;
             height: 20%;
-            animation: waveMotion 0.7s infinite ease-in-out alternate;
+            animation: waveMotion 0.6s infinite ease-in-out alternate;
         }
         .wave-bar:nth-child(1) { animation-delay: 0.1s; }
         .wave-bar:nth-child(2) { animation-delay: 0.3s; }
@@ -383,10 +383,10 @@ app_code = """
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: color 0.2s;
+            transition: color 0.2s, transform 0.2s;
         }
-        .mic-btn:hover { color: #ffffff; }
-        .mic-btn.active { color: #3b82f6; }
+        .mic-btn:hover { color: #ffffff; transform: scale(1.1); }
+        .mic-btn.active { color: #ef4444; }
 
         .arrow-submit-btn {
             width: 30px;
@@ -435,7 +435,7 @@ app_code = """
                     <svg viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                     <span>Search Chat</span>
                 </div>
-                <div class="menu-btn" onclick="alert('Library: Your past discussions & study notes')" data-tooltip="Library">
+                <div class="menu-btn" onclick="alert('Library: Past notes & discussions')" data-tooltip="Library">
                     <svg viewBox="0 0 24 24"><path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
                     <span>Library</span>
                 </div>
@@ -499,7 +499,7 @@ app_code = """
         <div class="input-wrapper">
             <div class="input-box" id="inputBox">
                 
-                <!-- STAR ICON WITH HOVER TOOLTIP -->
+                <!-- STAR ICON -->
                 <svg class="star-btn" viewBox="0 0 24 24" data-tooltip="Attach File & Photo" onclick="alert('Select File / Photo to attach')">
                     <defs>
                         <linearGradient id="starGrad" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -510,9 +510,9 @@ app_code = """
                     <path d="M12 0C12 6.627 6.627 12 0 12C6.627 12 12 17.373 12 24C12 17.373 17.373 12 24 12C17.373 12 12 6.627 12 0Z" fill="url(#starGrad)"/>
                 </svg>
 
-                <!-- MIC BUTTON WITH HOVER TOOLTIP -->
+                <!-- MIC BUTTON WITH PAUSE / TRIANGLE TOGGLE -->
                 <button id="micBtn" class="mic-btn" data-tooltip="Voice Input" onclick="toggleVoice()">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <svg id="micIconSvg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
                         <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
                         <line x1="12" y1="19" x2="12" y2="23"></line>
@@ -531,7 +531,7 @@ app_code = """
                 <!-- CHAT INPUT FIELD -->
                 <input type="text" id="chatInput" class="chat-input-field" placeholder="Ask Pyrox anything..." onkeypress="if(event.key==='Enter') sendMessage();" />
 
-                <!-- ARROW SUBMIT BUTTON WITH HOVER TOOLTIP -->
+                <!-- ARROW SUBMIT BUTTON -->
                 <button class="arrow-submit-btn" data-tooltip="Submit" onclick="sendMessage()">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
                         <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -547,6 +547,7 @@ app_code = """
     <script>
         let isListening = false;
         let recognition = null;
+        let accumulatedSpeech = "";
 
         function toggleDropdown() {
             document.getElementById('dropdownMenu').classList.toggle('show');
@@ -565,70 +566,101 @@ app_code = """
             let standard = prompt("आपकी कक्षा या वर्ष कौन सा है? (जैसे: Class 9, Class 11, B.Tech 1st Year)");
             if(!standard) return;
             
-            alert("बहुत बढ़िया! " + standard + " (" + goal + ") के लिए आपका स्टडी रूटीन सेट कर दिया गया है। अब आप मुझसे कोई भी चैप्टर या टॉपिक पूछ सकते हैं!");
+            alert("बहुत बढ़िया! " + standard + " (" + goal + ") के लिए आपका स्टडी रूटीन सेट कर दिया गया है।");
         }
 
+        /* ADVANCED CONTINUOUS MIC VOICE RECOGNITION (WON'T STOP ON BREATHING) */
         function toggleVoice() {
-            if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
-                alert("Speech recognition not supported.");
-                return;
-            }
-
             const micBtn = document.getElementById('micBtn');
+            const micSvg = document.getElementById('micIconSvg');
             const inputBox = document.getElementById('inputBox');
             const waveBox = document.getElementById('waveBox');
             const inputField = document.getElementById('chatInput');
 
             if (isListening) {
-                recognition.stop();
+                if (recognition) recognition.stop();
+                stopVoiceUI();
                 return;
             }
 
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                alert("Speech recognition not supported in your browser.");
+                return;
+            }
+
             recognition = new SpeechRecognition();
             recognition.lang = 'hi-IN';
+            recognition.continuous = true;       // KEEPS LISTENING THROUGH PAUSES & BREATHING
+            recognition.interimResults = true;  // SHOWS LIVE REALTIME TEXT
+
+            accumulatedSpeech = inputField.value ? inputField.value + " " : "";
 
             recognition.onstart = function() {
                 isListening = true;
                 micBtn.classList.add('active');
-                micBtn.setAttribute('data-tooltip', 'Stop Microphone');
+                micBtn.setAttribute('data-tooltip', 'Pause / Stop Mic');
                 inputBox.classList.add('recording');
                 waveBox.classList.add('active');
-                inputField.placeholder = "Listening...";
+                inputField.placeholder = "Listening continuously... (Pause button to stop)";
+                
+                // SWITCH ICON TO PAUSE / PLAY TRIANGLE
+                micSvg.innerHTML = `<rect x="6" y="4" width="4" height="16" fill="currentColor"/><rect x="14" y="4" width="4" height="16" fill="currentColor"/>`;
             };
 
             recognition.onresult = function(event) {
-                inputField.value = event.results[0][0].transcript;
-                stopVoiceUI();
+                let interimTranscript = '';
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    if (event.results[i].isFinal) {
+                        accumulatedSpeech += event.results[i][0].transcript + " ";
+                    } else {
+                        interimTranscript += event.results[i][0].transcript;
+                    }
+                }
+                inputField.value = accumulatedSpeech + interimTranscript;
             };
 
-            recognition.onerror = function() { stopVoiceUI(); };
-            recognition.onend = function() { stopVoiceUI(); };
+            recognition.onerror = function(event) {
+                console.log("Speech Error: ", event.error);
+            };
 
-            recognition.start();
+            recognition.onend = function() {
+                if (isListening) {
+                    try { recognition.start(); } catch(e) {}
+                }
+            };
+
+            try {
+                recognition.start();
+            } catch(e) {
+                console.error(e);
+            }
         }
 
         function stopVoiceUI() {
             isListening = false;
             const micBtn = document.getElementById('micBtn');
+            const micSvg = document.getElementById('micIconSvg');
             micBtn.classList.remove('active');
             micBtn.setAttribute('data-tooltip', 'Voice Input');
             document.getElementById('inputBox').classList.remove('recording');
             document.getElementById('waveBox').classList.remove('active');
             document.getElementById('chatInput').placeholder = "Ask Pyrox anything...";
+            
+            // RESTORE ORIGINAL MIC ICON
+            micSvg.innerHTML = `<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line>`;
         }
 
-        // FIXED AND ROBUST MALE SPEECH SYNTHESIS ENGINE
+        /* RELIABLE MALE SPEECH SYNTHESIS ENGINE */
         function speakText(text) {
             if ('speechSynthesis' in window) {
-                window.speechSynthesis.cancel(); // Stop any ongoing speech
+                window.speechSynthesis.cancel();
                 
                 let cleanText = text.replace(/[`*_#\\[\\]()]/g, '');
                 let utterance = new SpeechSynthesisUtterance(cleanText);
                 utterance.rate = 1.0;
-                utterance.pitch = 0.95; // Masculine tone
+                utterance.pitch = 0.95;
 
-                // Try to pick a proper voice immediately or wait for voices
                 let voices = window.speechSynthesis.getVoices();
                 if (voices.length === 0) {
                     window.speechSynthesis.onvoiceschanged = () => {
@@ -639,23 +671,26 @@ app_code = """
                     assignVoiceAndSpeak(utterance, voices);
                 }
             } else {
-                alert("Speech synthesis not supported in this browser.");
+                alert("Speech synthesis not supported.");
             }
         }
 
         function assignVoiceAndSpeak(utterance, voices) {
             let targetVoice = voices.find(v => 
-                (v.name.includes("Madhur") || v.name.includes("Prabhat") || v.name.includes("Male") || v.name.includes("David") || v.name.includes("George") || v.name.includes("Hemant")) &&
+                (v.name.includes("Madhur") || v.name.includes("Prabhat") || v.name.includes("Male") || v.name.includes("David") || v.name.includes("George")) &&
                 (v.lang.includes("hi") || v.lang.includes("en"))
             ) || voices.find(v => v.lang.includes("hi-IN") || v.lang.includes("en-IN")) || voices[0];
             
-            if (targetVoice) {
-                utterance.voice = targetVoice;
-            }
+            if (targetVoice) utterance.voice = targetVoice;
             window.speechSynthesis.speak(utterance);
         }
 
         function sendMessage() {
+            if (isListening && recognition) {
+                recognition.stop();
+                stopVoiceUI();
+            }
+
             const inputField = document.getElementById('chatInput');
             const text = inputField.value.trim();
             if(!text) return;
@@ -669,9 +704,10 @@ app_code = """
             chatContainer.appendChild(userDiv);
 
             inputField.value = '';
+            accumulatedSpeech = "";
             chatContainer.scrollTop = chatContainer.scrollHeight;
 
-            // AI Response with Working Audio Button
+            // AI Response
             setTimeout(() => {
                 const aiDiv = document.createElement('div');
                 aiDiv.className = 'message ai-message';
@@ -689,7 +725,6 @@ app_code = """
                     reply = "जी, आपकी बात समझ आ गई है। बताइए, इसमें आपकी किस प्रकार सहायता की जाए?";
                 }
 
-                // Clean string escaping for HTML inline function call
                 const safeReply = reply.replace(/'/g, "\\'").replace(/"/g, '&quot;');
 
                 aiDiv.innerHTML = `
@@ -715,5 +750,5 @@ app_code = """
 </html>
 """
 
-# Render in Streamlit with precise height constraint (620px to prevent any scroll on load)
+# Render in Streamlit
 st.components.v1.html(app_code, height=620, scrolling=False)
