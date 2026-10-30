@@ -22,30 +22,34 @@ st.markdown("""
 api_key = os.environ.get("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY", "")
 client = Groq(api_key=api_key) if api_key else None
 
-# Function to get real Groq AI response with Dynamic User-Understanding Intelligence
-def get_groq_response(user_prompt):
+# Function to get Groq AI response with Full Chat History Context & Sense of Humor
+def get_groq_response(messages_history):
     if not client:
         return "⚠️ Groq API Key missing in Streamlit Secrets!"
     try:
+        # Format session messages into Groq API structure
+        formatted_messages = [
+            {
+                "role": "system",
+                "content": (
+                    "You are Pyrox, an exceptionally intelligent, adaptive, and emotionally aware AI collaborator with a great sense of humor. "
+                    "Remember the full conversation history with the user. Never ask 'who are you' if they return. "
+                    "Talk in a smooth, natural blend of Hinglish (Hindi + English) with subtle, cool emojis ✨. "
+                    "Be witty, empathetic when they are frustrated, and sharp when they want answers."
+                )
+            }
+        ]
+        
+        # Append all previous messages so AI never forgets context
+        for msg in messages_history:
+            formatted_messages.append({
+                "role": msg["role"],
+                "content": msg["content"]
+            })
+
         completion = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are Pyrox, an exceptionally intelligent, adaptive, and emotionally aware AI collaborator. "
-                        "Read the user's tone carefully: if they are frustrated, angry, or stressed, respond with deep empathy, "
-                        "patience, grounding support, and practical clarity without sounding robotic or dismissive. "
-                        "If they are excited or curious, match their energy with sharp, creative, and engaging responses. "
-                        "Talk in a smooth, natural blend of Hinglish (Hindi + English) with subtle, cool emojis ✨. "
-                        "Always tailor your explanation precisely to the user's exact level of understanding and current mood."
-                    )
-                },
-                {
-                    "role": "user",
-                    "content": user_prompt
-                }
-            ],
+            messages=formatted_messages,
             temperature=0.75,
             max_tokens=600,
         )
@@ -304,33 +308,6 @@ app_code = """
             display: flex;
             flex-direction: column;
             gap: 8px;
-        }
-
-        /* AUDIO PLAY BUTTON */
-        .audio-play-btn {
-            background-color: #161618;
-            color: #3b82f6;
-            border: 1px solid #2a2a2e;
-            border-radius: 8px;
-            padding: 6px 12px;
-            font-size: 12px;
-            font-weight: 600;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            align-self: flex-start;
-            transition: background 0.2s, border-color 0.2s;
-        }
-        .audio-play-btn:hover {
-            background-color: #1f1f23;
-            border-color: #3b82f6;
-            color: #60a5fa;
-        }
-        .audio-play-btn svg {
-            width: 14px;
-            height: 14px;
-            fill: currentColor;
         }
 
         /* INPUT BAR AREA */
@@ -662,20 +639,6 @@ app_code = """
             micSvg.innerHTML = `<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line>`;
         }
 
-        function speakText(text) {
-            if ('speechSynthesis' in window) {
-                window.speechSynthesis.cancel();
-                let cleanText = text.replace(/[`*_#\\[\\]()]/g, '');
-                let utterance = new SpeechSynthesisUtterance(cleanText);
-                utterance.rate = 1.0;
-                utterance.pitch = 0.95;
-                let voices = window.speechSynthesis.getVoices();
-                let targetVoice = voices.find(v => (v.name.includes("Madhur") || v.name.includes("Male") || v.name.includes("David")) && (v.lang.includes("hi") || v.lang.includes("en"))) || voices[0];
-                if (targetVoice) utterance.voice = targetVoice;
-                window.speechSynthesis.speak(utterance);
-            }
-        }
-
         function sendMessage() {
             if (isListening && recognition) { recognition.stop(); stopVoiceUI(); }
             const inputField = document.getElementById('chatInput');
@@ -684,17 +647,6 @@ app_code = """
 
             const landingHeader = document.getElementById('landingHeader');
             if (landingHeader) landingHeader.style.display = 'none';
-
-            const chatContainer = document.getElementById('chatContainer');
-
-            const userDiv = document.createElement('div');
-            userDiv.className = 'message user-message';
-            userDiv.innerText = text;
-            chatContainer.appendChild(userDiv);
-
-            inputField.value = '';
-            accumulatedSpeech = "";
-            chatContainer.scrollTop = chatContainer.scrollHeight;
 
             const url = new URL(window.location.href);
             url.searchParams.set('q', encodeURIComponent(text));
@@ -711,19 +663,24 @@ app_code = """
 </html>
 """
 
-# Session State Management for Chat History
+# Session State Management for Chat History & Memory
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Handle Backend Interaction with Groq
+# Handle Backend Interaction with Groq (Full History Context)
 query_params = st.query_params
 if "q" in query_params:
     user_prompt = query_params["q"]
     st.query_params.clear()
     
     if user_prompt:
+        # Append user message to session history
         st.session_state.messages.append({"role": "user", "content": user_prompt})
-        reply = get_groq_response(user_prompt)
+        
+        # Get AI response passing the FULL conversation history for complete memory
+        reply = get_groq_response(st.session_state.messages)
+        
+        # Append assistant reply to session history
         st.session_state.messages.append({
             "role": "assistant",
             "content": reply
@@ -732,7 +689,7 @@ if "q" in query_params:
 # Render Studio App Interface
 st.components.v1.html(app_code, height=750, scrolling=False)
 
-# Render Chat history dynamically if messages exist
+# Render Chat history dynamically with full context
 if st.session_state.messages:
     chat_history_html = "<div style='max-width:800px; margin:auto; padding: 10px; color:#fff;'>"
     for msg in st.session_state.messages:
