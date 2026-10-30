@@ -4,9 +4,9 @@ import json
 
 st.title("Pyrox AI - Qwen Master Test")
 
-# Apni API key yahan hai
-api_key = "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"
-url = "https://openrouter.ai/api/v1/chat/completions"  # Agar OpenRouter ki list hai
+# Groq ki asli API key aur official Groq endpoint
+api_key = "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"
+url = "https://api.groq.com/openai/v1/chat/completions"
 
 headers = {
     "Authorization": f"Bearer {api_key}",
