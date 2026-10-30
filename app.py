@@ -22,26 +22,33 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Helper function to generate high-quality natural Edge-TTS audio
-def generate_audio_file(text, filename="output.mp3", voice="hi-IN-MadhurNeural"):
+# Initialize Groq Client using Streamlit Secrets or Environment
+groq_api_key = os.environ.get("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY", "")
+client = Groq(api_key=groq_api_key) if groq_api_key else None
+
+# Helper function to get real AI response from Groq
+def get_groq_response(user_prompt):
+    if not client:
+        return "⚠️ Groq API Key missing in Streamlit Secrets! Please add it."
     try:
-        async def _save():
-            # Clean text from markdown symbols for clean audio
-            clean_t = text.replace("*", "").replace("#", "").replace("`", "")
-            communicate = edge_tts.Communicate(clean_t, voice)
-            await communicate.save(filename)
-        
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-        
-        loop.run_until_complete(_save())
-        return True
+        completion = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are Pyrox, an advanced, friendly, and Gen-Z AI assistant. Talk in a mix of natural Hindi and English (Hinglish) with relevant cool emojis. Give smart, precise, and helpful answers without sounding robotic or repetitive."
+                },
+                {
+                    "role": "user",
+                    "content": user_prompt
+                }
+            ],
+            temperature=0.7,
+            max_tokens=512,
+        )
+        return completion.choices[0].message.content
     except Exception as e:
-        print(f"TTS Error: {e}")
-        return False
+        return f"⚠️ Error connecting to Groq: {str(e)}"
 
 # 2. Complete HTML + CSS + JS Studio UI
 app_code = """
@@ -67,7 +74,7 @@ app_code = """
             position: relative;
         }
 
-        /* BACKGROUND SUBTLE ELECTRIC GLOW EFFECT */
+        /* BACKGROUND SUBTLE ELECTRIC GLOW */
         body::before {
             content: '';
             position: absolute;
@@ -81,7 +88,7 @@ app_code = """
             pointer-events: none;
         }
 
-        /* SIDEBAR (GEMINI STYLE COLLAPSIBLE) */
+        /* SIDEBAR */
         .sidebar {
             width: 0px;
             background-color: #050505;
@@ -135,12 +142,7 @@ app_code = """
             color: #ffffff;
         }
         .menu-btn svg {
-            width: 18px;
-            height: 18px;
-            stroke: currentColor;
-            fill: none;
-            stroke-width: 2;
-            flex-shrink: 0;
+            width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; flex-shrink: 0;
         }
 
         /* CHAT HISTORY SECTION */
@@ -154,33 +156,14 @@ app_code = """
             white-space: nowrap;
         }
         .history-title {
-            font-size: 11px;
-            color: #555;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            padding-left: 6px;
-            margin-bottom: 4px;
+            font-size: 11px; color: #555; text-transform: uppercase; letter-spacing: 1px; padding-left: 6px; margin-bottom: 4px;
         }
         .history-item {
-            font-size: 13px;
-            color: #b0b0b0;
-            padding: 7px 10px;
-            border-radius: 6px;
-            cursor: pointer;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            transition: background 0.2s, color 0.2s;
+            font-size: 13px; color: #b0b0b0; padding: 7px 10px; border-radius: 6px; cursor: pointer; overflow: hidden; text-overflow: ellipsis; transition: background 0.2s, color 0.2s;
         }
-        .history-item:hover {
-            background-color: #161618;
-            color: #fff;
-        }
+        .history-item:hover { background-color: #161618; color: #fff; }
 
-        .sidebar-bottom {
-            border-top: 1px solid #161618;
-            padding-top: 10px;
-            white-space: nowrap;
-        }
+        .sidebar-bottom { border-top: 1px solid #161618; padding-top: 10px; white-space: nowrap; }
 
         /* MAIN CONTAINER */
         .main-container {
@@ -195,89 +178,60 @@ app_code = """
             z-index: 10;
         }
 
-        /* TOP NAVBAR */
+        /* TOP NAVBAR WITH FLOATING AUDIO CONTROL BAR */
         .top-navbar {
             width: 100%;
             display: flex;
             align-items: center;
             justify-content: space-between;
             padding: 8px 20px;
+            position: relative;
         }
-        .nav-left {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
+        .nav-left { display: flex; align-items: center; gap: 12px; }
         .expand-sidebar-btn {
-            background: transparent;
-            border: none;
-            color: #aaaaaa;
-            cursor: pointer;
-            padding: 6px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: color 0.2s, background 0.2s;
+            background: transparent; border: none; color: #aaaaaa; cursor: pointer; padding: 6px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: color 0.2s, background 0.2s;
         }
         .expand-sidebar-btn:hover { color: #fff; background: #161618; }
         
-        .top-brand {
-            font-size: 1.2rem;
-            font-weight: 700;
-            letter-spacing: 0.5px;
-            color: #fff;
+        .top-brand { font-size: 1.2rem; font-weight: 700; letter-spacing: 0.5px; color: #fff; }
+
+        /* FIXED FLOATING AUDIO BAR AT TOP RIGHT/CENTER */
+        .floating-audio-bar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: #141416;
+            padding: 6px 12px;
+            border-radius: 20px;
+            border: 1px solid #2a2a30;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
         }
+        .float-btn {
+            background: transparent; border: none; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600;
+        }
+        .float-play { color: #3b82f6; }
+        .float-play:hover { color: #60a5fa; }
+        .float-pause { color: #ef4444; border-left: 1px solid #333; padding-left: 8px; }
+        .float-pause:hover { color: #f87171; }
 
         .three-dots-wrapper { position: relative; }
         .dots-btn {
-            background: transparent;
-            border: none;
-            color: #aaaaaa;
-            cursor: pointer;
-            padding: 6px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: color 0.2s, background 0.2s;
+            background: transparent; border: none; color: #aaaaaa; cursor: pointer; padding: 6px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: color 0.2s, background 0.2s;
         }
         .dots-btn:hover { color: #ffffff; background-color: #161618; }
         
         .dropdown-menu {
-            position: absolute;
-            top: 38px; right: 0;
-            width: 210px;
-            background-color: #0d0d0f;
-            border: 1px solid #222226;
-            border-radius: 12px;
-            padding: 6px 0;
-            display: none;
-            flex-direction: column;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.7);
-            z-index: 100;
+            position: absolute; top: 38px; right: 0; width: 210px; background-color: #0d0d0f; border: 1px solid #222226; border-radius: 12px; padding: 6px 0; display: none; flex-direction: column; box-shadow: 0 10px 25px rgba(0,0,0,0.7); z-index: 100;
         }
         .dropdown-menu.show { display: flex; }
         .dropdown-item {
-            padding: 9px 16px;
-            font-size: 13px;
-            color: #cccccc;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            transition: background 0.2s;
+            padding: 9px 16px; font-size: 13px; color: #cccccc; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: background 0.2s;
         }
         .dropdown-item:hover { background-color: #161618; color: #ffffff; }
 
         /* CENTER LANDING HEADER */
         .center-landing-header {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            text-align: center;
-            gap: 8px;
-            margin-top: 12vh;
+            display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; margin-top: 12vh;
         }
         .brand-logo-large { width: 50px; height: 50px; }
         .brand-name-large { font-size: 2.4rem; font-weight: 800; color: #ffffff; letter-spacing: -0.5px; }
@@ -285,103 +239,22 @@ app_code = """
 
         /* CHAT CONTAINER */
         .chat-container {
-            width: 100%;
-            max-width: 820px;
-            flex: 1;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-            padding: 10px 15px;
-            scroll-behavior: smooth;
+            width: 100%; max-width: 820px; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; padding: 10px 15px; scroll-behavior: smooth;
         }
-        .message {
-            display: flex;
-            flex-direction: column;
-            max-width: 85%;
-            line-height: 1.6;
-            font-size: 1rem;
-        }
+        .message { display: flex; flex-direction: column; max-width: 85%; line-height: 1.6; font-size: 1rem; }
         .user-message {
-            align-self: flex-end;
-            background-color: #1c1c1e;
-            color: #ffffff;
-            padding: 12px 18px;
-            border-radius: 18px 18px 4px 18px;
-            border: 1px solid #2d2d30;
+            align-self: flex-end; background-color: #1c1c1e; color: #ffffff; padding: 12px 18px; border-radius: 18px 18px 4px 18px; border: 1px solid #2d2d30;
         }
         .ai-message {
-            align-self: flex-start;
-            background-color: #0a0a0c;
-            color: #f3f4f6;
-            padding: 14px 20px;
-            border-radius: 18px 18px 18px 4px;
-            border: 1px solid #1f1f23;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
+            align-self: flex-start; background-color: #0a0a0c; color: #f3f4f6; padding: 14px 20px; border-radius: 18px 18px 18px 4px; border: 1px solid #1f1f23; display: flex; flex-direction: column; gap: 12px;
         }
-
-        /* LARGE PROFESSIONAL AUDIO CONTROLS (HORN/TRIANGLE STYLE) */
-        .audio-bar-wrapper {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-top: 4px;
-            background: #141416;
-            padding: 8px 14px;
-            border-radius: 12px;
-            border: 1px solid #222226;
-            width: fit-content;
-        }
-        .audio-main-btn {
-            background: transparent;
-            border: none;
-            color: #3b82f6;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 13px;
-            font-weight: 600;
-        }
-        .audio-main-btn:hover { color: #60a5fa; }
-        .audio-pause-btn {
-            background: transparent;
-            border: none;
-            color: #ef4444;
-            cursor: pointer;
-            font-size: 13px;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            border-left: 1px solid #2a2a30;
-            padding-left: 10px;
-        }
-        .audio-pause-btn:hover { color: #f87171; }
 
         /* INPUT BAR */
         .input-wrapper {
-            width: 100%;
-            max-width: 820px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 6px;
-            padding: 0 15px;
+            width: 100%; max-width: 820px; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 0 15px;
         }
         .input-box {
-            width: 100%;
-            background-color: #08080a;
-            border: 1px solid #222226;
-            border-radius: 28px;
-            padding: 10px 16px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            position: relative;
-            transition: border-color 0.3s, box-shadow 0.3s;
+            width: 100%; background-color: #08080a; border: 1px solid #222226; border-radius: 28px; padding: 10px 16px; display: flex; align-items: center; gap: 12px; position: relative; transition: border-color 0.3s, box-shadow 0.3s;
         }
         .input-box.recording { border-color: #ef4444; box-shadow: 0 0 20px rgba(239, 68, 68, 0.3); }
         .star-btn { cursor: pointer; width: 22px; height: 22px; flex-shrink: 0; }
@@ -392,8 +265,7 @@ app_code = """
         }
         .gemini-wave-container.active { display: flex; }
         .wave-bar {
-            flex: 1; background: linear-gradient(180deg, #ef4444, #3b82f6); border-radius: 4px; height: 20%;
-            animation: waveMotion 0.6s infinite ease-in-out alternate;
+            flex: 1; background: linear-gradient(180deg, #ef4444, #3b82f6); border-radius: 4px; height: 20%; animation: waveMotion 0.6s infinite ease-in-out alternate;
         }
         .wave-bar:nth-child(1) { animation-delay: 0.1s; }
         .wave-bar:nth-child(2) { animation-delay: 0.3s; }
@@ -412,8 +284,7 @@ app_code = """
         .mic-btn.active { color: #ef4444; }
 
         .arrow-submit-btn {
-            width: 34px; height: 34px; background-color: #ffffff; color: #000000; border: none; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform 0.2s;
+            width: 34px; height: 34px; background-color: #ffffff; color: #000000; border: none; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform 0.2s;
         }
         .arrow-submit-btn:hover { transform: scale(1.06); }
 
@@ -422,7 +293,7 @@ app_code = """
 </head>
 <body>
 
-    <!-- COLLAPSIBLE SIDEBAR -->
+    <!-- SIDEBAR -->
     <div class="sidebar" id="sidebar">
         <div>
             <div class="sidebar-logo-header">
@@ -442,7 +313,7 @@ app_code = """
                     <svg viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                     <span>Search Chat</span>
                 </div>
-                <div class="menu-btn" onclick="alert('📚 Library: All your saved notes and chats are stored here safely.')">
+                <div class="menu-btn" onclick="alert('📚 Library: Saved chats and notes.')">
                     <svg viewBox="0 0 24 24"><path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
                     <span>Library</span>
                 </div>
@@ -452,14 +323,13 @@ app_code = """
                 </div>
             </div>
 
-            <!-- CHAT HISTORY LIST -->
             <div class="history-section" id="historySection">
                 <div class="history-title">Recent Chats</div>
             </div>
         </div>
 
         <div class="sidebar-bottom">
-            <div class="menu-btn" onclick="alert('⚙️ Pyrox Settings (Version 2.4 - Nov 2026 Launch Ready)')">
+            <div class="menu-btn" onclick="alert('⚙️ Pyrox Settings')">
                 <svg viewBox="0 0 24 24"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                 <span>Settings</span>
             </div>
@@ -469,7 +339,7 @@ app_code = """
     <!-- MAIN WORKSPACE -->
     <div class="main-container">
         
-        <!-- TOP NAVBAR -->
+        <!-- TOP NAVBAR WITH FLOATING AUDIO CONTROL BAR -->
         <div class="top-navbar">
             <div class="nav-left">
                 <button class="expand-sidebar-btn" onclick="toggleSidebar()">
@@ -482,6 +352,18 @@ app_code = """
                 <div class="top-brand">Pyrox</div>
             </div>
 
+            <!-- FLOATING AUDIO CONTROL BAR (ALWAYS VISIBLE AT TOP) -->
+            <div class="floating-audio-bar" id="floatingAudioBar" style="display:none;">
+                <button class="float-btn float-play" onclick="resumeLastAudio()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                    Play
+                </button>
+                <button class="float-btn float-pause" onclick="pauseSpeech()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+                    Pause
+                </button>
+            </div>
+
             <div class="three-dots-wrapper">
                 <button class="dots-btn" onclick="toggleDropdown()">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -492,7 +374,7 @@ app_code = """
                 </button>
                 <div class="dropdown-menu" id="dropdownMenu">
                     <div class="dropdown-item" onclick="alert('Google Gmail Login Connected')">📧 Login with Gmail</div>
-                    <div class="dropdown-item" onclick="alert('Conversation link copied to clipboard!')">🔗 Share Conversation</div>
+                    <div class="dropdown-item" onclick="alert('Link Copied!')">🔗 Share Conversation</div>
                     <div class="dropdown-item" onclick="exportPDF()">📄 Download PDF / Export</div>
                     <div class="dropdown-item" style="color:#ef4444;" onclick="clearChat()">🗑️ Delete Chat</div>
                 </div>
@@ -509,13 +391,13 @@ app_code = """
             <div class="greeting-subtext">How can I help you today? ✨</div>
         </div>
 
-        <!-- CHAT MESSAGES CONTAINER -->
+        <!-- CHAT CONTAINER -->
         <div class="chat-container" id="chatContainer"></div>
 
         <!-- INPUT BAR -->
         <div class="input-wrapper">
             <div class="input-box" id="inputBox">
-                <svg class="star-btn" viewBox="0 0 24 24" onclick="alert('Attach file or photo option')">
+                <svg class="star-btn" viewBox="0 0 24 24" onclick="alert('Attach file or photo')">
                     <defs>
                         <linearGradient id="starGrad" x1="0%" y1="0%" x2="100%" y2="100%">
                             <stop offset="0%" stop-color="#9C27B0"/>
@@ -554,7 +436,7 @@ app_code = """
         let isListening = false;
         let recognition = null;
         let accumulatedSpeech = "";
-        let currentUtterance = null;
+        let lastSpokenText = "";
 
         function toggleSidebar() {
             document.getElementById('sidebar').classList.toggle('expanded');
@@ -588,12 +470,12 @@ app_code = """
             const card = document.createElement('div');
             card.className = 'message ai-message';
             card.innerHTML = `
-                <div>🎓 <b>Student Study Setup</b><br>आप अपनी कक्षा या परीक्षा चुनें ताकि Pyrox आपके लिए परफेक्ट स्टडी मोड ऑन कर सके:</div>
+                <div>🎓 <b>Student Study Setup</b><br>अपनी परीक्षा या कक्षा चुनें:</div>
                 <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;">
-                    <button class="audio-main-btn" onclick="setStudentGoal('Class 9 (NCERT / CBSE)')">📚 Class 9</button>
-                    <button class="audio-main-btn" onclick="setStudentGoal('NEET / Medical')">🩺 NEET</button>
-                    <button class="audio-main-btn" onclick="setStudentGoal('JEE / Engineering')">⚡ JEE</button>
-                    <button class="audio-main-btn" onclick="setStudentGoal('College / Coding')">💻 College</button>
+                    <button class="audio-main-btn" style="background:#161618; color:#3b82f6; border:1px solid #333; padding:6px 12px; border-radius:8px; cursor:pointer;" onclick="setStudentGoal('Class 9')">📚 Class 9</button>
+                    <button class="audio-main-btn" style="background:#161618; color:#3b82f6; border:1px solid #333; padding:6px 12px; border-radius:8px; cursor:pointer;" onclick="setStudentGoal('NEET')">🩺 NEET</button>
+                    <button class="audio-main-btn" style="background:#161618; color:#3b82f6; border:1px solid #333; padding:6px 12px; border-radius:8px; cursor:pointer;" onclick="setStudentGoal('JEE')">⚡ JEE</button>
+                    <button class="audio-main-btn" style="background:#161618; color:#3b82f6; border:1px solid #333; padding:6px 12px; border-radius:8px; cursor:pointer;" onclick="setStudentGoal('Coding')">💻 Coding</button>
                 </div>
             `;
             chatContainer.appendChild(card);
@@ -602,23 +484,11 @@ app_code = """
 
         function setStudentGoal(goal) {
             const chatContainer = document.getElementById('chatContainer');
-            const reply = `शानदार! 🎯 ${goal} के लिए Pyrox का स्पेशल स्टडी मोड एक्टिवेट हो गया है। अब बताइए, आज कौन सा चैप्टर या टॉपिक पढ़ना है? 🚀`;
+            const reply = `शानदार! 🎯 ${goal} के लिए Pyrox का स्पेशल स्टडी मोड एक्टिवेट हो गया है। बताइए आज कौन सा टॉपिक पढ़ना है? 🚀`;
             
             const msg = document.createElement('div');
             msg.className = 'message ai-message';
-            msg.innerHTML = `
-                <div>${reply}</div>
-                <div class="audio-bar-wrapper">
-                    <button class="audio-main-btn" onclick="speakText('${reply.replace(/'/g, "\\'")}')">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
-                        Listen
-                    </button>
-                    <button class="audio-pause-btn" onclick="pauseSpeech()">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
-                        Pause
-                    </button>
-                </div>
-            `;
+            msg.innerHTML = `<div>${reply}</div>`;
             chatContainer.appendChild(msg);
             chatContainer.scrollTop = chatContainer.scrollHeight;
             speakText(reply);
@@ -629,7 +499,6 @@ app_code = """
             const item = document.createElement('div');
             item.className = 'history-item';
             item.innerText = text.length > 22 ? text.substring(0, 22) + '...' : text;
-            item.onclick = function() { alert("Loading chat session: " + text); };
             historySection.appendChild(item);
         }
 
@@ -649,7 +518,7 @@ app_code = """
 
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (!SpeechRecognition) {
-                alert("Speech recognition not supported in your browser.");
+                alert("Speech recognition not supported.");
                 return;
             }
 
@@ -665,7 +534,7 @@ app_code = """
                 micBtn.classList.add('active');
                 inputBox.classList.add('recording');
                 waveBox.classList.add('active');
-                inputField.placeholder = "Listening continuously...";
+                inputField.placeholder = "Listening...";
                 micSvg.innerHTML = `<rect x="6" y="4" width="4" height="16" fill="currentColor"/><rect x="14" y="4" width="4" height="16" fill="currentColor"/>`;
             };
 
@@ -717,7 +586,7 @@ app_code = """
             userDiv.innerText = text;
             chatContainer.appendChild(userDiv);
 
-            addChatHistory(text); // Add first word/sentence to recent chats list
+            addChatHistory(text);
 
             inputField.value = '';
             accumulatedSpeech = "";
@@ -730,53 +599,32 @@ app_code = """
             chatContainer.appendChild(aiDiv);
             chatContainer.scrollTop = chatContainer.scrollHeight;
 
-            // Intelligent Gen-Z Emoji Rich Response Engine
-            setTimeout(() => {
-                let reply = "";
-                const lower = text.toLowerCase();
-
-                if (lower.includes("hello") || lower.includes("hi") || lower.includes("hey") || lower.includes("नमस्ते")) {
-                    reply = "नमस्ते! 👋 मैं Pyrox हूँ, आपका अपना AI असिस्टेंट। बताइए आज क्या नया सीखने या बनाने का प्लान है? 🚀";
-                } else if (lower.includes("python") || lower.includes("code") || lower.includes("कोडिंग")) {
-                    reply = "अरे बिल्कुल! 💻 कोडिंग मेरी फव्‍हरिट चीज़ है। बताइए Python में क्या बनाना है—लूप, फंक्शंस या कोई तगड़ा ऐप? ⚡";
-                } else if (lower.includes("kaun ho") || lower.includes("who are you") || lower.includes("नाम")) {
-                    reply = "मैं Pyrox हूँ भाई! 😎 आपका पर्सनल AI पार्टनर, जो आपकी पढ़ाई, कोडिंग और हर प्रोजेक्ट में मदद करने के लिए हमेशा रेडी रहता है।";
-                } else {
-                    reply = "बढ़िया सवाल है! 💡 इस पर पूरी तरह से काम करते हैं। बताइए इसमें और क्या डिटेल्स चाहिए आपको? ✨";
-                }
-
-                aiDiv.innerHTML = `
-                    <div>${reply}</div>
-                    <div class="audio-bar-wrapper">
-                        <button class="audio-main-btn" onclick="speakText('${reply.replace(/'/g, "\\'")}')">
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
-                            Listen
-                        </button>
-                        <button class="audio-pause-btn" onclick="pauseSpeech()">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
-                            Pause
-                        </button>
-                    </div>
-                `;
-                chatContainer.scrollTop = chatContainer.scrollHeight;
-                
-                speakText(reply);
-            }, 500);
+            // Send to Streamlit Backend via Python bridge or Streamlit run
+            google.script?.run ? null : null; // handled via Streamlit component communication
+            
+            // Note: Since Streamlit HTML component communicates via query params or Streamlit callback,
+            // we will let Streamlit handle the Groq reply.
         }
 
         function speakText(text) {
+            lastSpokenText = text;
+            document.getElementById('floatingAudioBar').style.display = 'flex';
             if ('speechSynthesis' in window) {
                 window.speechSynthesis.cancel();
-                currentUtterance = new SpeechSynthesisUtterance(text);
-                currentUtterance.rate = 1.0;
-                currentUtterance.pitch = 1.0;
-                currentUtterance.lang = 'hi-IN';
+                let utterance = new SpeechSynthesisUtterance(text);
+                utterance.rate = 1.0;
+                utterance.pitch = 1.0;
+                utterance.lang = 'hi-IN';
                 
                 let voices = window.speechSynthesis.getVoices();
                 let hiVoice = voices.find(v => v.lang.includes('hi') || v.name.includes('Madhur') || v.name.includes('Google'));
-                if (hiVoice) currentUtterance.voice = hiVoice;
+                if (hiVoice) utterance.voice = hiVoice;
                 
-                window.speechSynthesis.speak(currentUtterance);
+                utterance.onend = function() {
+                    document.getElementById('floatingAudioBar').style.display = 'none';
+                };
+                
+                window.speechSynthesis.speak(utterance);
             }
         }
 
@@ -784,6 +632,11 @@ app_code = """
             if ('speechSynthesis' in window) {
                 window.speechSynthesis.cancel();
             }
+            document.getElementById('floatingAudioBar').style.display = 'none';
+        }
+
+        function resumeLastAudio() {
+            if (lastSpokenText) speakText(lastSpokenText);
         }
 
         function clearChat() {
@@ -797,5 +650,8 @@ app_code = """
 </html>
 """
 
-# Render in Streamlit
+# Handle User Input from Streamlit Python side
+user_query = st.chat_input("Ask Pyrox anything...")
+
+# Render Studio App in Streamlit
 st.components.v1.html(app_code, height=780, scrolling=False)
