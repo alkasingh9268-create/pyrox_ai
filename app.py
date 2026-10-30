@@ -12,7 +12,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Hide Default Streamlit Elements & Force Zero Padding for Meta AI Clean UI
+# Hide Default Streamlit Elements & Force Zero Padding for Clean Custom UI
 st.markdown("""
     <style>
     .stApp { background-color: #000000; color: #ffffff; }
@@ -47,17 +47,17 @@ def generate_edge_audio(text, filename="response.mp3"):
         print("TTS Error:", e)
         return False
 
-# Function to get real AI response from Groq
+# Function to get real AI response from Groq (Gen-Z, Emoji Rich, Smart & Contextual)
 def get_groq_response(user_prompt):
     if not client:
-        return "⚠️ Groq API Key missing in Streamlit Secrets! Please add it."
+        return "⚠️ Groq API Key missing in Streamlit Secrets!"
     try:
         completion = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[
                 {
                     "role": "system",
-                    "content": "You are Pyrox, an advanced, highly intelligent, and Gen-Z AI assistant inspired by Meta AI and ChatGPT. Talk in a smooth mix of natural Hindi and English (Hinglish) with cool emojis. Give crisp, highly accurate, and engaging answers without sounding robotic or repetitive."
+                    "content": "You are Pyrox, an advanced, highly intelligent, and Gen-Z friendly AI assistant inspired by Meta AI and ChatGPT. Talk in a smooth mix of natural Hindi and English (Hinglish) with cool emojis ✨. Give crisp, highly accurate, and engaging answers without sounding robotic, repetitive, or overly formal. Understand user intent deeply and reply like a smart personal partner."
                 },
                 {
                     "role": "user",
@@ -71,7 +71,7 @@ def get_groq_response(user_prompt):
     except Exception as e:
         return f"⚠️ Error connecting to Groq: {str(e)}"
 
-# 2. Meta AI + ChatGPT Inspired Clean Studio Frontend UI
+# 2. Pure Clean Studio Frontend UI (HTML + CSS + JS)
 app_code = """
 <!DOCTYPE html>
 <html lang="hi">
@@ -95,24 +95,10 @@ app_code = """
             position: relative;
         }
 
-        /* META AI STYLE CLEAN SUBTLE GLOW */
-        body::before {
-            content: '';
-            position: absolute;
-            top: -50px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 700px;
-            height: 220px;
-            background: radial-gradient(circle, rgba(59, 130, 246, 0.06) 0%, rgba(147, 51, 234, 0.04) 50%, transparent 80%);
-            z-index: 0;
-            pointer-events: none;
-        }
-
-        /* SIDEBAR (META / GEMINI STYLE COLLAPSIBLE) */
+        /* SIDEBAR (COLLAPSIBLE GEMINI/META STYLE) */
         .sidebar {
             width: 0px;
-            background-color: #060608;
+            background-color: #050507;
             border-right: none;
             display: flex;
             flex-direction: column;
@@ -250,12 +236,6 @@ app_code = """
             align-self: flex-start; background-color: #08080c; color: #f3f4f6; padding: 14px 20px; border-radius: 18px 18px 18px 4px; border: 1px solid #1a1a22; display: flex; flex-direction: column; gap: 12px;
         }
 
-        /* AUDIO PLAYER BUTTON */
-        .audio-btn {
-            background-color: #14141c; color: #3b82f6; border: 1px solid #22222e; border-radius: 8px; padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; transition: background 0.2s;
-        }
-        .audio-btn:hover { background-color: #1c1c28; color: #60a5fa; }
-
         /* INPUT BAR */
         .input-wrapper {
             width: 100%; max-width: 840px; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 0 15px;
@@ -320,13 +300,9 @@ app_code = """
                     <svg viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                     <span>Search Chat</span>
                 </div>
-                <div class="menu-btn" onclick="alert('📚 Library: All your saved chats & notes are stored securely.')">
+                <div class="menu-btn" onclick="alert('📚 Library: Saved chats and notes.')">
                     <svg viewBox="0 0 24 24"><path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
                     <span>Library</span>
-                </div>
-                <div class="menu-btn" onclick="openStudentSetup()">
-                    <svg viewBox="0 0 24 24"><path d="M12 14l9-5-9-5-9 5 9 5z"></path><path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0112 20.055a11.952 11.952 0 01-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"></path></svg>
-                    <span>For Students</span>
                 </div>
             </div>
 
@@ -423,7 +399,7 @@ app_code = """
                     </svg>
                 </button>
             </div>
-            <div class="footer-disclaimer">Pyrox AI • Global Launch Nov 2026</div>
+            <div class="footer-disclaimer">Pyrox AI</div>
         </div>
     </div>
 
@@ -452,39 +428,34 @@ app_code = """
             if(term) alert("'" + term + "' से जुड़े मैसेज खोजे जा रहे हैं...");
         }
 
-        function openStudentSetup() {
-            const chatContainer = document.getElementById('chatContainer');
-            const landingHeader = document.getElementById('landingHeader');
-            if(landingHeader) landingHeader.style.display = 'none';
-
-            const card = document.createElement('div');
-            card.className = 'message ai-message';
-            card.innerHTML = `
-                <div>🎓 <b>Student Study Setup</b><br>अपनी कक्षा या परीक्षा चुनें:</div>
-                <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;">
-                    <button class="audio-btn" onclick="triggerPreset('Class 9 Study Mode')">📚 Class 9</button>
-                    <button class="audio-btn" onclick="triggerPreset('NEET Prep Mode')">🩺 NEET</button>
-                    <button class="audio-btn" onclick="triggerPreset('JEE Prep Mode')">⚡ JEE</button>
-                    <button class="audio-btn" onclick="triggerPreset('Coding & Python Mode')">💻 Coding</button>
-                </div>
-            `;
-            chatContainer.appendChild(card);
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-        }
-
-        function triggerPreset(text) {
-            document.getElementById('chatInput').value = text;
-            triggerSend();
-        }
-
         function triggerSend() {
             const inputField = document.getElementById('chatInput');
             const text = inputField.value.trim();
             if(!text) return;
             
-            // Pass value back via Streamlit query or form submission simulation
-            // For now, we trigger Python backend via Streamlit rerender bridge
-            window.parent.postMessage({type: 'streamlit:setComponentValue', value: text}, '*');
+            const chatContainer = document.getElementById('chatContainer');
+            const landingHeader = document.getElementById('landingHeader');
+            if(landingHeader) landingHeader.style.display = 'none';
+
+            const userDiv = document.createElement('div');
+            userDiv.className = 'message user-message';
+            userDiv.innerText = text;
+            chatContainer.appendChild(userDiv);
+
+            // Add history
+            const historySection = document.getElementById('historySection');
+            const hItem = document.createElement('div');
+            hItem.className = 'history-item';
+            hItem.innerText = text.length > 22 ? text.substring(0, 22) + '...' : text;
+            historySection.appendChild(hItem);
+
+            inputField.value = '';
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+
+            // Trigger Streamlit rerun with query param
+            const url = new URL(window.location.href);
+            url.searchParams.set('q', encodeURIComponent(text));
+            window.location.href = url.toString();
         }
 
         function toggleVoice() {
@@ -553,53 +524,38 @@ app_code = """
         }
 
         function clearChat() {
-            document.getElementById('chatContainer').innerHTML = '';
-            const landingHeader = document.getElementById('landingHeader');
-            if(landingHeader) landingHeader.style.display = 'flex';
+            const url = new URL(window.location.href);
+            url.searchParams.delete('q');
+            window.location.href = url.toString();
         }
     </script>
 </body>
 </html>
 """
 
-# Handle Python Side Groq LLM & Edge-TTS Generation inside Streamlit Native Loop
+# Session State Management
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# If user submitted a message from the custom frontend or chat
-user_prompt = st.chat_input("Ask Pyrox anything...")
+# Check if query parameter 'q' exists from frontend trigger
+query_params = st.query_params
+if "q" in query_params:
+    user_prompt = query_params["q"]
+    st.query_params.clear()
+    
+    if user_prompt:
+        st.session_state.messages.append({"role": "user", "content": user_prompt})
+        reply = get_groq_response(user_prompt)
+        
+        audio_filename = f"audio_{len(st.session_state.messages)}.mp3"
+        success = generate_edge_audio(reply, audio_filename)
+        audio_path = audio_filename if success else None
+        
+        st.session_state.messages.append({
+            "role": "assistant",
+            "content": reply,
+            "audio_file": audio_path
+        })
 
-# Display Chat History cleanly
-for message in st.session_state.messages:
-    with st.chat_message(message["role"], avatar="🤖" if message["role"] == "assistant" else "👤"):
-        st.markdown(message["content"])
-        if message["role"] == "assistant" and "audio_file" in message:
-            if message["audio_file"] and os.path.exists(message["audio_file"]):
-                st.audio(message["audio_file"], format="audio/mp3")
-
-if user_prompt:
-    st.session_state.messages.append({"role": "user", "content": user_prompt})
-    with st.chat_message("user", avatar="👤"):
-        st.markdown(user_prompt)
-
-    with st.chat_message("assistant", avatar="🤖"):
-        with st.spinner("✨ Pyrox is thinking..."):
-            reply = get_groq_response(user_prompt)
-            
-            # Generate Edge-TTS audio file
-            audio_filename = f"audio_{len(st.session_state.messages)}.mp3"
-            success = generate_edge_audio(reply, audio_filename)
-            audio_path = audio_filename if success else None
-            
-            st.markdown(reply)
-            if audio_path and os.path.exists(audio_path):
-                st.audio(audio_path, format="audio/mp3")
-            
-            st.session_state.messages.append({
-                "role": "assistant",
-                "content": reply,
-                "audio_file": audio_path
-            })
-
-# Render Studio App Interface alongside Streamlit loop
+# Render Studio App Interface
 st.components.v1.html(app_code, height=780, scrolling=False)
