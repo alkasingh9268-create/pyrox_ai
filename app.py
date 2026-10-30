@@ -2,6 +2,7 @@ import os
 import asyncio
 import edge_tts
 import streamlit as st
+from groq import Groq
 
 # 1. Page Configuration
 st.set_page_config(
@@ -21,11 +22,13 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Helper function to generate Edge-TTS MP3 audio file on server
+# Helper function to generate high-quality natural Edge-TTS audio
 def generate_audio_file(text, filename="output.mp3", voice="hi-IN-MadhurNeural"):
     try:
         async def _save():
-            communicate = edge_tts.Communicate(text, voice)
+            # Clean text from markdown symbols for clean audio
+            clean_t = text.replace("*", "").replace("#", "").replace("`", "")
+            communicate = edge_tts.Communicate(clean_t, voice)
             await communicate.save(filename)
         
         try:
@@ -40,7 +43,7 @@ def generate_audio_file(text, filename="output.mp3", voice="hi-IN-MadhurNeural")
         print(f"TTS Error: {e}")
         return False
 
-# 2. Complete HTML + CSS + JS Studio UI with Collapsible Sidebar & History
+# 2. Complete HTML + CSS + JS Studio UI
 app_code = """
 <!DOCTYPE html>
 <html lang="hi">
@@ -61,9 +64,24 @@ app_code = """
             display: flex;
             height: 100vh;
             overflow: hidden;
+            position: relative;
         }
 
-        /* SIDEBAR (COLLAPSIBLE GEMINI STYLE) */
+        /* BACKGROUND SUBTLE ELECTRIC GLOW EFFECT */
+        body::before {
+            content: '';
+            position: absolute;
+            top: -50px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 600px;
+            height: 200px;
+            background: radial-gradient(circle, rgba(239, 68, 68, 0.08) 0%, rgba(59, 130, 246, 0.04) 50%, transparent 80%);
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        /* SIDEBAR (GEMINI STYLE COLLAPSIBLE) */
         .sidebar {
             width: 0px;
             background-color: #050505;
@@ -77,25 +95,20 @@ app_code = """
             transition: width 0.3s ease, padding 0.3s ease, border-right 0.3s ease;
         }
         .sidebar.expanded {
-            width: 240px;
-            padding: 12px 10px;
-            border-right: 1px solid #141414;
+            width: 250px;
+            padding: 14px 12px;
+            border-right: 1px solid #161618;
         }
         .sidebar-logo-header {
             display: flex;
             align-items: center;
             gap: 10px;
             padding: 4px 6px;
-            margin-bottom: 10px;
+            margin-bottom: 12px;
             white-space: nowrap;
         }
-        .sidebar-logo-header svg {
-            width: 24px;
-            height: 24px;
-            flex-shrink: 0;
-        }
         .sidebar-brand-name {
-            font-size: 1.1rem;
+            font-size: 1.15rem;
             font-weight: 700;
             color: #ffffff;
             letter-spacing: 0.5px;
@@ -103,39 +116,34 @@ app_code = """
         .menu-list {
             display: flex;
             flex-direction: column;
-            gap: 3px;
+            gap: 4px;
             white-space: nowrap;
         }
         .menu-btn {
             display: flex;
             align-items: center;
             gap: 12px;
-            padding: 8px 10px;
+            padding: 9px 10px;
             color: #aaaaaa;
-            font-size: 13px;
+            font-size: 13.5px;
             border-radius: 8px;
             cursor: pointer;
             transition: background 0.2s, color 0.2s;
         }
         .menu-btn:hover {
-            background-color: #141414;
+            background-color: #161618;
             color: #ffffff;
         }
         .menu-btn svg {
-            width: 17px;
-            height: 17px;
+            width: 18px;
+            height: 18px;
             stroke: currentColor;
             fill: none;
             stroke-width: 2;
             flex-shrink: 0;
         }
-        .sidebar-bottom {
-            border-top: 1px solid #141414;
-            padding-top: 8px;
-            white-space: nowrap;
-        }
 
-        /* CHAT HISTORY SECTION IN SIDEBAR */
+        /* CHAT HISTORY SECTION */
         .history-section {
             margin-top: 15px;
             flex: 1;
@@ -143,24 +151,24 @@ app_code = """
             display: flex;
             flex-direction: column;
             gap: 4px;
+            white-space: nowrap;
         }
         .history-title {
             font-size: 11px;
-            color: #666;
+            color: #555;
             text-transform: uppercase;
             letter-spacing: 1px;
             padding-left: 6px;
             margin-bottom: 4px;
         }
         .history-item {
-            font-size: 12.5px;
+            font-size: 13px;
             color: #b0b0b0;
-            padding: 6px 10px;
+            padding: 7px 10px;
             border-radius: 6px;
             cursor: pointer;
             overflow: hidden;
             text-overflow: ellipsis;
-            white-space: nowrap;
             transition: background 0.2s, color 0.2s;
         }
         .history-item:hover {
@@ -168,22 +176,10 @@ app_code = """
             color: #fff;
         }
 
-        /* TOOLTIP */
-        [data-tooltip] { position: relative; }
-        [data-tooltip]:hover::after {
-            content: attr(data-tooltip);
-            position: absolute;
-            bottom: 115%;
-            left: 50%;
-            transform: translateX(-50%);
-            background-color: #1f1f1f;
-            color: #ffffff;
-            font-size: 11px;
-            padding: 4px 8px;
-            border-radius: 6px;
+        .sidebar-bottom {
+            border-top: 1px solid #161618;
+            padding-top: 10px;
             white-space: nowrap;
-            border: 1px solid #333;
-            z-index: 1000;
         }
 
         /* MAIN CONTAINER */
@@ -195,7 +191,8 @@ app_code = """
             align-items: center;
             height: 100vh;
             padding-top: 4px;
-            padding-bottom: 8px;
+            padding-bottom: 10px;
+            z-index: 10;
         }
 
         /* TOP NAVBAR */
@@ -204,12 +201,12 @@ app_code = """
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 6px 20px;
+            padding: 8px 20px;
         }
         .nav-left {
             display: flex;
             align-items: center;
-            gap: 14px;
+            gap: 12px;
         }
         .expand-sidebar-btn {
             background: transparent;
@@ -223,12 +220,13 @@ app_code = """
             justify-content: center;
             transition: color 0.2s, background 0.2s;
         }
-        .expand-sidebar-btn:hover { color: #fff; background: #1a1a1a; }
+        .expand-sidebar-btn:hover { color: #fff; background: #161618; }
         
         .top-brand {
-            font-size: 1.15rem;
+            font-size: 1.2rem;
             font-weight: 700;
             letter-spacing: 0.5px;
+            color: #fff;
         }
 
         .three-dots-wrapper { position: relative; }
@@ -244,19 +242,19 @@ app_code = """
             justify-content: center;
             transition: color 0.2s, background 0.2s;
         }
-        .dots-btn:hover { color: #ffffff; background-color: #1a1a1a; }
+        .dots-btn:hover { color: #ffffff; background-color: #161618; }
         
         .dropdown-menu {
             position: absolute;
-            top: 36px; right: 0;
+            top: 38px; right: 0;
             width: 210px;
-            background-color: #0d0d0d;
-            border: 1px solid #222222;
+            background-color: #0d0d0f;
+            border: 1px solid #222226;
             border-radius: 12px;
             padding: 6px 0;
             display: none;
             flex-direction: column;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.6);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.7);
             z-index: 100;
         }
         .dropdown-menu.show { display: flex; }
@@ -270,7 +268,7 @@ app_code = """
             gap: 10px;
             transition: background 0.2s;
         }
-        .dropdown-item:hover { background-color: #1a1a1a; color: #ffffff; }
+        .dropdown-item:hover { background-color: #161618; color: #ffffff; }
 
         /* CENTER LANDING HEADER */
         .center-landing-header {
@@ -278,106 +276,123 @@ app_code = """
             flex-direction: column;
             align-items: center;
             text-align: center;
-            gap: 4px;
-            margin-top: 10vh;
+            gap: 8px;
+            margin-top: 12vh;
         }
-        .brand-logo-large { width: 45px; height: 45px; }
-        .brand-name-large { font-size: 2.2rem; font-weight: 800; color: #ffffff; }
+        .brand-logo-large { width: 50px; height: 50px; }
+        .brand-name-large { font-size: 2.4rem; font-weight: 800; color: #ffffff; letter-spacing: -0.5px; }
         .greeting-subtext { font-size: 1.25rem; font-weight: 500; color: #9ca3af; }
 
-        /* CHAT MESSAGES */
+        /* CHAT CONTAINER */
         .chat-container {
             width: 100%;
-            max-width: 800px;
+            max-width: 820px;
             flex: 1;
             overflow-y: auto;
             display: flex;
             flex-direction: column;
-            gap: 14px;
-            padding: 5px 15px;
+            gap: 16px;
+            padding: 10px 15px;
+            scroll-behavior: smooth;
         }
         .message {
             display: flex;
             flex-direction: column;
-            max-width: 82%;
-            line-height: 1.5;
-            font-size: 0.98rem;
+            max-width: 85%;
+            line-height: 1.6;
+            font-size: 1rem;
         }
         .user-message {
             align-self: flex-end;
             background-color: #1c1c1e;
             color: #ffffff;
-            padding: 10px 16px;
-            border-radius: 16px 16px 4px 16px;
-            border: 1px solid #2d2d2d;
+            padding: 12px 18px;
+            border-radius: 18px 18px 4px 18px;
+            border: 1px solid #2d2d30;
         }
         .ai-message {
             align-self: flex-start;
-            background-color: #0d0d0f;
-            color: #f0f0f0;
-            padding: 12px 18px;
-            border-radius: 16px 16px 16px 4px;
+            background-color: #0a0a0c;
+            color: #f3f4f6;
+            padding: 14px 20px;
+            border-radius: 18px 18px 18px 4px;
             border: 1px solid #1f1f23;
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 12px;
         }
 
-        /* AUDIO PLAYER & STOP/PAUSE BUTTONS */
-        .audio-controls {
+        /* LARGE PROFESSIONAL AUDIO CONTROLS (HORN/TRIANGLE STYLE) */
+        .audio-bar-wrapper {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
+            margin-top: 4px;
+            background: #141416;
+            padding: 8px 14px;
+            border-radius: 12px;
+            border: 1px solid #222226;
+            width: fit-content;
         }
-        .audio-play-btn, .audio-stop-btn {
-            background-color: #161618;
+        .audio-main-btn {
+            background: transparent;
+            border: none;
             color: #3b82f6;
-            border: 1px solid #2a2a2e;
-            border-radius: 8px;
-            padding: 6px 12px;
-            font-size: 12px;
-            font-weight: 600;
             cursor: pointer;
-            display: inline-flex;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        .audio-main-btn:hover { color: #60a5fa; }
+        .audio-pause-btn {
+            background: transparent;
+            border: none;
+            color: #ef4444;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            display: flex;
             align-items: center;
             gap: 6px;
-            transition: background 0.2s;
+            border-left: 1px solid #2a2a30;
+            padding-left: 10px;
         }
-        .audio-play-btn:hover, .audio-stop-btn:hover { background-color: #1f1f23; }
-        .audio-stop-btn { color: #ef4444; border-color: #3a1c1c; }
+        .audio-pause-btn:hover { color: #f87171; }
 
         /* INPUT BAR */
         .input-wrapper {
             width: 100%;
-            max-width: 800px;
+            max-width: 820px;
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 4px;
+            gap: 6px;
             padding: 0 15px;
         }
         .input-box {
             width: 100%;
-            background-color: #080808;
-            border: 1px solid #222222;
-            border-radius: 26px;
-            padding: 8px 14px;
+            background-color: #08080a;
+            border: 1px solid #222226;
+            border-radius: 28px;
+            padding: 10px 16px;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
             position: relative;
-            transition: border-color 0.3s;
+            transition: border-color 0.3s, box-shadow 0.3s;
         }
-        .input-box.recording { border-color: #ef4444; box-shadow: 0 0 15px rgba(239, 68, 68, 0.25); }
-        .star-btn { cursor: pointer; width: 20px; height: 20px; flex-shrink: 0; }
+        .input-box.recording { border-color: #ef4444; box-shadow: 0 0 20px rgba(239, 68, 68, 0.3); }
+        .star-btn { cursor: pointer; width: 22px; height: 22px; flex-shrink: 0; }
 
         /* WAVE BARS */
         .gemini-wave-container {
-            display: flex; align-items: center; gap: 3.5px; height: 20px; width: 120px; display: none;
+            display: flex; align-items: center; gap: 4px; height: 22px; width: 130px; display: none;
         }
         .gemini-wave-container.active { display: flex; }
         .wave-bar {
-            flex: 1; background: linear-gradient(180deg, #ef4444, #3b82f6); border-radius: 3px; height: 20%;
+            flex: 1; background: linear-gradient(180deg, #ef4444, #3b82f6); border-radius: 4px; height: 20%;
             animation: waveMotion 0.6s infinite ease-in-out alternate;
         }
         .wave-bar:nth-child(1) { animation-delay: 0.1s; }
@@ -388,21 +403,21 @@ app_code = """
         @keyframes waveMotion { 0% { height: 15%; } 100% { height: 100%; } }
 
         .chat-input-field {
-            flex: 1; background: transparent; border: none; outline: none; color: #ffffff; font-size: 0.95rem; padding: 4px 0;
+            flex: 1; background: transparent; border: none; outline: none; color: #ffffff; font-size: 1rem; padding: 4px 0;
         }
-        .chat-input-field::placeholder { color: #555555; }
+        .chat-input-field::placeholder { color: #666666; }
 
         .mic-btn { background: transparent; border: none; color: #aaaaaa; cursor: pointer; display: flex; align-items: center; transition: color 0.2s; }
         .mic-btn:hover { color: #ffffff; }
         .mic-btn.active { color: #ef4444; }
 
         .arrow-submit-btn {
-            width: 30px; height: 30px; background-color: #ffffff; color: #000000; border: none; border-radius: 50%;
+            width: 34px; height: 34px; background-color: #ffffff; color: #000000; border: none; border-radius: 50%;
             display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform 0.2s;
         }
-        .arrow-submit-btn:hover { transform: scale(1.05); }
+        .arrow-submit-btn:hover { transform: scale(1.06); }
 
-        .footer-disclaimer { font-size: 10px; color: #444; text-align: center; }
+        .footer-disclaimer { font-size: 11px; color: #555; text-align: center; }
     </style>
 </head>
 <body>
@@ -411,9 +426,9 @@ app_code = """
     <div class="sidebar" id="sidebar">
         <div>
             <div class="sidebar-logo-header">
-                <svg viewBox="0 0 200 200">
-                    <circle cx="100" cy="100" r="85" fill="#050505" stroke="#ffffff" stroke-width="4"/>
-                    <path d="M 100 25 L 70 85 L 110 85 L 90 115 L 130 115 L 100 175" fill="none" stroke="#ffffff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+                <svg width="24" height="24" viewBox="0 0 200 200">
+                    <circle cx="100" cy="100" r="85" fill="#050505" stroke="#ffffff" stroke-width="6"/>
+                    <path d="M 100 25 L 70 85 L 110 85 L 90 115 L 130 115 L 100 175" fill="none" stroke="#ffffff" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
                 <span class="sidebar-brand-name">Pyrox</span>
             </div>
@@ -427,7 +442,7 @@ app_code = """
                     <svg viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                     <span>Search Chat</span>
                 </div>
-                <div class="menu-btn" onclick="alert('Library: Saved discussions & notes.')">
+                <div class="menu-btn" onclick="alert('📚 Library: All your saved notes and chats are stored here safely.')">
                     <svg viewBox="0 0 24 24"><path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
                     <span>Library</span>
                 </div>
@@ -437,14 +452,14 @@ app_code = """
                 </div>
             </div>
 
-            <!-- CHAT HISTORY LIST (ChatGPT / Gemini Style) -->
+            <!-- CHAT HISTORY LIST -->
             <div class="history-section" id="historySection">
                 <div class="history-title">Recent Chats</div>
             </div>
         </div>
 
         <div class="sidebar-bottom">
-            <div class="menu-btn" onclick="alert('Settings Panel')">
+            <div class="menu-btn" onclick="alert('⚙️ Pyrox Settings (Version 2.4 - Nov 2026 Launch Ready)')">
                 <svg viewBox="0 0 24 24"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                 <span>Settings</span>
             </div>
@@ -457,8 +472,8 @@ app_code = """
         <!-- TOP NAVBAR -->
         <div class="top-navbar">
             <div class="nav-left">
-                <button class="expand-sidebar-btn" onclick="toggleSidebar()" data-tooltip="Expand Menu">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <button class="expand-sidebar-btn" onclick="toggleSidebar()">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <line x1="3" y1="12" x2="21" y2="12"></line>
                         <line x1="3" y1="6" x2="21" y2="6"></line>
                         <line x1="3" y1="18" x2="21" y2="18"></line>
@@ -476,9 +491,9 @@ app_code = """
                     </svg>
                 </button>
                 <div class="dropdown-menu" id="dropdownMenu">
-                    <div class="dropdown-item" onclick="alert('Google Gmail Login')">📧 Login with Gmail</div>
-                    <div class="dropdown-item" onclick="alert('Link Copied!')">🔗 Share Conversation</div>
-                    <div class="dropdown-item" onclick="exportPDF()">📄 Download PDF</div>
+                    <div class="dropdown-item" onclick="alert('Google Gmail Login Connected')">📧 Login with Gmail</div>
+                    <div class="dropdown-item" onclick="alert('Conversation link copied to clipboard!')">🔗 Share Conversation</div>
+                    <div class="dropdown-item" onclick="exportPDF()">📄 Download PDF / Export</div>
                     <div class="dropdown-item" style="color:#ef4444;" onclick="clearChat()">🗑️ Delete Chat</div>
                 </div>
             </div>
@@ -487,20 +502,20 @@ app_code = """
         <!-- CENTER LANDING HEADER -->
         <div class="center-landing-header" id="landingHeader">
             <svg class="brand-logo-large" viewBox="0 0 200 200">
-                <circle cx="100" cy="100" r="85" fill="#000000" stroke="#ffffff" stroke-width="5"/>
-                <path d="M 100 25 L 70 85 L 110 85 L 90 115 L 130 115 L 100 175" fill="none" stroke="#ffffff" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+                <circle cx="100" cy="100" r="85" fill="#000000" stroke="#ffffff" stroke-width="6"/>
+                <path d="M 100 25 L 70 85 L 110 85 L 90 115 L 130 115 L 100 175" fill="none" stroke="#ffffff" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
             <div class="brand-name-large">Pyrox</div>
-            <div class="greeting-subtext">Hi, how can I help you today?</div>
+            <div class="greeting-subtext">How can I help you today? ✨</div>
         </div>
 
-        <!-- CHAT MESSAGES -->
+        <!-- CHAT MESSAGES CONTAINER -->
         <div class="chat-container" id="chatContainer"></div>
 
         <!-- INPUT BAR -->
         <div class="input-wrapper">
             <div class="input-box" id="inputBox">
-                <svg class="star-btn" viewBox="0 0 24 24" onclick="alert('Attach file/photo')">
+                <svg class="star-btn" viewBox="0 0 24 24" onclick="alert('Attach file or photo option')">
                     <defs>
                         <linearGradient id="starGrad" x1="0%" y1="0%" x2="100%" y2="100%">
                             <stop offset="0%" stop-color="#9C27B0"/>
@@ -522,7 +537,7 @@ app_code = """
                     <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
                 </div>
 
-                <input type="text" id="chatInput" class="chat-input-field" placeholder="Ask Pyrox..." onkeypress="if(event.key==='Enter') sendMessage();" />
+                <input type="text" id="chatInput" class="chat-input-field" placeholder="Ask Pyrox anything..." onkeypress="if(event.key==='Enter') sendMessage();" />
 
                 <button class="arrow-submit-btn" onclick="sendMessage()">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
@@ -531,7 +546,7 @@ app_code = """
                     </svg>
                 </button>
             </div>
-            <div class="footer-disclaimer">Pyrox AI is under active development for Nov 2026 launch.</div>
+            <div class="footer-disclaimer">Pyrox AI • Global Launch Nov 2026</div>
         </div>
     </div>
 
@@ -539,7 +554,7 @@ app_code = """
         let isListening = false;
         let recognition = null;
         let accumulatedSpeech = "";
-        let currentAudio = null;
+        let currentUtterance = null;
 
         function toggleSidebar() {
             document.getElementById('sidebar').classList.toggle('expanded');
@@ -557,29 +572,68 @@ app_code = """
         }
 
         function searchChat() {
-            let term = prompt("चैट में क्या खोजना चाहते हैं?");
-            if(term) alert("'" + term + "' से जुड़े मैसेज खोजे जा रहे हैं।");
+            let term = prompt("🔍 चैट में क्या खोजना चाहते हैं?");
+            if(term) alert("'" + term + "' से जुड़े मैसेज खोजे जा रहे हैं...");
         }
 
         function exportPDF() {
-            alert("चैट का पीडीएफ फॉर्मेट डाउनलोड हो रहा है...");
+            alert("📄 आपकी चैट का पीडीएफ फॉर्मेट तैयार हो रहा है...");
         }
 
         function openStudentSetup() {
-            let goal = prompt("आपकी कक्षा या परीक्षा कौन सी है? (जैसे: Class 9, NEET, JEE)");
-            if(goal) alert("Pyrox AI ने आपके लिए " + goal + " का स्टडी मोड एक्टिवेट कर दिया है!");
+            const chatContainer = document.getElementById('chatContainer');
+            const landingHeader = document.getElementById('landingHeader');
+            if(landingHeader) landingHeader.style.display = 'none';
+
+            const card = document.createElement('div');
+            card.className = 'message ai-message';
+            card.innerHTML = `
+                <div>🎓 <b>Student Study Setup</b><br>आप अपनी कक्षा या परीक्षा चुनें ताकि Pyrox आपके लिए परफेक्ट स्टडी मोड ऑन कर सके:</div>
+                <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;">
+                    <button class="audio-main-btn" onclick="setStudentGoal('Class 9 (NCERT / CBSE)')">📚 Class 9</button>
+                    <button class="audio-main-btn" onclick="setStudentGoal('NEET / Medical')">🩺 NEET</button>
+                    <button class="audio-main-btn" onclick="setStudentGoal('JEE / Engineering')">⚡ JEE</button>
+                    <button class="audio-main-btn" onclick="setStudentGoal('College / Coding')">💻 College</button>
+                </div>
+            `;
+            chatContainer.appendChild(card);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function setStudentGoal(goal) {
+            const chatContainer = document.getElementById('chatContainer');
+            const reply = `शानदार! 🎯 ${goal} के लिए Pyrox का स्पेशल स्टडी मोड एक्टिवेट हो गया है। अब बताइए, आज कौन सा चैप्टर या टॉपिक पढ़ना है? 🚀`;
+            
+            const msg = document.createElement('div');
+            msg.className = 'message ai-message';
+            msg.innerHTML = `
+                <div>${reply}</div>
+                <div class="audio-bar-wrapper">
+                    <button class="audio-main-btn" onclick="speakText('${reply.replace(/'/g, "\\'")}')">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+                        Listen
+                    </button>
+                    <button class="audio-pause-btn" onclick="pauseSpeech()">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+                        Pause
+                    </button>
+                </div>
+            `;
+            chatContainer.appendChild(msg);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            speakText(reply);
         }
 
         function addChatHistory(text) {
             const historySection = document.getElementById('historySection');
             const item = document.createElement('div');
             item.className = 'history-item';
-            item.innerText = text.length > 25 ? text.substring(0, 25) + '...' : text;
-            item.onclick = function() { alert("Loading chat: " + text); };
+            item.innerText = text.length > 22 ? text.substring(0, 22) + '...' : text;
+            item.onclick = function() { alert("Loading chat session: " + text); };
             historySection.appendChild(item);
         }
 
-        /* VOICE SPEECH RECOGNITION */
+        /* VOICE RECOGNITION */
         function toggleVoice() {
             const micBtn = document.getElementById('micBtn');
             const micSvg = document.getElementById('micIconSvg');
@@ -611,7 +665,7 @@ app_code = """
                 micBtn.classList.add('active');
                 inputBox.classList.add('recording');
                 waveBox.classList.add('active');
-                inputField.placeholder = "Listening...";
+                inputField.placeholder = "Listening continuously...";
                 micSvg.innerHTML = `<rect x="6" y="4" width="4" height="16" fill="currentColor"/><rect x="14" y="4" width="4" height="16" fill="currentColor"/>`;
             };
 
@@ -641,7 +695,7 @@ app_code = """
             micBtn.classList.remove('active');
             document.getElementById('inputBox').classList.remove('recording');
             document.getElementById('waveBox').classList.remove('active');
-            document.getElementById('chatInput').placeholder = "Ask Pyrox...";
+            document.getElementById('chatInput').placeholder = "Ask Pyrox anything...";
             micSvg.innerHTML = `<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line>`;
         }
 
@@ -663,7 +717,7 @@ app_code = """
             userDiv.innerText = text;
             chatContainer.appendChild(userDiv);
 
-            addChatHistory(text); // Add to sidebar history list
+            addChatHistory(text); // Add first word/sentence to recent chats list
 
             inputField.value = '';
             accumulatedSpeech = "";
@@ -672,67 +726,63 @@ app_code = """
             // AI Loading
             const aiDiv = document.createElement('div');
             aiDiv.className = 'message ai-message';
-            aiDiv.innerHTML = `<div>Thinking...</div>`;
+            aiDiv.innerHTML = `<div>✨ Thinking...</div>`;
             chatContainer.appendChild(aiDiv);
             chatContainer.scrollTop = chatContainer.scrollHeight;
 
-            // Smart Simulation Response
+            // Intelligent Gen-Z Emoji Rich Response Engine
             setTimeout(() => {
                 let reply = "";
                 const lower = text.toLowerCase();
 
-                if (lower.includes("hello") || lower.includes("hi") || lower.includes("नमस्ते")) {
-                    reply = "नमस्ते! पाइरोक्स स्टूडियो में आपका स्वागत है। बताइए, आज मैं आपकी क्या सहायता कर सकता हूँ?";
+                if (lower.includes("hello") || lower.includes("hi") || lower.includes("hey") || lower.includes("नमस्ते")) {
+                    reply = "नमस्ते! 👋 मैं Pyrox हूँ, आपका अपना AI असिस्टेंट। बताइए आज क्या नया सीखने या बनाने का प्लान है? 🚀";
                 } else if (lower.includes("python") || lower.includes("code") || lower.includes("कोडिंग")) {
-                    reply = "ज़रूर! पाइथन या किसी भी प्रोजेक्ट में आपकी मदद के लिए मैं तैयार हूँ। बताइए आगे क्या करना है?";
+                    reply = "अरे बिल्कुल! 💻 कोडिंग मेरी फव्‍हरिट चीज़ है। बताइए Python में क्या बनाना है—लूप, फंक्शंस या कोई तगड़ा ऐप? ⚡";
+                } else if (lower.includes("kaun ho") || lower.includes("who are you") || lower.includes("नाम")) {
+                    reply = "मैं Pyrox हूँ भाई! 😎 आपका पर्सनल AI पार्टनर, जो आपकी पढ़ाई, कोडिंग और हर प्रोजेक्ट में मदद करने के लिए हमेशा रेडी रहता है।";
                 } else {
-                    reply = "जी, आपकी बात बिल्कुल समझ आ गई है। नवंबर 2026 लॉन्च के लिए हम पूरी तरह तैयार हैं!";
+                    reply = "बढ़िया सवाल है! 💡 इस पर पूरी तरह से काम करते हैं। बताइए इसमें और क्या डिटेल्स चाहिए आपको? ✨";
                 }
 
                 aiDiv.innerHTML = `
                     <div>${reply}</div>
-                    <div class="audio-controls">
-                        <button class="audio-play-btn" onclick="playAudioText('${reply.replace(/'/g, "\\'")}')">
-                            ▶ Listen Voice
+                    <div class="audio-bar-wrapper">
+                        <button class="audio-main-btn" onclick="speakText('${reply.replace(/'/g, "\\'")}')">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+                            Listen
                         </button>
-                        <button class="audio-stop-btn" onclick="stopAudio()">
-                            ⏸ Pause
+                        <button class="audio-pause-btn" onclick="pauseSpeech()">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+                            Pause
                         </button>
                     </div>
                 `;
                 chatContainer.scrollTop = chatContainer.scrollHeight;
                 
-                // Auto play voice
-                playAudioText(reply);
+                speakText(reply);
             }, 500);
         }
 
-        function playAudioText(text) {
-            if (currentAudio) { currentAudio.pause(); currentAudio = null; }
-            
-            // Using browser speech synthesis configured cleanly for natural Indian Hindi tone as a reliable stream
+        function speakText(text) {
             if ('speechSynthesis' in window) {
                 window.speechSynthesis.cancel();
-                let utterance = new SpeechSynthesisUtterance(text);
-                utterance.rate = 1.0;
-                utterance.pitch = 1.0;
-                utterance.lang = 'hi-IN';
+                currentUtterance = new SpeechSynthesisUtterance(text);
+                currentUtterance.rate = 1.0;
+                currentUtterance.pitch = 1.0;
+                currentUtterance.lang = 'hi-IN';
                 
                 let voices = window.speechSynthesis.getVoices();
                 let hiVoice = voices.find(v => v.lang.includes('hi') || v.name.includes('Madhur') || v.name.includes('Google'));
-                if (hiVoice) utterance.voice = hiVoice;
+                if (hiVoice) currentUtterance.voice = hiVoice;
                 
-                window.speechSynthesis.speak(utterance);
+                window.speechSynthesis.speak(currentUtterance);
             }
         }
 
-        function stopAudio() {
+        function pauseSpeech() {
             if ('speechSynthesis' in window) {
                 window.speechSynthesis.cancel();
-            }
-            if (currentAudio) {
-                currentAudio.pause();
-                currentAudio = null;
             }
         }
 
@@ -740,7 +790,7 @@ app_code = """
             document.getElementById('chatContainer').innerHTML = '';
             const landingHeader = document.getElementById('landingHeader');
             if(landingHeader) landingHeader.style.display = 'flex';
-            stopAudio();
+            pauseSpeech();
         }
     </script>
 </body>
