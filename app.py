@@ -2,80 +2,44 @@ import os
 import streamlit as st
 from groq import Groq
 
-# Page Configuration
-st.set_page_config(
-    page_title="Pyrox",
-    page_icon="⚡",
-    layout="centered"
-)
+st.set_page_config(page_title="Pyrox", page_icon="⚡", layout="centered")
 
-# Custom Styling for Dark Theme
-st.markdown("""
-    <style>
-    .stApp { background-color: #000000; color: #ffffff; }
-    #MainMenu, header, footer { visibility: hidden; }
-    </style>
-""", unsafe_allow_html=True)
+st.title("⚡ Pyrox - मॉडल शीशा चेकर")
+st.write("यह टूल चेक कर रहा है कि आपकी API Key पर Groq का कौन सा मॉडल चल रहा है।")
 
-st.title("⚡ Pyrox")
-st.write("✨ नेटिव चैट कंसोल — बिना रीलोड, बिना रुकावट।")
-
-# API Key Initialization
 api_key = os.environ.get("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY", "")
-client = Groq(api_key=api_key) if api_key else None
 
 if not api_key:
-    st.error("⚠️ कृपया Streamlit Secrets में अपनी GROQ_API_KEY सेट करें।")
-
-# Initialize Session State for Chat History
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-# Display Prior Messages
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
-
-# Native Streamlit Chat Input
-if prompt := st.chat_input("Pyrox से कुछ भी पूछें..."):
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
-
-    # Generate Assistant Response via Groq API (Updated Active Model)
-    if client:
-        with st.chat_message("assistant"):
-            with st.spinner("Pyrox सोच रहा है... ✨"):
-                try:
-                    formatted_messages = [
-                        {
-                            "role": "system",
-                            "content": (
-                                "You are Pyrox, an exceptionally intelligent, adaptive, and emotionally aware AI collaborator with a great sense of humor. "
-                                "Remember the full conversation history. Talk in a smooth, natural blend of Hinglish (Hindi + English) with cool emojis ✨."
-                            )
-                        }
-                    ]
-                    for msg in st.session_state.messages:
-                        formatted_messages.append({
-                            "role": msg["role"],
-                            "content": msg["content"]
-                        })
-
-                    completion = client.chat.completions.create(
-                        model="llama-3.3-70b-versatile",  # Updated active model
-                        messages=formatted_messages,
-                        temperature=0.75,
-                        max_tokens=600,
-                    )
-                    reply = completion.choices[0].message.content
-                    st.markdown(reply)
-                    
-                    st.session_state.messages.append({"role": "assistant", "content": reply})
+    st.error("❌ API Key नहीं मिली!")
+else:
+    st.success("✅ API Key मौजूद है।")
+    try:
+        client = Groq(api_key=api_key)
+        
+        # Groq से पूछ रहे हैं कि इस की पर कौन से मॉडल उपलब्ध हैं
+        st.write("🔍 **उपलब्ध मॉडल्स की सूची की जांच की जा रही है...**")
+        
+        # एक टेस्ट कॉल भेजकर देखते हैं कि कौन सा मॉडल रिस्पॉन्स देता है
+        test_models = ["llama-3.3-70b-versatile", "llama3-8b-8192", "mixtral-8x7b-32768", "gemma2-9b-it"]
+        working_model = None
+        
+        for m in test_models:
+            try:
+                res = client.chat.completions.create(
+                    model=m,
+                    messages=[{"role": "user", "content": "hi"}],
+                    max_tokens=5
+                )
+                working_model = m
+                st.success(f"🎉 **मिल गया! यह मॉडल 100% काम कर रहा है:** `{m}`")
+                break
+            except Exception as ex:
+                st.write(f"❌ मॉडल `{m}` काम नहीं कर रहा: `{str(ex)}`")
                 
-                except Exception as e:
-                    error_msg = f"⚠️ API Error: {str(e)}"
-                    st.error(error_msg)
-                    st.session_state.messages.append({"role": "assistant", "content": error_msg})
-    else:
-        st.error("❌ Groq Client उपलब्ध नहीं है।")
+        if working_model:
+            st.info(f"👉 अब आप अपने मुख्य ऐप में मॉडल का नाम **`{working_model}`** रख सकते हैं!")
+        else:
+            st.error("⚠️ आपकी इस API Key पर कोई भी मॉडल काम नहीं कर रहा। कृपया नई API Key बनाएं।")
+            
+    except Exception as e:
+        st.error(f"❌ कनेक्शन एरर: {str(e)}")
