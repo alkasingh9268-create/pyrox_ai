@@ -1,51 +1,35 @@
-using System;
-using System.Net.Http;
-using System.Net.Http.Headers;
-using System.Text;
-using System.Text.Json;
-using System.Threading.Tasks;
+import streamlit as st
+import requests
+import json
 
-class Program
-{
-    static async Task Main(string[] args)
-    {
-        // Yahan apni poori API key daal de
-        string apiKey = "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";
-        string url = "https://api.groq.com/openai/v1/chat/completions";
+st.title("Pyrox AI - Direct API Test")
 
-        using var client = new HttpClient();
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+# Apni API key yahan hai
+api_key = "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"
+url = "https://api.groq.com/openai/v1/chat/completions"
 
-        var requestPayload = new
-        {
-            model = "llama-3.1-8b-instant",
-            messages = new[]
-            {
-                new { role = "user", content = "Hello! Pyrox ke liye test message hai." }
-            }
-        };
-
-        string jsonBody = JsonSerializer.Serialize(requestPayload);
-        var content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
-
-        try
-        {
-            HttpResponseMessage response = await client.PostAsync(url, content);
-            string responseString = await response.Content.ReadAsStringAsync();
-
-            if (response.IsSuccessStatusCode)
-            {
-                Console.WriteLine("🎉 Success! Response:");
-                Console.WriteLine(responseString);
-            }
-            else
-            {
-                Console.WriteLine($"❌ Error ({response.StatusCode}): {responseString}");
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Exception aagayi: {ex.Message}");
-        }
-    }
+headers = {
+    "Authorization": f"Bearer {api_key}",
+    "Content-Type": "application/json"
 }
+
+payload = {
+    "model": "llama-3.1-8b-instant",
+    "messages": [
+        {"role": "user", "content": "Hello! Pyrox ke liye test message hai."}
+    ]
+}
+
+try:
+    response = requests.post(url, headers=headers, data=json.dumps(payload))
+    
+    if response.status_code == 200:
+        res_json = response.json()
+        reply = res_json['choices'][0]['message']['content']
+        st.success("🎉 Maza aa gaya! API ekdam sahi chal rahi hai:")
+        st.write(reply)
+    else:
+        st.error(f"❌ Error ({response.status_code}): {response.text}")
+        
+except Exception as e:
+    st.error(f"Exception aagayi: {str(e)}")
