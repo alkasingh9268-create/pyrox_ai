@@ -7,12 +7,12 @@ chat_completion = client.chat.completions.create(
     messages=[
         {
             "role": "user",
-            "content": "Hello! How are you?",
+            "content": "Hello!",
         }
     ],
-    model="llama-3.1-8b-instant",
+    model="llama3-8b-8192",
 )
 
-st.success("API Key aur Model ekdum sahi kaam kar rahe hain!")
-st.write("🤖 AI ka reply:")
+st.success("API Key aur Model dono ekdam fit kaam kar rahe hain!")
+st.write("🤖 AI Reply:")
 st.info(chat_completion.choices[0].message.content)
