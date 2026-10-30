@@ -54,7 +54,7 @@ def get_groq_response(messages_history):
     except Exception as e:
         return f"⚠️ Error connecting to Groq: {str(e)}"
 
-# 2. Complete HTML + CSS + JS Studio UI with Collapsible Sidebar & Fixed Viewport
+# 2. Complete HTML + CSS + JS Studio UI with Collapsible Sidebar & Fixed Viewport (No MS-TTS Bloat)
 app_code = """
 <!DOCTYPE html>
 <html lang="hi">
@@ -130,7 +130,7 @@ app_code = """
             color: #ffffff;
         }
 
-        /* MAIN CONTAINER - COMPACT 620px HEIGHT TO AVOID SCROLLING */
+        /* MAIN CONTAINER - COMPACT HEIGHT TO AVOID SCROLLING */
         .main-container {
             flex: 1;
             display: flex;
@@ -142,7 +142,7 @@ app_code = """
             padding-bottom: 6px;
         }
 
-        /* TOP NAVBAR WITH TWO PARALLEL LINES (HAMBURGER) */
+        /* TOP NAVBAR WITH TWO PARALLEL LINES */
         .top-navbar {
             width: 100%;
             display: flex;
@@ -170,7 +170,7 @@ app_code = """
             background-color: #ffffff;
         }
 
-        /* CENTER LANDING HEADER - PULLED UP */
+        /* CENTER LANDING HEADER */
         .center-landing-header {
             display: flex;
             flex-direction: column;
@@ -233,7 +233,7 @@ app_code = """
             border: 1px solid #1a1a1a;
         }
 
-        /* INPUT BAR AREA - OPTIMIZED FOR NO SCROLL */
+        /* INPUT BAR AREA */
         .input-wrapper {
             width: 100%;
             max-width: 700px;
