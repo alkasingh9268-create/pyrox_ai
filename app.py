@@ -1,39 +1,73 @@
 import streamlit as st
 import requests
+import json
+import asyncio
+import edge_tts
+import tempfile
+import os
 
-st.title("Pyrox AI - Whisper Voice Test")
+st.markdown("<h1 style='text-align: center; color: #ff4b4b;'>🔥 Pyrox AI Assistant</h1>", unsafe_allow_html=True)
+st.write("---")
 
+# API Setup
 api_key = "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"
-url = "https://api.groq.com/openai/v1/audio/transcriptions"
+url = "https://api.groq.com/openai/v1/chat/completions"
 
-# Ek choti si audio file upload karne ka option
-uploaded_file = st.file_uploader("Apne phone ya laptop se koi choti audio file (mp3/wav) daal:", type=["mp3", "wav", "m4a", "ogg"])
+# Input field
+user_input = st.text_input("✍️ Apna sawal yahan likh:", "Pyrox ke baare mein kuch achhi baatein batao.")
 
-if uploaded_file is not None:
-    # Audio play karke sunne ke liye
-    st.audio(uploaded_file)
+# Async function to generate Microsoft Neural Voice (MP3)
+async def generate_speech(text):
+    # 'hi-IN-SwaraNeural' ekdum natural Hindi/Indian English female neural voice hai
+    # Tu chahe toh English ke liye 'en-US-AriaNeural' bhi use kar sakta hai
+    voice = "hi-IN-SwaraNeural" 
     
-    if st.button("🚀 Whisper se Text mein Badlo"):
+    communicate = edge_tts.Communicate(text, voice)
+    
+    # Temporary file banakar usme audio save karenge
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_file:
+        tmp_path = tmp_file.name
+        
+    await communicate.save(tmp_path)
+    return tmp_path
+
+if st.button("🚀 Qwen se Pucho aur Microsoft Voice mein Suno"):
+    if user_input.strip() == "":
+        st.warning("Pehle kuch likh toh bhai!")
+    else:
         headers = {
-            "Authorization": f"Bearer {api_key}"
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
         }
         
-        files = {
-            "file": (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)
+        payload = {
+            "model": "qwen/qwen3.8-27b",
+            "messages": [
+                {"role": "user", "content": user_input}
+            ]
         }
         
-        data = {
-            "model": "whisper-large-v3-turbo"
-        }
-        
-        with st.spinner("Whisper sun raha hai... thoda sabr kar bhai!"):
+        with st.spinner("🤖 Qwen soch raha hai aur Microsoft Neural Voice taiyar ho rahi hai..."):
             try:
-                response = requests.post(url, headers=headers, files=files, data=data)
+                # 1. Qwen se text jawab mangwana
+                response = requests.post(url, headers=headers, data=json.dumps(payload))
                 
                 if response.status_code == 200:
-                    result = response.json()
-                    st.success("🎉 Maza aa gaya! Audio se text ban gaya:")
-                    st.write(result.get("text"))
+                    res_json = response.json()
+                    reply = res_json['choices'][0]['message']['content']
+                    
+                    st.success("✨ Qwen ka Jawab:")
+                    st.write(reply)
+                    
+                    # 2. Microsoft ki high-quality Neural Voice generate karna
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    audio_path = loop.run_until_complete(generate_speech(reply))
+                    
+                    # 3. Streamlit par audio player dikhana taaki saaf-suthri awaz sunai de
+                    st.markdown("### 🎧 Microsoft Natural Audio Output:")
+                    st.audio(audio_path, format="audio/mp3")
+                    
                 else:
                     st.error(f"❌ Error ({response.status_code}): {response.text}")
                     
