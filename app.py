@@ -27,20 +27,17 @@ def get_groq_response(messages_history):
     if not client:
         return "⚠️ Groq API Key missing in Streamlit Secrets!"
     try:
-        # Format session messages into Groq API structure
         formatted_messages = [
             {
                 "role": "system",
                 "content": (
                     "You are Pyrox, an exceptionally intelligent, adaptive, and emotionally aware AI collaborator with a great sense of humor. "
-                    "Remember the full conversation history with the user. Never ask 'who are you' if they return. "
+                    "Remember the full conversation history with the user. Never forget past context. "
                     "Talk in a smooth, natural blend of Hinglish (Hindi + English) with subtle, cool emojis ✨. "
-                    "Be witty, empathetic when they are frustrated, and sharp when they want answers."
+                    "Be witty, smart, and precise."
                 )
             }
         ]
-        
-        # Append all previous messages so AI never forgets context
         for msg in messages_history:
             formatted_messages.append({
                 "role": msg["role"],
@@ -57,7 +54,7 @@ def get_groq_response(messages_history):
     except Exception as e:
         return f"⚠️ Error connecting to Groq: {str(e)}"
 
-# 2. Complete HTML + CSS + JS Studio UI
+# 2. Complete HTML + CSS + JS Studio UI with Collapsible Sidebar & Fixed Viewport
 app_code = """
 <!DOCTYPE html>
 <html lang="hi">
@@ -80,16 +77,23 @@ app_code = """
             overflow: hidden;
         }
 
-        /* SIDEBAR ULTRA MAX DARK */
+        /* COLLAPSIBLE SIDEBAR WITH TWO PARALLEL LINES TOGGLE */
         .sidebar {
-            width: 230px;
+            width: 0px;
             background-color: #050505;
-            border-right: 1px solid #141414;
+            border-right: 0px solid #141414;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-            padding: 12px 10px;
+            padding: 0px;
             z-index: 20;
+            transition: width 0.3s ease, padding 0.3s ease, border-right 0.3s ease;
+            overflow: hidden;
+        }
+        .sidebar.open {
+            width: 220px;
+            padding: 12px 10px;
+            border-right: 1px solid #141414;
         }
         .sidebar-logo-header {
             display: flex;
@@ -98,20 +102,16 @@ app_code = """
             padding: 4px 6px;
             margin-bottom: 10px;
         }
-        .sidebar-logo-header svg {
-            width: 24px;
-            height: 24px;
-        }
         .sidebar-brand-name {
             font-size: 1.1rem;
             font-weight: 700;
             color: #ffffff;
-            letter-spacing: 0.5px;
+            white-space: nowrap;
         }
         .menu-list {
             display: flex;
             flex-direction: column;
-            gap: 3px;
+            gap: 4px;
         }
         .menu-btn {
             display: flex;
@@ -122,49 +122,15 @@ app_code = """
             font-size: 13px;
             border-radius: 8px;
             cursor: pointer;
+            white-space: nowrap;
             transition: background 0.2s, color 0.2s;
-            position: relative;
         }
         .menu-btn:hover {
             background-color: #141414;
             color: #ffffff;
         }
-        .menu-btn svg {
-            width: 17px;
-            height: 17px;
-            stroke: currentColor;
-            fill: none;
-            stroke-width: 2;
-        }
-        .sidebar-bottom {
-            border-top: 1px solid #141414;
-            padding-top: 8px;
-        }
 
-        /* TOOLTIP HOVER HELPER */
-        [data-tooltip] {
-            position: relative;
-        }
-        [data-tooltip]:hover::after {
-            content: attr(data-tooltip);
-            position: absolute;
-            bottom: 115%;
-            left: 50%;
-            transform: translateX(-50%);
-            background-color: #1f1f1f;
-            color: #ffffff;
-            font-size: 11px;
-            font-weight: 500;
-            padding: 4px 8px;
-            border-radius: 6px;
-            white-space: nowrap;
-            border: 1px solid #333;
-            pointer-events: none;
-            z-index: 1000;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-        }
-
-        /* MAIN CONTAINER */
+        /* MAIN CONTAINER - COMPACT 620px HEIGHT TO AVOID SCROLLING */
         .main-container {
             flex: 1;
             display: flex;
@@ -172,170 +138,147 @@ app_code = """
             justify-content: space-between;
             align-items: center;
             height: 100vh;
-            padding-top: 4px;
-            padding-bottom: 8px;
+            padding-top: 2px;
+            padding-bottom: 6px;
         }
 
-        /* TOP NAVBAR */
+        /* TOP NAVBAR WITH TWO PARALLEL LINES (HAMBURGER) */
         .top-navbar {
             width: 100%;
             display: flex;
             align-items: center;
-            justify-content: flex-end;
-            padding: 4px 20px;
-            position: relative;
+            justify-content: space-between;
+            padding: 4px 15px;
         }
-        .three-dots-wrapper {
-            position: relative;
-        }
-        .dots-btn {
+        .toggle-menu-btn {
             background: transparent;
             border: none;
-            color: #aaaaaa;
             cursor: pointer;
-            padding: 6px;
-            border-radius: 50%;
             display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: color 0.2s, background 0.2s;
-        }
-        .dots-btn:hover {
-            color: #ffffff;
-            background-color: #1a1a1a;
-        }
-        .dropdown-menu {
-            position: absolute;
-            top: 36px;
-            right: 0;
-            width: 210px;
-            background-color: #0d0d0d;
-            border: 1px solid #222222;
-            border-radius: 12px;
-            padding: 6px 0;
-            display: none;
             flex-direction: column;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.6);
-            z-index: 100;
+            gap: 4px;
+            padding: 6px;
         }
-        .dropdown-menu.show {
-            display: flex;
-        }
-        .dropdown-item {
-            padding: 9px 16px;
-            font-size: 13px;
-            color: #cccccc;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 10px;
+        .toggle-line {
+            width: 20px;
+            height: 2px;
+            background-color: #aaaaaa;
+            border-radius: 2px;
             transition: background 0.2s;
         }
-        .dropdown-item:hover {
-            background-color: #1a1a1a;
-            color: #ffffff;
-        }
-        .dropdown-item.login-item {
-            border-bottom: 1px solid #222;
-            color: #3b82f6;
-            font-weight: 600;
+        .toggle-menu-btn:hover .toggle-line {
+            background-color: #ffffff;
         }
 
-        /* CENTER LANDING HEADER */
+        /* CENTER LANDING HEADER - PULLED UP */
         .center-landing-header {
             display: flex;
             flex-direction: column;
             align-items: center;
             text-align: center;
-            gap: 4px;
-            margin-top: 2px;
+            gap: 2px;
+            margin-top: 5px;
         }
         .brand-title-box {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
         }
         .brand-logo-large {
-            width: 38px;
-            height: 38px;
+            width: 32px;
+            height: 32px;
         }
         .brand-name-large {
-            font-size: 1.9rem;
+            font-size: 1.6rem;
             font-weight: 800;
             color: #ffffff;
-            letter-spacing: -0.5px;
         }
         .greeting-subtext {
-            font-size: 1.2rem;
-            font-weight: 500;
-            color: #d1d5db;
+            font-size: 1.05rem;
+            color: #9ca3af;
         }
 
         /* CHAT MESSAGES AREA */
         .chat-container {
             width: 100%;
-            max-width: 800px;
+            max-width: 700px;
             flex: 1;
             overflow-y: auto;
             display: flex;
             flex-direction: column;
-            gap: 12px;
-            padding: 5px 15px;
-            margin-top: 5px;
+            gap: 10px;
+            padding: 5px 12px;
         }
         .message {
             display: flex;
             flex-direction: column;
             max-width: 82%;
-            line-height: 1.5;
-            font-size: 0.95rem;
+            line-height: 1.45;
+            font-size: 0.93rem;
         }
         .user-message {
             align-self: flex-end;
             background-color: #1c1c1e;
             color: #ffffff;
-            padding: 10px 16px;
-            border-radius: 16px 16px 4px 16px;
+            padding: 8px 14px;
+            border-radius: 14px 14px 2px 14px;
             border: 1px solid #2d2d2d;
         }
         .ai-message {
             align-self: flex-start;
             background-color: #080808;
             color: #f0f0f0;
-            padding: 12px 18px;
-            border-radius: 16px 16px 16px 4px;
+            padding: 10px 14px;
+            border-radius: 14px 14px 14px 2px;
             border: 1px solid #1a1a1a;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
         }
 
-        /* INPUT BAR AREA */
+        /* INPUT BAR AREA - OPTIMIZED FOR NO SCROLL */
         .input-wrapper {
             width: 100%;
-            max-width: 800px;
+            max-width: 700px;
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 4px;
-            padding: 0 15px;
+            gap: 3px;
+            padding: 0 12px;
+            margin-bottom: 2px;
         }
         .input-box {
             width: 100%;
             background-color: #080808;
             border: 1px solid #222222;
             border-radius: 26px;
-            padding: 8px 14px;
+            padding: 6px 12px;
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
             position: relative;
-            transition: border-color 0.3s, box-shadow 0.3s;
         }
         .input-box.recording {
             border-color: #ef4444;
-            box-shadow: 0 0 15px rgba(239, 68, 68, 0.25);
+            box-shadow: 0 0 12px rgba(239, 68, 68, 0.25);
         }
+
+        /* TOOLTIP FOR STAR BUTTON */
+        [data-tooltip] {
+            position: relative;
+        }
+        [data-tooltip]:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 125%;
+            left: 0;
+            background-color: #1f1f1f;
+            color: #ffffff;
+            font-size: 11px;
+            padding: 4px 8px;
+            border-radius: 6px;
+            white-space: nowrap;
+            border: 1px solid #333;
+            z-index: 1000;
+        }
+
         .star-btn {
             cursor: pointer;
             width: 20px;
@@ -343,14 +286,14 @@ app_code = """
             flex-shrink: 0;
         }
 
-        /* PREMIUM WIDE & THIN GEMINI WAVE BARS */
+        /* ULTRA THIN & WIDE GEMINI WAVE BARS */
         .gemini-wave-container {
             display: flex;
             align-items: center;
             gap: 2.5px;
-            height: 22px;
+            height: 20px;
             flex: 1;
-            padding: 0 10px;
+            padding: 0 8px;
             display: none;
         }
         .gemini-wave-container.active {
@@ -361,21 +304,10 @@ app_code = """
             background: linear-gradient(180deg, #ef4444, #3b82f6);
             border-radius: 2px;
             height: 20%;
-            animation: waveMotion 0.5s infinite ease-in-out alternate;
+            animation: waveMotion 0.45s infinite ease-in-out alternate;
         }
-        .wave-bar:nth-child(1) { animation-delay: 0.05s; }
-        .wave-bar:nth-child(2) { animation-delay: 0.2s; }
-        .wave-bar:nth-child(3) { animation-delay: 0.1s; }
-        .wave-bar:nth-child(4) { animation-delay: 0.35s; }
-        .wave-bar:nth-child(5) { animation-delay: 0.15s; }
-        .wave-bar:nth-child(6) { animation-delay: 0.3s; }
-        .wave-bar:nth-child(7) { animation-delay: 0.08s; }
-        .wave-bar:nth-child(8) { animation-delay: 0.25s; }
-        .wave-bar:nth-child(9) { animation-delay: 0.12s; }
-        .wave-bar:nth-child(10) { animation-delay: 0.4s; }
-
         @keyframes waveMotion {
-            0% { height: 15%; }
+            0% { height: 10%; }
             100% { height: 100%; }
         }
 
@@ -385,7 +317,7 @@ app_code = """
             border: none;
             outline: none;
             color: #ffffff;
-            font-size: 0.95rem;
+            font-size: 0.93rem;
             padding: 4px 0;
         }
         .chat-input-field::placeholder { color: #555555; }
@@ -397,15 +329,12 @@ app_code = """
             cursor: pointer;
             display: flex;
             align-items: center;
-            justify-content: center;
-            transition: color 0.2s, transform 0.2s;
         }
-        .mic-btn:hover { color: #ffffff; transform: scale(1.1); }
         .mic-btn.active { color: #ef4444; }
 
         .arrow-submit-btn {
-            width: 30px;
-            height: 30px;
+            width: 28px;
+            height: 28px;
             background-color: #ffffff;
             color: #000000;
             border: none;
@@ -414,28 +343,23 @@ app_code = """
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            transition: transform 0.2s, opacity 0.2s;
             flex-shrink: 0;
-        }
-        .arrow-submit-btn:hover {
-            transform: scale(1.05);
-            opacity: 0.9;
         }
 
         .footer-disclaimer {
-            font-size: 10.5px;
-            color: #555555;
+            font-size: 10px;
+            color: #444444;
             text-align: center;
         }
     </style>
 </head>
 <body>
 
-    <!-- LEFT SIDEBAR -->
-    <div class="sidebar">
+    <!-- COLLAPSIBLE SIDEBAR -->
+    <div class="sidebar" id="appSidebar">
         <div>
             <div class="sidebar-logo-header">
-                <svg viewBox="0 0 200 200">
+                <svg width="22" height="22" viewBox="0 0 200 200">
                     <circle cx="100" cy="100" r="85" fill="#050505" stroke="#ffffff" stroke-width="4"/>
                     <path d="M 100 25 L 70 85 L 110 85 L 90 115 L 130 115 L 100 175" fill="none" stroke="#ffffff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
@@ -443,29 +367,22 @@ app_code = """
             </div>
 
             <div class="menu-list">
-                <div class="menu-btn" onclick="clearChat()" data-tooltip="New Chat">
-                    <svg viewBox="0 0 24 24"><path d="M12 4v16m8-8H4"></path></svg>
+                <div class="menu-btn" onclick="clearChat()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v16m8-8H4"></path></svg>
                     <span>New Chat</span>
                 </div>
-                <div class="menu-btn" onclick="alert('Search chat history')" data-tooltip="Search Chat">
-                    <svg viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                <div class="menu-btn" onclick="alert('Search Chat')">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                     <span>Search Chat</span>
                 </div>
-                <div class="menu-btn" onclick="alert('Library: Past notes & discussions')" data-tooltip="Library">
-                    <svg viewBox="0 0 24 24"><path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                <div class="menu-btn" onclick="alert('Library')">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
                     <span>Library</span>
                 </div>
-                <div class="menu-btn" onclick="openStudentSetup()" data-tooltip="For Students">
-                    <svg viewBox="0 0 24 24"><path d="M12 14l9-5-9-5-9 5 9 5z"></path><path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0112 20.055a11.952 11.952 0 01-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"></path></svg>
+                <div class="menu-btn" onclick="alert('For Students')">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 14l9-5-9-5-9 5 9 5z"></path></svg>
                     <span>For Students</span>
                 </div>
-            </div>
-        </div>
-
-        <div class="sidebar-bottom">
-            <div class="menu-btn" onclick="alert('Settings Panel')" data-tooltip="Settings">
-                <svg viewBox="0 0 24 24"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                <span>Settings</span>
             </div>
         </div>
     </div>
@@ -473,25 +390,12 @@ app_code = """
     <!-- MAIN WORKSPACE -->
     <div class="main-container">
         
-        <!-- TOP NAVBAR -->
+        <!-- TOP NAVBAR WITH TWO PARALLEL LINES -->
         <div class="top-navbar">
-            <div class="three-dots-wrapper">
-                <button class="dots-btn" onclick="toggleDropdown()" data-tooltip="More Options">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="5" r="1.5"></circle>
-                        <circle cx="12" cy="12" r="1.5"></circle>
-                        <circle cx="12" cy="19" r="1.5"></circle>
-                    </svg>
-                </button>
-                <div class="dropdown-menu" id="dropdownMenu">
-                    <div class="dropdown-item login-item" onclick="alert('Redirecting to Gmail Login...')">📧 Login with Gmail</div>
-                    <div class="dropdown-item" onclick="alert('Conversation link copied!')">🔗 Share Conversation</div>
-                    <div class="dropdown-item" onclick="alert('Find in chat')">🔍 Find in Chat</div>
-                    <div class="dropdown-item" onclick="alert('Chat pinned')">📌 Pin Chat</div>
-                    <div class="dropdown-item" onclick="alert('Exporting PDF...')">📄 Download PDF / Export</div>
-                    <div class="dropdown-item" style="color:#ef4444;" onclick="clearChat()">🗑️ Delete Chat</div>
-                </div>
-            </div>
+            <button class="toggle-menu-btn" onclick="toggleSidebar()" data-tooltip="Toggle Menu">
+                <div class="toggle-line"></div>
+                <div class="toggle-line"></div>
+            </button>
         </div>
 
         <!-- CENTER LANDING HEADER -->
@@ -503,7 +407,7 @@ app_code = """
                 </svg>
                 <span class="brand-name-large">Pyrox</span>
             </div>
-            <div class="greeting-subtext">Hi, how can I help you today?</div>
+            <div class="greeting-subtext">Hi, how can I help you today? ✨</div>
         </div>
 
         <!-- CHAT MESSAGES CONTAINER -->
@@ -512,7 +416,8 @@ app_code = """
         <!-- INPUT BAR AREA -->
         <div class="input-wrapper">
             <div class="input-box" id="inputBox">
-                <svg class="star-btn" viewBox="0 0 24 24" data-tooltip="Attach File & Photo" onclick="alert('Select File / Photo to attach')">
+                <!-- STAR BUTTON WITH EXACT TOOLTIP -->
+                <svg class="star-btn" viewBox="0 0 24 24" data-tooltip="Find and Photo Images Uploaded" onclick="alert('Select File / Photo to attach')">
                     <defs>
                         <linearGradient id="starGrad" x1="0%" y1="0%" x2="100%" y2="100%">
                             <stop offset="0%" stop-color="#9C27B0"/>
@@ -522,15 +427,14 @@ app_code = """
                     <path d="M12 0C12 6.627 6.627 12 0 12C6.627 12 12 17.373 12 24C12 17.373 17.373 12 24 12C17.373 12 12 6.627 12 0Z" fill="url(#starGrad)"/>
                 </svg>
 
-                <button id="micBtn" class="mic-btn" data-tooltip="Voice Input" onclick="toggleVoice()">
-                    <svg id="micIconSvg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <button id="micBtn" class="mic-btn" onclick="toggleVoice()">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
                         <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
                         <line x1="12" y1="19" x2="12" y2="23"></line>
                     </svg>
                 </button>
 
-                <!-- WIDE & THIN GEMINI WAVE BARS SPANNING FROM MIC TO ARROW -->
                 <div class="gemini-wave-container" id="waveBox">
                     <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
                     <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
@@ -538,8 +442,8 @@ app_code = """
 
                 <input type="text" id="chatInput" class="chat-input-field" placeholder="Ask Pyrox anything..." onkeypress="if(event.key==='Enter') sendMessage();" />
 
-                <button class="arrow-submit-btn" data-tooltip="Submit" onclick="sendMessage()">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                <button class="arrow-submit-btn" onclick="sendMessage()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
                         <line x1="5" y1="12" x2="19" y2="12"></line>
                         <polyline points="12 5 19 12 12 19"></polyline>
                     </svg>
@@ -553,30 +457,13 @@ app_code = """
     <script>
         let isListening = false;
         let recognition = null;
-        let accumulatedSpeech = "";
 
-        function toggleDropdown() {
-            document.getElementById('dropdownMenu').classList.toggle('show');
-        }
-
-        window.onclick = function(event) {
-            if (!event.target.closest('.three-dots-wrapper')) {
-                const m = document.getElementById('dropdownMenu');
-                if(m) m.classList.remove('show');
-            }
-        }
-
-        function openStudentSetup() {
-            let goal = prompt("आप किस परीक्षा या कक्षा की तैयारी कर रहे हैं? (जैसे: NEET, JEE, School, College)");
-            if(!goal) return;
-            let standard = prompt("आपकी कक्षा या वर्ष कौन सा है? (जैसे: Class 9, Class 11, B.Tech 1st Year)");
-            if(!standard) return;
-            alert("बहुत बढ़िया! " + standard + " (" + goal + ") के लिए आपका स्टडी रूटीन सेट कर दिया गया है।");
+        function toggleSidebar() {
+            document.getElementById('appSidebar').classList.toggle('open');
         }
 
         function toggleVoice() {
             const micBtn = document.getElementById('micBtn');
-            const micSvg = document.getElementById('micIconSvg');
             const inputBox = document.getElementById('inputBox');
             const waveBox = document.getElementById('waveBox');
             const inputField = document.getElementById('chatInput');
@@ -589,16 +476,13 @@ app_code = """
 
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (!SpeechRecognition) {
-                alert("Speech recognition not supported in your browser.");
+                alert("Speech recognition not supported.");
                 return;
             }
 
             recognition = new SpeechRecognition();
             recognition.lang = 'hi-IN';
             recognition.continuous = true;
-            recognition.interimResults = true;
-
-            accumulatedSpeech = inputField.value ? inputField.value + " " : "";
 
             recognition.onstart = function() {
                 isListening = true;
@@ -606,23 +490,11 @@ app_code = """
                 inputBox.classList.add('recording');
                 waveBox.classList.add('active');
                 inputField.style.display = 'none';
-                micSvg.innerHTML = `<rect x="6" y="4" width="4" height="16" fill="currentColor"/><rect x="14" y="4" width="4" height="16" fill="currentColor"/>`;
             };
 
             recognition.onresult = function(event) {
-                let interim = '';
-                for (let i = event.resultIndex; i < event.results.length; ++i) {
-                    if (event.results[i].isFinal) {
-                        accumulatedSpeech += event.results[i][0].transcript + " ";
-                    } else {
-                        interim += event.results[i][0].transcript;
-                    }
-                }
-                inputField.value = accumulatedSpeech + interim;
-            };
-
-            recognition.onend = function() {
-                if (isListening) { try { recognition.start(); } catch(e) {} }
+                let text = event.results[event.results.length - 1][0].transcript;
+                inputField.value = text;
             };
 
             try { recognition.start(); } catch(e) {}
@@ -630,13 +502,10 @@ app_code = """
 
         function stopVoiceUI() {
             isListening = false;
-            const micBtn = document.getElementById('micBtn');
-            const micSvg = document.getElementById('micIconSvg');
-            micBtn.classList.remove('active');
+            document.getElementById('micBtn').classList.remove('active');
             document.getElementById('inputBox').classList.remove('recording');
             document.getElementById('waveBox').classList.remove('active');
             document.getElementById('chatInput').style.display = 'block';
-            micSvg.innerHTML = `<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line>`;
         }
 
         function sendMessage() {
@@ -674,28 +543,23 @@ if "q" in query_params:
     st.query_params.clear()
     
     if user_prompt:
-        # Append user message to session history
         st.session_state.messages.append({"role": "user", "content": user_prompt})
-        
-        # Get AI response passing the FULL conversation history for complete memory
         reply = get_groq_response(st.session_state.messages)
-        
-        # Append assistant reply to session history
         st.session_state.messages.append({
             "role": "assistant",
             "content": reply
         })
 
-# Render Studio App Interface
-st.components.v1.html(app_code, height=750, scrolling=False)
+# Render Studio App Interface (Fixed Compact Height to Prevent Scrolling)
+st.components.v1.html(app_code, height=620, scrolling=False)
 
 # Render Chat history dynamically with full context
 if st.session_state.messages:
-    chat_history_html = "<div style='max-width:800px; margin:auto; padding: 10px; color:#fff;'>"
+    chat_history_html = "<div style='max-width:700px; margin:auto; padding: 10px; color:#fff;'>"
     for msg in st.session_state.messages:
         if msg["role"] == "user":
-            chat_history_html += f"<div style='background:#1c1c1e; padding:10px 16px; border-radius:16px; margin:8px 0; max-width:800px; text-align:right;'>{msg['content']}</div>"
+            chat_history_html += f"<div style='background:#1c1c1e; padding:10px 16px; border-radius:14px; margin:6px 0; max-width:700px; text-align:right;'>👤 {msg['content']}</div>"
         else:
-            chat_history_html += f"<div style='background:#080808; border:1px solid #1a1a1a; padding:12px 18px; border-radius:16px; margin:8px 0; max-width:800px;'>🤖 {msg['content']}</div>"
+            chat_history_html += f"<div style='background:#080808; border:1px solid #1a1a1a; padding:12px 18px; border-radius:14px; margin:6px 0; max-width:700px;'>🤖 {msg['content']}</div>"
     chat_history_html += "</div>"
     st.markdown(chat_history_html, unsafe_allow_html=True)
