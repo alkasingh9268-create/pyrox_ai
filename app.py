@@ -1,50 +1,28 @@
-using System;
-using System.Net.Http;
-using System.Net.Http.Headers;
-using System.Text;
-using System.Text.Json;
-using System.Threading.Tasks;
+import streamlit as st
+import requests
 
-class Program
-{
-    static async Task Main(string[] args)
-    {
-        string apiKey = "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";
-        string url = "https://api.groq.com/openai/v1/chat/completions";
+st.title("🪞 Pyrox - The Mirror (Model Checker)")
 
-        using var client = new HttpClient();
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+api_key = "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"
+url = "https://api.groq.com/openai/v1/models"
 
-        var requestPayload = new
-        {
-            model = "llama-3.1-8b-instant",
-            messages = new[]
-            {
-                new { role = "user", content = "Hello! Testing Groq from C#" }
-            }
-        };
-
-        string jsonBody = JsonSerializer.Serialize(requestPayload);
-        var content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
-
-        try
-        {
-            HttpResponseMessage response = await client.PostAsync(url, content);
-            string responseString = await response.Content.ReadAsStringAsync();
-
-            if (response.IsSuccessStatusCode)
-            {
-                Console.WriteLine("🎉 Success! Response:");
-                Console.WriteLine(responseString);
-            }
-            else
-            {
-                Console.WriteLine($"❌ Error ({response.StatusCode}): {responseString}");
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Exception aagayi: {ex.Message}");
-        }
-    }
+headers = {
+    "Authorization": f"Bearer {api_key}"
 }
+
+try:
+    response = requests.get(url, headers=headers)
+    
+    if response.status_code == 200:
+        data = response.json()
+        models = data.get("data", [])
+        
+        st.success(f"🎉 शीशा साफ़ है! तेरी API Key बिल्कुल सही है और इसपर कुल {len(models)} models available हैं:")
+        
+        for model in models:
+            st.code(model.get("id"))
+    else:
+        st.error(f"❌ Error ({response.status_code}): {response.text}")
+        
+except Exception as e:
+    st.error(f"Exception aagayi: {str(e)}")
