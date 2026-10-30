@@ -1,6 +1,4 @@
 import os
-import asyncio
-import edge_tts
 import streamlit as st
 from groq import Groq
 
@@ -12,42 +10,19 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Hide Default Streamlit Elements & Force Zero Padding for Clean Custom UI
+# Hide Default Streamlit Elements & Force Zero Padding
 st.markdown("""
     <style>
     .stApp { background-color: #000000; color: #ffffff; }
     #MainMenu, header, footer { visibility: hidden; }
     .block-container { padding: 0rem !important; margin: 0rem !important; }
-    iframe { width: 100% !important; height: 100vh !important; border: none; }
     </style>
 """, unsafe_allow_html=True)
 
-# Initialize Groq Client
-groq_api_key = os.environ.get("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY", "")
-client = Groq(api_key=groq_api_key) if groq_api_key else None
+api_key = os.environ.get("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY", "")
+client = Groq(api_key=api_key) if api_key else None
 
-# Function to generate real Edge-TTS (Madhur Neural) Audio File on server
-def generate_edge_audio(text, filename="response.mp3"):
-    try:
-        clean_t = text.replace("*", "").replace("#", "").replace("`", "").replace("✨", "").replace("👋", "").replace("🚀", "").replace("💻", "").replace("😎", "").replace("💡", "").replace("🎯", "")
-        
-        async def _main():
-            communicate = edge_tts.Communicate(clean_t, "hi-IN-MadhurNeural")
-            await communicate.save(filename)
-        
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-        
-        loop.run_until_complete(_main())
-        return True
-    except Exception as e:
-        print("TTS Error:", e)
-        return False
-
-# Function to get real AI response from Groq (Gen-Z, Emoji Rich, Smart & Contextual)
+# Function to get real Groq AI response with Dynamic User-Understanding Intelligence
 def get_groq_response(user_prompt):
     if not client:
         return "⚠️ Groq API Key missing in Streamlit Secrets!"
@@ -57,28 +32,35 @@ def get_groq_response(user_prompt):
             messages=[
                 {
                     "role": "system",
-                    "content": "You are Pyrox, an advanced, highly intelligent, and Gen-Z friendly AI assistant inspired by Meta AI and ChatGPT. Talk in a smooth mix of natural Hindi and English (Hinglish) with cool emojis ✨. Give crisp, highly accurate, and engaging answers without sounding robotic, repetitive, or overly formal. Understand user intent deeply and reply like a smart personal partner."
+                    "content": (
+                        "You are Pyrox, an exceptionally intelligent, adaptive, and emotionally aware AI collaborator. "
+                        "Read the user's tone carefully: if they are frustrated, angry, or stressed, respond with deep empathy, "
+                        "patience, grounding support, and practical clarity without sounding robotic or dismissive. "
+                        "If they are excited or curious, match their energy with sharp, creative, and engaging responses. "
+                        "Talk in a smooth, natural blend of Hinglish (Hindi + English) with subtle, cool emojis ✨. "
+                        "Always tailor your explanation precisely to the user's exact level of understanding and current mood."
+                    )
                 },
                 {
                     "role": "user",
                     "content": user_prompt
                 }
             ],
-            temperature=0.7,
-            max_tokens=512,
+            temperature=0.75,
+            max_tokens=600,
         )
         return completion.choices[0].message.content
     except Exception as e:
         return f"⚠️ Error connecting to Groq: {str(e)}"
 
-# 2. Pure Clean Studio Frontend UI (HTML + CSS + JS)
+# 2. Complete HTML + CSS + JS Studio UI
 app_code = """
 <!DOCTYPE html>
 <html lang="hi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pyrox Studio</title>
+    <title>Pyrox</title>
     <style>
         * {
             margin: 0;
@@ -92,37 +74,32 @@ app_code = """
             display: flex;
             height: 100vh;
             overflow: hidden;
-            position: relative;
         }
 
-        /* SIDEBAR (COLLAPSIBLE GEMINI/META STYLE) */
+        /* SIDEBAR ULTRA MAX DARK */
         .sidebar {
-            width: 0px;
-            background-color: #050507;
-            border-right: none;
+            width: 230px;
+            background-color: #050505;
+            border-right: 1px solid #141414;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-            padding: 0px;
+            padding: 12px 10px;
             z-index: 20;
-            overflow: hidden;
-            transition: width 0.3s ease, padding 0.3s ease, border-right 0.3s ease;
-        }
-        .sidebar.expanded {
-            width: 250px;
-            padding: 14px 12px;
-            border-right: 1px solid #16161a;
         }
         .sidebar-logo-header {
             display: flex;
             align-items: center;
             gap: 10px;
             padding: 4px 6px;
-            margin-bottom: 12px;
-            white-space: nowrap;
+            margin-bottom: 10px;
+        }
+        .sidebar-logo-header svg {
+            width: 24px;
+            height: 24px;
         }
         .sidebar-brand-name {
-            font-size: 1.15rem;
+            font-size: 1.1rem;
             font-weight: 700;
             color: #ffffff;
             letter-spacing: 0.5px;
@@ -130,49 +107,60 @@ app_code = """
         .menu-list {
             display: flex;
             flex-direction: column;
-            gap: 4px;
-            white-space: nowrap;
+            gap: 3px;
         }
         .menu-btn {
             display: flex;
             align-items: center;
             gap: 12px;
-            padding: 9px 10px;
+            padding: 8px 10px;
             color: #aaaaaa;
-            font-size: 13.5px;
+            font-size: 13px;
             border-radius: 8px;
             cursor: pointer;
             transition: background 0.2s, color 0.2s;
+            position: relative;
         }
         .menu-btn:hover {
-            background-color: #16161a;
+            background-color: #141414;
             color: #ffffff;
         }
         .menu-btn svg {
-            width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; flex-shrink: 0;
+            width: 17px;
+            height: 17px;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 2;
+        }
+        .sidebar-bottom {
+            border-top: 1px solid #141414;
+            padding-top: 8px;
         }
 
-        /* CHAT HISTORY SECTION */
-        .history-section {
-            margin-top: 15px;
-            flex: 1;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
+        /* TOOLTIP HOVER HELPER */
+        [data-tooltip] {
+            position: relative;
+        }
+        [data-tooltip]:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 115%;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #1f1f1f;
+            color: #ffffff;
+            font-size: 11px;
+            font-weight: 500;
+            padding: 4px 8px;
+            border-radius: 6px;
             white-space: nowrap;
+            border: 1px solid #333;
+            pointer-events: none;
+            z-index: 1000;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
         }
-        .history-title {
-            font-size: 11px; color: #555; text-transform: uppercase; letter-spacing: 1px; padding-left: 6px; margin-bottom: 4px;
-        }
-        .history-item {
-            font-size: 13px; color: #b0b0b0; padding: 7px 10px; border-radius: 6px; cursor: pointer; overflow: hidden; text-overflow: ellipsis; transition: background 0.2s, color 0.2s;
-        }
-        .history-item:hover { background-color: #16161a; color: #fff; }
 
-        .sidebar-bottom { border-top: 1px solid #16161a; padding-top: 10px; white-space: nowrap; }
-
-        /* MAIN WORKSPACE */
+        /* MAIN CONTAINER */
         .main-container {
             flex: 1;
             display: flex;
@@ -181,8 +169,7 @@ app_code = """
             align-items: center;
             height: 100vh;
             padding-top: 4px;
-            padding-bottom: 12px;
-            z-index: 10;
+            padding-bottom: 8px;
         }
 
         /* TOP NAVBAR */
@@ -190,129 +177,316 @@ app_code = """
             width: 100%;
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            padding: 8px 20px;
+            justify-content: flex-end;
+            padding: 4px 20px;
+            position: relative;
         }
-        .nav-left { display: flex; align-items: center; gap: 12px; }
-        .expand-sidebar-btn {
-            background: transparent; border: none; color: #aaaaaa; cursor: pointer; padding: 6px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: color 0.2s, background 0.2s;
+        .three-dots-wrapper {
+            position: relative;
         }
-        .expand-sidebar-btn:hover { color: #fff; background: #16161a; }
-        
-        .top-brand { font-size: 1.2rem; font-weight: 700; letter-spacing: 0.5px; color: #fff; }
-
-        .three-dots-wrapper { position: relative; }
         .dots-btn {
-            background: transparent; border: none; color: #aaaaaa; cursor: pointer; padding: 6px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: color 0.2s, background 0.2s;
+            background: transparent;
+            border: none;
+            color: #aaaaaa;
+            cursor: pointer;
+            padding: 6px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.2s, background 0.2s;
         }
-        .dots-btn:hover { color: #ffffff; background-color: #16161a; }
-        
+        .dots-btn:hover {
+            color: #ffffff;
+            background-color: #1a1a1a;
+        }
         .dropdown-menu {
-            position: absolute; top: 38px; right: 0; width: 210px; background-color: #0d0d12; border: 1px solid #22222a; border-radius: 12px; padding: 6px 0; display: none; flex-direction: column; box-shadow: 0 10px 25px rgba(0,0,0,0.8); z-index: 100;
+            position: absolute;
+            top: 36px;
+            right: 0;
+            width: 210px;
+            background-color: #0d0d0d;
+            border: 1px solid #222222;
+            border-radius: 12px;
+            padding: 6px 0;
+            display: none;
+            flex-direction: column;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.6);
+            z-index: 100;
         }
-        .dropdown-menu.show { display: flex; }
+        .dropdown-menu.show {
+            display: flex;
+        }
         .dropdown-item {
-            padding: 9px 16px; font-size: 13px; color: #cccccc; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: background 0.2s;
+            padding: 9px 16px;
+            font-size: 13px;
+            color: #cccccc;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: background 0.2s;
         }
-        .dropdown-item:hover { background-color: #16161a; color: #ffffff; }
+        .dropdown-item:hover {
+            background-color: #1a1a1a;
+            color: #ffffff;
+        }
+        .dropdown-item.login-item {
+            border-bottom: 1px solid #222;
+            color: #3b82f6;
+            font-weight: 600;
+        }
 
         /* CENTER LANDING HEADER */
         .center-landing-header {
-            display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; margin-top: 14vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            gap: 4px;
+            margin-top: 2px;
         }
-        .brand-logo-large { width: 54px; height: 54px; }
-        .brand-name-large { font-size: 2.5rem; font-weight: 800; color: #ffffff; letter-spacing: -0.5px; }
-        .greeting-subtext { font-size: 1.25rem; font-weight: 500; color: #9ca3af; }
+        .brand-title-box {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .brand-logo-large {
+            width: 38px;
+            height: 38px;
+        }
+        .brand-name-large {
+            font-size: 1.9rem;
+            font-weight: 800;
+            color: #ffffff;
+            letter-spacing: -0.5px;
+        }
+        .greeting-subtext {
+            font-size: 1.2rem;
+            font-weight: 500;
+            color: #d1d5db;
+        }
 
-        /* CHAT CONTAINER */
+        /* CHAT MESSAGES AREA */
         .chat-container {
-            width: 100%; max-width: 840px; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; padding: 10px 15px; scroll-behavior: smooth;
+            width: 100%;
+            max-width: 800px;
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding: 5px 15px;
+            margin-top: 5px;
         }
-        .message { display: flex; flex-direction: column; max-width: 85%; line-height: 1.6; font-size: 1.02rem; }
+        .message {
+            display: flex;
+            flex-direction: column;
+            max-width: 82%;
+            line-height: 1.5;
+            font-size: 0.95rem;
+        }
         .user-message {
-            align-self: flex-end; background-color: #1c1c21; color: #ffffff; padding: 12px 18px; border-radius: 18px 18px 4px 18px; border: 1px solid #2d2d35;
+            align-self: flex-end;
+            background-color: #1c1c1e;
+            color: #ffffff;
+            padding: 10px 16px;
+            border-radius: 16px 16px 4px 16px;
+            border: 1px solid #2d2d2d;
         }
         .ai-message {
-            align-self: flex-start; background-color: #08080c; color: #f3f4f6; padding: 14px 20px; border-radius: 18px 18px 18px 4px; border: 1px solid #1a1a22; display: flex; flex-direction: column; gap: 12px;
+            align-self: flex-start;
+            background-color: #080808;
+            color: #f0f0f0;
+            padding: 12px 18px;
+            border-radius: 16px 16px 16px 4px;
+            border: 1px solid #1a1a1a;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
         }
 
-        /* INPUT BAR */
+        /* AUDIO PLAY BUTTON */
+        .audio-play-btn {
+            background-color: #161618;
+            color: #3b82f6;
+            border: 1px solid #2a2a2e;
+            border-radius: 8px;
+            padding: 6px 12px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            align-self: flex-start;
+            transition: background 0.2s, border-color 0.2s;
+        }
+        .audio-play-btn:hover {
+            background-color: #1f1f23;
+            border-color: #3b82f6;
+            color: #60a5fa;
+        }
+        .audio-play-btn svg {
+            width: 14px;
+            height: 14px;
+            fill: currentColor;
+        }
+
+        /* INPUT BAR AREA */
         .input-wrapper {
-            width: 100%; max-width: 840px; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 0 15px;
+            width: 100%;
+            max-width: 800px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            padding: 0 15px;
         }
         .input-box {
-            width: 100%; background-color: #060608; border: 1px solid #22222a; border-radius: 28px; padding: 10px 16px; display: flex; align-items: center; gap: 12px; position: relative; transition: border-color 0.3s, box-shadow 0.3s;
+            width: 100%;
+            background-color: #080808;
+            border: 1px solid #222222;
+            border-radius: 26px;
+            padding: 8px 14px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            position: relative;
+            transition: border-color 0.3s, box-shadow 0.3s;
         }
-        .input-box.recording { border-color: #ef4444; box-shadow: 0 0 20px rgba(239, 68, 68, 0.3); }
-        .star-btn { cursor: pointer; width: 22px; height: 22px; flex-shrink: 0; }
+        .input-box.recording {
+            border-color: #ef4444;
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.25);
+        }
+        .star-btn {
+            cursor: pointer;
+            width: 20px;
+            height: 20px;
+            flex-shrink: 0;
+        }
 
-        /* WAVE BARS */
+        /* PREMIUM WIDE & THIN GEMINI WAVE BARS */
         .gemini-wave-container {
-            display: flex; align-items: center; gap: 4px; height: 22px; width: 130px; display: none;
+            display: flex;
+            align-items: center;
+            gap: 2.5px;
+            height: 22px;
+            flex: 1;
+            padding: 0 10px;
+            display: none;
         }
-        .gemini-wave-container.active { display: flex; }
+        .gemini-wave-container.active {
+            display: flex;
+        }
         .wave-bar {
-            flex: 1; background: linear-gradient(180deg, #ef4444, #3b82f6); border-radius: 4px; height: 20%; animation: waveMotion 0.6s infinite ease-in-out alternate;
+            flex: 1;
+            background: linear-gradient(180deg, #ef4444, #3b82f6);
+            border-radius: 2px;
+            height: 20%;
+            animation: waveMotion 0.5s infinite ease-in-out alternate;
         }
-        .wave-bar:nth-child(1) { animation-delay: 0.1s; }
-        .wave-bar:nth-child(2) { animation-delay: 0.3s; }
-        .wave-bar:nth-child(3) { animation-delay: 0.2s; }
-        .wave-bar:nth-child(4) { animation-delay: 0.5s; }
+        .wave-bar:nth-child(1) { animation-delay: 0.05s; }
+        .wave-bar:nth-child(2) { animation-delay: 0.2s; }
+        .wave-bar:nth-child(3) { animation-delay: 0.1s; }
+        .wave-bar:nth-child(4) { animation-delay: 0.35s; }
         .wave-bar:nth-child(5) { animation-delay: 0.15s; }
-        @keyframes waveMotion { 0% { height: 15%; } 100% { height: 100%; } }
+        .wave-bar:nth-child(6) { animation-delay: 0.3s; }
+        .wave-bar:nth-child(7) { animation-delay: 0.08s; }
+        .wave-bar:nth-child(8) { animation-delay: 0.25s; }
+        .wave-bar:nth-child(9) { animation-delay: 0.12s; }
+        .wave-bar:nth-child(10) { animation-delay: 0.4s; }
+
+        @keyframes waveMotion {
+            0% { height: 15%; }
+            100% { height: 100%; }
+        }
 
         .chat-input-field {
-            flex: 1; background: transparent; border: none; outline: none; color: #ffffff; font-size: 1rem; padding: 4px 0;
+            flex: 1;
+            background: transparent;
+            border: none;
+            outline: none;
+            color: #ffffff;
+            font-size: 0.95rem;
+            padding: 4px 0;
         }
-        .chat-input-field::placeholder { color: #666666; }
+        .chat-input-field::placeholder { color: #555555; }
 
-        .mic-btn { background: transparent; border: none; color: #aaaaaa; cursor: pointer; display: flex; align-items: center; transition: color 0.2s; }
-        .mic-btn:hover { color: #ffffff; }
+        .mic-btn {
+            background: transparent;
+            border: none;
+            color: #aaaaaa;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.2s, transform 0.2s;
+        }
+        .mic-btn:hover { color: #ffffff; transform: scale(1.1); }
         .mic-btn.active { color: #ef4444; }
 
         .arrow-submit-btn {
-            width: 34px; height: 34px; background-color: #ffffff; color: #000000; border: none; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform 0.2s;
+            width: 30px;
+            height: 30px;
+            background-color: #ffffff;
+            color: #000000;
+            border: none;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: transform 0.2s, opacity 0.2s;
+            flex-shrink: 0;
         }
-        .arrow-submit-btn:hover { transform: scale(1.06); }
+        .arrow-submit-btn:hover {
+            transform: scale(1.05);
+            opacity: 0.9;
+        }
 
-        .footer-disclaimer { font-size: 11px; color: #555; text-align: center; }
+        .footer-disclaimer {
+            font-size: 10.5px;
+            color: #555555;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
 
-    <!-- SIDEBAR -->
-    <div class="sidebar" id="sidebar">
+    <!-- LEFT SIDEBAR -->
+    <div class="sidebar">
         <div>
             <div class="sidebar-logo-header">
-                <svg width="24" height="24" viewBox="0 0 200 200">
-                    <circle cx="100" cy="100" r="85" fill="#060608" stroke="#ffffff" stroke-width="6"/>
-                    <path d="M 100 25 L 70 85 L 110 85 L 90 115 L 130 115 L 100 175" fill="none" stroke="#ffffff" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+                <svg viewBox="0 0 200 200">
+                    <circle cx="100" cy="100" r="85" fill="#050505" stroke="#ffffff" stroke-width="4"/>
+                    <path d="M 100 25 L 70 85 L 110 85 L 90 115 L 130 115 L 100 175" fill="none" stroke="#ffffff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
                 <span class="sidebar-brand-name">Pyrox</span>
             </div>
 
             <div class="menu-list">
-                <div class="menu-btn" onclick="clearChat()">
+                <div class="menu-btn" onclick="clearChat()" data-tooltip="New Chat">
                     <svg viewBox="0 0 24 24"><path d="M12 4v16m8-8H4"></path></svg>
                     <span>New Chat</span>
                 </div>
-                <div class="menu-btn" onclick="searchChat()">
+                <div class="menu-btn" onclick="alert('Search chat history')" data-tooltip="Search Chat">
                     <svg viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                     <span>Search Chat</span>
                 </div>
-                <div class="menu-btn" onclick="alert('📚 Library: Saved chats and notes.')">
+                <div class="menu-btn" onclick="alert('Library: Past notes & discussions')" data-tooltip="Library">
                     <svg viewBox="0 0 24 24"><path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
                     <span>Library</span>
                 </div>
-            </div>
-
-            <div class="history-section" id="historySection">
-                <div class="history-title">Recent Chats</div>
+                <div class="menu-btn" onclick="openStudentSetup()" data-tooltip="For Students">
+                    <svg viewBox="0 0 24 24"><path d="M12 14l9-5-9-5-9 5 9 5z"></path><path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0112 20.055a11.952 11.952 0 01-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"></path></svg>
+                    <span>For Students</span>
+                </div>
             </div>
         </div>
 
         <div class="sidebar-bottom">
-            <div class="menu-btn" onclick="alert('⚙️ Pyrox Settings')">
+            <div class="menu-btn" onclick="alert('Settings Panel')" data-tooltip="Settings">
                 <svg viewBox="0 0 24 24"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                 <span>Settings</span>
             </div>
@@ -324,28 +498,19 @@ app_code = """
         
         <!-- TOP NAVBAR -->
         <div class="top-navbar">
-            <div class="nav-left">
-                <button class="expand-sidebar-btn" onclick="toggleSidebar()">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="3" y1="12" x2="21" y2="12"></line>
-                        <line x1="3" y1="6" x2="21" y2="6"></line>
-                        <line x1="3" y1="18" x2="21" y2="18"></line>
-                    </svg>
-                </button>
-                <div class="top-brand">Pyrox</div>
-            </div>
-
             <div class="three-dots-wrapper">
-                <button class="dots-btn" onclick="toggleDropdown()">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <button class="dots-btn" onclick="toggleDropdown()" data-tooltip="More Options">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="5" r="1.5"></circle>
                         <circle cx="12" cy="12" r="1.5"></circle>
                         <circle cx="12" cy="19" r="1.5"></circle>
                     </svg>
                 </button>
                 <div class="dropdown-menu" id="dropdownMenu">
-                    <div class="dropdown-item" onclick="alert('Google Gmail Login')">📧 Login with Gmail</div>
-                    <div class="dropdown-item" onclick="alert('Link Copied!')">🔗 Share Conversation</div>
+                    <div class="dropdown-item login-item" onclick="alert('Redirecting to Gmail Login...')">📧 Login with Gmail</div>
+                    <div class="dropdown-item" onclick="alert('Conversation link copied!')">🔗 Share Conversation</div>
+                    <div class="dropdown-item" onclick="alert('Find in chat')">🔍 Find in Chat</div>
+                    <div class="dropdown-item" onclick="alert('Chat pinned')">📌 Pin Chat</div>
                     <div class="dropdown-item" onclick="alert('Exporting PDF...')">📄 Download PDF / Export</div>
                     <div class="dropdown-item" style="color:#ef4444;" onclick="clearChat()">🗑️ Delete Chat</div>
                 </div>
@@ -354,21 +519,23 @@ app_code = """
 
         <!-- CENTER LANDING HEADER -->
         <div class="center-landing-header" id="landingHeader">
-            <svg class="brand-logo-large" viewBox="0 0 200 200">
-                <circle cx="100" cy="100" r="85" fill="#000000" stroke="#ffffff" stroke-width="6"/>
-                <path d="M 100 25 L 70 85 L 110 85 L 90 115 L 130 115 L 100 175" fill="none" stroke="#ffffff" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            <div class="brand-name-large">Pyrox</div>
-            <div class="greeting-subtext">How can I help you today? ✨</div>
+            <div class="brand-title-box">
+                <svg class="brand-logo-large" viewBox="0 0 200 200">
+                    <circle cx="100" cy="100" r="85" fill="#000000" stroke="#ffffff" stroke-width="5"/>
+                    <path d="M 100 25 L 70 85 L 110 85 L 90 115 L 130 115 L 100 175" fill="none" stroke="#ffffff" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <span class="brand-name-large">Pyrox</span>
+            </div>
+            <div class="greeting-subtext">Hi, how can I help you today?</div>
         </div>
 
-        <!-- CHAT CONTAINER -->
+        <!-- CHAT MESSAGES CONTAINER -->
         <div class="chat-container" id="chatContainer"></div>
 
-        <!-- INPUT BAR -->
+        <!-- INPUT BAR AREA -->
         <div class="input-wrapper">
             <div class="input-box" id="inputBox">
-                <svg class="star-btn" viewBox="0 0 24 24" onclick="alert('Attach file or photo')">
+                <svg class="star-btn" viewBox="0 0 24 24" data-tooltip="Attach File & Photo" onclick="alert('Select File / Photo to attach')">
                     <defs>
                         <linearGradient id="starGrad" x1="0%" y1="0%" x2="100%" y2="100%">
                             <stop offset="0%" stop-color="#9C27B0"/>
@@ -378,7 +545,7 @@ app_code = """
                     <path d="M12 0C12 6.627 6.627 12 0 12C6.627 12 12 17.373 12 24C12 17.373 17.373 12 24 12C17.373 12 12 6.627 12 0Z" fill="url(#starGrad)"/>
                 </svg>
 
-                <button id="micBtn" class="mic-btn" onclick="toggleVoice()">
+                <button id="micBtn" class="mic-btn" data-tooltip="Voice Input" onclick="toggleVoice()">
                     <svg id="micIconSvg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
                         <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
@@ -386,20 +553,23 @@ app_code = """
                     </svg>
                 </button>
 
+                <!-- WIDE & THIN GEMINI WAVE BARS SPANNING FROM MIC TO ARROW -->
                 <div class="gemini-wave-container" id="waveBox">
+                    <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
                     <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
                 </div>
 
-                <input type="text" id="chatInput" class="chat-input-field" placeholder="Ask Pyrox anything..." onkeypress="if(event.key==='Enter') triggerSend();" />
+                <input type="text" id="chatInput" class="chat-input-field" placeholder="Ask Pyrox anything..." onkeypress="if(event.key==='Enter') sendMessage();" />
 
-                <button class="arrow-submit-btn" onclick="triggerSend()">
+                <button class="arrow-submit-btn" data-tooltip="Submit" onclick="sendMessage()">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
                         <line x1="5" y1="12" x2="19" y2="12"></line>
                         <polyline points="12 5 19 12 12 19"></polyline>
                     </svg>
                 </button>
             </div>
-            <div class="footer-disclaimer">Pyrox AI</div>
+            
+            <div class="footer-disclaimer">Pyrox is AI and can make mistakes</div>
         </div>
     </div>
 
@@ -408,54 +578,23 @@ app_code = """
         let recognition = null;
         let accumulatedSpeech = "";
 
-        function toggleSidebar() {
-            document.getElementById('sidebar').classList.toggle('expanded');
-        }
-
         function toggleDropdown() {
             document.getElementById('dropdownMenu').classList.toggle('show');
         }
 
         window.onclick = function(event) {
-            if (!event.target.closest('.three-dots-wrapper') && !event.target.closest('.expand-sidebar-btn')) {
+            if (!event.target.closest('.three-dots-wrapper')) {
                 const m = document.getElementById('dropdownMenu');
                 if(m) m.classList.remove('show');
             }
         }
 
-        function searchChat() {
-            let term = prompt("🔍 चैट में क्या खोजना चाहते हैं?");
-            if(term) alert("'" + term + "' से जुड़े मैसेज खोजे जा रहे हैं...");
-        }
-
-        function triggerSend() {
-            const inputField = document.getElementById('chatInput');
-            const text = inputField.value.trim();
-            if(!text) return;
-            
-            const chatContainer = document.getElementById('chatContainer');
-            const landingHeader = document.getElementById('landingHeader');
-            if(landingHeader) landingHeader.style.display = 'none';
-
-            const userDiv = document.createElement('div');
-            userDiv.className = 'message user-message';
-            userDiv.innerText = text;
-            chatContainer.appendChild(userDiv);
-
-            // Add history
-            const historySection = document.getElementById('historySection');
-            const hItem = document.createElement('div');
-            hItem.className = 'history-item';
-            hItem.innerText = text.length > 22 ? text.substring(0, 22) + '...' : text;
-            historySection.appendChild(hItem);
-
-            inputField.value = '';
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-
-            // Trigger Streamlit rerun with query param
-            const url = new URL(window.location.href);
-            url.searchParams.set('q', encodeURIComponent(text));
-            window.location.href = url.toString();
+        function openStudentSetup() {
+            let goal = prompt("आप किस परीक्षा या कक्षा की तैयारी कर रहे हैं? (जैसे: NEET, JEE, School, College)");
+            if(!goal) return;
+            let standard = prompt("आपकी कक्षा या वर्ष कौन सा है? (जैसे: Class 9, Class 11, B.Tech 1st Year)");
+            if(!standard) return;
+            alert("बहुत बढ़िया! " + standard + " (" + goal + ") के लिए आपका स्टडी रूटीन सेट कर दिया गया है।");
         }
 
         function toggleVoice() {
@@ -473,7 +612,7 @@ app_code = """
 
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (!SpeechRecognition) {
-                alert("Speech recognition not supported.");
+                alert("Speech recognition not supported in your browser.");
                 return;
             }
 
@@ -489,7 +628,7 @@ app_code = """
                 micBtn.classList.add('active');
                 inputBox.classList.add('recording');
                 waveBox.classList.add('active');
-                inputField.placeholder = "Listening...";
+                inputField.style.display = 'none';
                 micSvg.innerHTML = `<rect x="6" y="4" width="4" height="16" fill="currentColor"/><rect x="14" y="4" width="4" height="16" fill="currentColor"/>`;
             };
 
@@ -519,8 +658,47 @@ app_code = """
             micBtn.classList.remove('active');
             document.getElementById('inputBox').classList.remove('recording');
             document.getElementById('waveBox').classList.remove('active');
-            document.getElementById('chatInput').placeholder = "Ask Pyrox anything...";
+            document.getElementById('chatInput').style.display = 'block';
             micSvg.innerHTML = `<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line>`;
+        }
+
+        function speakText(text) {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                let cleanText = text.replace(/[`*_#\\[\\]()]/g, '');
+                let utterance = new SpeechSynthesisUtterance(cleanText);
+                utterance.rate = 1.0;
+                utterance.pitch = 0.95;
+                let voices = window.speechSynthesis.getVoices();
+                let targetVoice = voices.find(v => (v.name.includes("Madhur") || v.name.includes("Male") || v.name.includes("David")) && (v.lang.includes("hi") || v.lang.includes("en"))) || voices[0];
+                if (targetVoice) utterance.voice = targetVoice;
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+
+        function sendMessage() {
+            if (isListening && recognition) { recognition.stop(); stopVoiceUI(); }
+            const inputField = document.getElementById('chatInput');
+            const text = inputField.value.trim();
+            if(!text) return;
+
+            const landingHeader = document.getElementById('landingHeader');
+            if (landingHeader) landingHeader.style.display = 'none';
+
+            const chatContainer = document.getElementById('chatContainer');
+
+            const userDiv = document.createElement('div');
+            userDiv.className = 'message user-message';
+            userDiv.innerText = text;
+            chatContainer.appendChild(userDiv);
+
+            inputField.value = '';
+            accumulatedSpeech = "";
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+
+            const url = new URL(window.location.href);
+            url.searchParams.set('q', encodeURIComponent(text));
+            window.location.href = url.toString();
         }
 
         function clearChat() {
@@ -533,11 +711,11 @@ app_code = """
 </html>
 """
 
-# Session State Management
+# Session State Management for Chat History
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Check if query parameter 'q' exists from frontend trigger
+# Handle Backend Interaction with Groq
 query_params = st.query_params
 if "q" in query_params:
     user_prompt = query_params["q"]
@@ -546,16 +724,21 @@ if "q" in query_params:
     if user_prompt:
         st.session_state.messages.append({"role": "user", "content": user_prompt})
         reply = get_groq_response(user_prompt)
-        
-        audio_filename = f"audio_{len(st.session_state.messages)}.mp3"
-        success = generate_edge_audio(reply, audio_filename)
-        audio_path = audio_filename if success else None
-        
         st.session_state.messages.append({
             "role": "assistant",
-            "content": reply,
-            "audio_file": audio_path
+            "content": reply
         })
 
 # Render Studio App Interface
-st.components.v1.html(app_code, height=780, scrolling=False)
+st.components.v1.html(app_code, height=750, scrolling=False)
+
+# Render Chat history dynamically if messages exist
+if st.session_state.messages:
+    chat_history_html = "<div style='max-width:800px; margin:auto; padding: 10px; color:#fff;'>"
+    for msg in st.session_state.messages:
+        if msg["role"] == "user":
+            chat_history_html += f"<div style='background:#1c1c1e; padding:10px 16px; border-radius:16px; margin:8px 0; max-width:800px; text-align:right;'>{msg['content']}</div>"
+        else:
+            chat_history_html += f"<div style='background:#080808; border:1px solid #1a1a1a; padding:12px 18px; border-radius:16px; margin:8px 0; max-width:800px;'>🤖 {msg['content']}</div>"
+    chat_history_html += "</div>"
+    st.markdown(chat_history_html, unsafe_allow_html=True)
