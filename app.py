@@ -1,17 +1,18 @@
-import os
+import streamlit as st
 from groq import Groq
 
-# Yahan apni poori ki poori API key daal de bina kisi cheez ke
 client = Groq(api_key="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")
 
 chat_completion = client.chat.completions.create(
     messages=[
         {
             "role": "user",
-            "content": "Hello!",
+            "content": "Hello! How are you?",
         }
     ],
-    model="llama3-8b-8192",
+    model="llama-3.1-8b-instant",
 )
 
-print(chat_completion.choices[0].message.content)
+st.success("API Key aur Model ekdum sahi kaam kar rahe hain!")
+st.write("🤖 AI ka reply:")
+st.info(chat_completion.choices[0].message.content)
