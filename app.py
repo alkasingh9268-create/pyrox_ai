@@ -1,18 +1,51 @@
-import streamlit as st
-from groq import Groq
+using System;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Text;
+using System.Text.Json;
+using System.Threading.Tasks;
 
-client = Groq(api_key="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")
+class Program
+{
+    static async Task Main(string[] args)
+    {
+        // Yahan apni poori API key daal de
+        string apiKey = "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";
+        string url = "https://api.groq.com/openai/v1/chat/completions";
 
-chat_completion = client.chat.completions.create(
-    messages=[
+        using var client = new HttpClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+
+        var requestPayload = new
         {
-            "role": "user",
-            "content": "Hello!",
-        }
-    ],
-    model="llama3-8b-8192",
-)
+            model = "llama-3.1-8b-instant",
+            messages = new[]
+            {
+                new { role = "user", content = "Hello! Pyrox ke liye test message hai." }
+            }
+        };
 
-st.success("API Key aur Model dono ekdam fit kaam kar rahe hain!")
-st.write("🤖 AI Reply:")
-st.info(chat_completion.choices[0].message.content)
+        string jsonBody = JsonSerializer.Serialize(requestPayload);
+        var content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
+
+        try
+        {
+            HttpResponseMessage response = await client.PostAsync(url, content);
+            string responseString = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                Console.WriteLine("🎉 Success! Response:");
+                Console.WriteLine(responseString);
+            }
+            else
+            {
+                Console.WriteLine($"❌ Error ({response.StatusCode}): {responseString}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception aagayi: {ex.Message}");
+        }
+    }
+}
