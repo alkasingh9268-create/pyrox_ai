@@ -33,11 +33,9 @@ if "messages" not in st.session_state:
 # Function to generate real Microsoft Edge-TTS (Madhur Neural - Male Voice) Audio File
 def generate_edge_audio(text, filename="response.mp3"):
     try:
-        # Clean text from special markdown symbols for crisp audio reading
         clean_t = text.replace("*", "").replace("#", "").replace("`", "").replace("✨", "").replace("👋", "").replace("🚀", "").replace("💻", "").replace("😎", "").replace("💡", "").replace("🎯", "")
         
         async def _main():
-            # hi-IN-MadhurNeural is a premium, natural-sounding Indian Male Neural Voice
             communicate = edge_tts.Communicate(clean_t, "hi-IN-MadhurNeural")
             await communicate.save(filename)
         
@@ -53,7 +51,7 @@ def generate_edge_audio(text, filename="response.mp3"):
         print("TTS Error:", e)
         return False
 
-# Function to get intelligent Gen-Z AI response from Groq (Llama 3.3 70B Versatile)
+# Function to get intelligent Gen-Z AI response from Groq
 def get_groq_response(user_prompt):
     if not client:
         return "⚠️ Groq API Key missing in Streamlit Secrets or Environment Variables!"
@@ -63,7 +61,7 @@ def get_groq_response(user_prompt):
             messages=[
                 {
                     "role": "system",
-                    "content": "You are Pyrox, an advanced, highly intelligent, and Gen-Z friendly AI assistant inspired by Meta AI and ChatGPT. Talk in a smooth mix of natural Hindi and English (Hinglish) with cool emojis ✨. Give crisp, highly accurate, and engaging answers without sounding robotic or repetitive."
+                    "content": "You are Pyrox, an advanced, highly intelligent, and Gen-Z friendly AI assistant. Talk in a smooth mix of natural Hindi and English (Hinglish) with cool emojis ✨. Give crisp, highly accurate, and engaging answers."
                 },
                 {
                     "role": "user",
@@ -77,7 +75,7 @@ def get_groq_response(user_prompt):
     except Exception as e:
         return f"⚠️ Error connecting to Groq: {str(e)}"
 
-# Handle Backend Interaction with Groq + Edge-TTS Audio Generation via Query Params
+# Handle Backend Interaction via Query Params
 query_params = st.query_params
 if "q" in query_params:
     user_prompt = query_params["q"]
@@ -87,7 +85,6 @@ if "q" in query_params:
         st.session_state.messages.append({"role": "user", "content": user_prompt})
         reply = get_groq_response(user_prompt)
         
-        # Generate Server-side Microsoft Edge-TTS Audio File with Male Voice
         audio_filename = f"audio_{len(st.session_state.messages)}.mp3"
         success = generate_edge_audio(reply, audio_filename)
         audio_path = audio_filename if success else None
@@ -98,10 +95,10 @@ if "q" in query_params:
             "audio_file": audio_path
         })
 
-# Convert Python chat history into JSON string to embed cleanly in HTML/JS UI
+# Convert Python chat history into JSON string
 chat_history_json = json.dumps(st.session_state.messages)
 
-# 2. Complete HTML + CSS + JS Studio UI with Injected Dynamic History & Audio Support
+# 2. Complete HTML + CSS + JS Studio UI
 app_code = f"""
 <!DOCTYPE html>
 <html lang="hi">
@@ -279,11 +276,6 @@ app_code = f"""
             background-color: #1a1a1a;
             color: #ffffff;
         }}
-        .dropdown-item.login-item {{
-            border-bottom: 1px solid #222;
-            color: #3b82f6;
-            font-weight: 600;
-        }}
 
         /* CENTER LANDING HEADER */
         .center-landing-header {{
@@ -383,49 +375,7 @@ app_code = f"""
             align-items: center;
             gap: 10px;
             position: relative;
-            transition: border-color 0.3s, box-shadow 0.3s;
         }}
-        .input-box.recording {{
-            border-color: #ef4444;
-            box-shadow: 0 0 15px rgba(239, 68, 68, 0.25);
-        }}
-        .star-btn {{
-            cursor: pointer;
-            width: 20px;
-            height: 20px;
-            flex-shrink: 0;
-        }}
-
-        /* GEMINI WAVE BARS */
-        .gemini-wave-container {{
-            display: flex;
-            align-items: center;
-            gap: 3.5px;
-            height: 20px;
-            width: 120px;
-            display: none;
-        }}
-        .gemini-wave-container.active {{
-            display: flex;
-        }}
-        .wave-bar {{
-            flex: 1;
-            background: linear-gradient(180deg, #ef4444, #3b82f6);
-            border-radius: 3px;
-            height: 20%;
-            animation: waveMotion 0.6s infinite ease-in-out alternate;
-        }}
-        .wave-bar:nth-child(1) {{ animation-delay: 0.1s; }}
-        .wave-bar:nth-child(2) {{ animation-delay: 0.3s; }}
-        .wave-bar:nth-child(3) {{ animation-delay: 0.2s; }}
-        .wave-bar:nth-child(4) {{ animation-delay: 0.5s; }}
-        .wave-bar:nth-child(5) {{ animation-delay: 0.15s; }}
-
-        @keyframes waveMotion {{
-            0% {{ height: 15%; }}
-            100% {{ height: 100%; }}
-        }}
-
         .chat-input-field {{
             flex: 1;
             background: transparent;
@@ -436,19 +386,6 @@ app_code = f"""
             padding: 4px 0;
         }}
         .chat-input-field::placeholder {{ color: #555555; }}
-
-        .mic-btn {{
-            background: transparent;
-            border: none;
-            color: #aaaaaa;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: color 0.2s, transform 0.2s;
-        }}
-        .mic-btn:hover {{ color: #ffffff; transform: scale(1.1); }}
-        .mic-btn.active {{ color: #ef4444; }}
 
         .arrow-submit-btn {{
             width: 30px;
@@ -461,17 +398,6 @@ app_code = f"""
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            transition: transform 0.2s, opacity 0.2s;
-        }}
-        .arrow-submit-btn:hover {{
-            transform: scale(1.05);
-            opacity: 0.9;
-        }}
-
-        .footer-disclaimer {{
-            font-size: 10.5px;
-            color: #555555;
-            text-align: center;
         }}
     </style>
 </head>
@@ -487,122 +413,43 @@ app_code = f"""
                 </svg>
                 <span class="sidebar-brand-name">Pyrox</span>
             </div>
-
             <div class="menu-list">
-                <div class="menu-btn" onclick="clearChat()" data-tooltip="New Chat">
+                <div class="menu-btn" onclick="clearChat()">
                     <svg viewBox="0 0 24 24"><path d="M12 4v16m8-8H4"></path></svg>
                     <span>New Chat</span>
                 </div>
-                <div class="menu-btn" onclick="alert('Search chat history')" data-tooltip="Search Chat">
-                    <svg viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                    <span>Search Chat</span>
-                </div>
-                <div class="menu-btn" onclick="alert('Library: Past notes & discussions')" data-tooltip="Library">
-                    <svg viewBox="0 0 24 24"><path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
-                    <span>Library</span>
-                </div>
-                <div class="menu-btn" onclick="openStudentSetup()" data-tooltip="For Students">
-                    <svg viewBox="0 0 24 24"><path d="M12 14l9-5-9-5-9 5 9 5z"></path><path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0112 20.055a11.952 11.952 0 01-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"></path></svg>
-                    <span>For Students</span>
-                </div>
-            </div>
-        </div>
-
-        <div class="sidebar-bottom">
-            <div class="menu-btn" onclick="alert('Settings Panel')" data-tooltip="Settings">
-                <svg viewBox="0 0 24 24"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                <span>Settings</span>
             </div>
         </div>
     </div>
 
     <!-- MAIN WORKSPACE -->
     <div class="main-container">
-        
-        <!-- TOP NAVBAR -->
         <div class="top-navbar">
             <div class="three-dots-wrapper">
-                <button class="dots-btn" onclick="toggleDropdown()" data-tooltip="More Options">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="5" r="1.5"></circle>
-                        <circle cx="12" cy="12" r="1.5"></circle>
-                        <circle cx="12" cy="19" r="1.5"></circle>
-                    </svg>
-                </button>
-                <div class="dropdown-menu" id="dropdownMenu">
-                    <div class="dropdown-item login-item" onclick="alert('Redirecting to Gmail Login...')">📧 Login with Gmail</div>
-                    <div class="dropdown-item" onclick="alert('Conversation link copied!')">🔗 Share Conversation</div>
-                    <div class="dropdown-item" onclick="alert('Find in chat')">🔍 Find in Chat</div>
-                    <div class="dropdown-item" onclick="alert('Chat pinned')">📌 Pin Chat</div>
-                    <div class="dropdown-item" onclick="alert('Exporting PDF...')">📄 Download PDF / Export</div>
-                    <div class="dropdown-item" style="color:#ef4444;" onclick="clearChat()">🗑️ Delete Chat</div>
-                </div>
+                <button class="dots-btn" onclick="toggleDropdown()">⚙️</button>
             </div>
         </div>
 
-        <!-- CENTER LANDING HEADER (Hides if messages exist) -->
-        <div class="center-landing-header" id="landingHeader" style="display: none;">
+        <div class="center-landing-header" id="landingHeader">
             <div class="brand-title-box">
-                <svg class="brand-logo-large" viewBox="0 0 200 200">
-                    <circle cx="100" cy="100" r="85" fill="#000000" stroke="#ffffff" stroke-width="5"/>
-                    <path d="M 100 25 L 70 85 L 110 85 L 90 115 L 130 115 L 100 175" fill="none" stroke="#ffffff" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
                 <span class="brand-name-large">Pyrox</span>
             </div>
             <div class="greeting-subtext">Hi, how can I help you today?</div>
         </div>
 
-        <!-- CHAT MESSAGES CONTAINER -->
         <div class="chat-container" id="chatContainer"></div>
 
-        <!-- INPUT BAR AREA -->
         <div class="input-wrapper">
             <div class="input-box" id="inputBox">
-                <svg class="star-btn" viewBox="0 0 24 24" data-tooltip="Attach File & Photo" onclick="alert('Select File / Photo to attach')">
-                    <defs>
-                        <linearGradient id="starGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <stop offset="0%" stop-color="#9C27B0"/>
-                            <stop offset="100%" stop-color="#03A9F4"/>
-                        </linearGradient>
-                    </defs>
-                    <path d="M12 0C12 6.627 6.627 12 0 12C6.627 12 12 17.373 12 24C12 17.373 17.373 12 24 12C17.373 12 12 6.627 12 0Z" fill="url(#starGrad)"/>
-                </svg>
-
-                <button id="micBtn" class="mic-btn" data-tooltip="Voice Input" onclick="toggleVoice()">
-                    <svg id="micIconSvg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
-                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-                        <line x1="12" y1="19" x2="12" y2="23"></line>
-                    </svg>
-                </button>
-
-                <div class="gemini-wave-container" id="waveBox">
-                    <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
-                </div>
-
                 <input type="text" id="chatInput" class="chat-input-field" placeholder="Ask Pyrox anything..." onkeypress="if(event.key==='Enter') triggerSend();" />
-
-                <button class="arrow-submit-btn" data-tooltip="Submit" onclick="triggerSend()">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                        <line x1="5" y1="12" x2="19" y2="12"></line>
-                        <polyline points="12 5 19 12 12 19"></polyline>
-                    </svg>
-                </button>
+                <button class="arrow-submit-btn" onclick="triggerSend()">➔</button>
             </div>
-            
-            <div class="footer-disclaimer">Pyrox is AI and can make mistakes</div>
         </div>
     </div>
 
     <script>
-        let isListening = false;
-        let recognition = null;
-        let accumulatedSpeech = "";
-
-        // Injected Chat History from Python Session State
         const chatMessages = {chat_history_json};
 
-        // Render messages on load inside the UI chat container
         window.onload = function() {{
             const container = document.getElementById('chatContainer');
             const landing = document.getElementById('landingHeader');
@@ -630,92 +477,7 @@ app_code = f"""
             }}
         }};
 
-        function toggleDropdown() {{
-            document.getElementById('dropdownMenu').classList.toggle('show');
-        }}
-
-        window.onclick = function(event) {{
-            if (!event.target.closest('.three-dots-wrapper')) {{
-                const m = document.getElementById('dropdownMenu');
-                if(m) m.classList.remove('show');
-            }}
-        }}
-
-        function openStudentSetup() {{
-            let goal = prompt("आप किस परीक्षा या कक्षा की तैयारी कर रहे हैं? (जैसे: NEET, JEE, School, College)");
-            if(!goal) return;
-            let standard = prompt("आपकी कक्षा या वर्ष कौन सा है? (जैसे: Class 9, Class 11, B.Tech 1st Year)");
-            if(!standard) return;
-            alert("बहुत बढ़िया! " + standard + " (" + goal + ") के लिए आपका स्टडी रूटीन सेट कर दिया गया है।");
-        }}
-
-        function toggleVoice() {{
-            const micBtn = document.getElementById('micBtn');
-            const micSvg = document.getElementById('micIconSvg');
-            const inputBox = document.getElementById('inputBox');
-            const waveBox = document.getElementById('waveBox');
-            const inputField = document.getElementById('chatInput');
-
-            if (isListening) {{
-                if (recognition) recognition.stop();
-                stopVoiceUI();
-                return;
-            }}
-
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (!SpeechRecognition) {{
-                alert("Speech recognition not supported in your browser.");
-                return;
-            }}
-
-            recognition = new SpeechRecognition();
-            recognition.lang = 'hi-IN';
-            recognition.continuous = true;
-            recognition.interimResults = true;
-
-            accumulatedSpeech = inputField.value ? inputField.value + " " : "";
-
-            recognition.onstart = function() {{
-                isListening = true;
-                micBtn.classList.add('active');
-                inputBox.classList.add('recording');
-                waveBox.classList.add('active');
-                inputField.placeholder = "Listening continuously...";
-                micSvg.innerHTML = `<rect x="6" y="4" width="4" height="16" fill="currentColor"/><rect x="14" y="4" width="4" height="16" fill="currentColor"/>`;
-            }};
-
-            recognition.onresult = function(event) {{
-                let interim = '';
-                for (let i = event.resultIndex; i < event.results.length; ++i) {{
-                    if (event.results[i].isFinal) {{
-                        accumulatedSpeech += event.results[i][0].transcript + " ";
-                    }} else {{
-                        interim += event.results[i][0].transcript;
-                    }}
-                }}
-                inputField.value = accumulatedSpeech + interim;
-            }};
-
-            recognition.onend = function() {{
-                if (isListening) {{ try {{ recognition.start(); }} catch(e) {{}} }}
-            }};
-
-            try {{ recognition.start(); }} catch(e) {{}}
-        }}
-
-        function stopVoiceUI() {{
-            isListening = false;
-            const micBtn = document.getElementById('micBtn');
-            const micSvg = document.getElementById('micIconSvg');
-            micBtn.classList.remove('active');
-            document.getElementById('inputBox').classList.remove('recording');
-            document.getElementById('waveBox').classList.remove('active');
-            document.getElementById('chatInput').placeholder = "Ask Pyrox anything...";
-            micSvg.innerHTML = `<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line>`;
-        }}
-
         function triggerSend() {{
-            if (isListening && recognition) {{ recognition.stop(); stopVoiceUI(); }}
             const inputField = document.getElementById('chatInput');
             const text = inputField.value.trim();
             if(!text) return;
@@ -735,5 +497,6 @@ app_code = f"""
 </html>
 """
 
-# Render Studio App Interface seamlessly
-st.components.v1.html(app_code, height=750, scrolling=False)
+st.components.v1.html(app_code, height=600, scrolling=False)
+        
+       
