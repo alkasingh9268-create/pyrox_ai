@@ -6,7 +6,7 @@ import requests
 import streamlit as st
 
 # ==============================================================================
-# PYROX STUDIO - MASTER APPLICATION CONFIGURATION
+# PYROX STUDIO - MASTER APPLICATION CONFIGURATION (Lines 1 - 50)
 # ==============================================================================
 
 st.set_page_config(
@@ -28,13 +28,48 @@ st.markdown("""
 # API Key Setup
 api_key = os.environ.get("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY")
 
+# Session State Management for Chat History
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
 # ==============================================================================
-# GROQ & TTS DIRECT HANDLER FOR AJAX REQUESTS
+# MICROSOFT EDGE NEURAL TEXT-TO-SPEECH (Madhur Neural - Male Voice) (Lines 51 - 120)
+# ==============================================================================
+
+def generate_edge_audio(text, filename="response.mp3"):
+    """
+    Generates premium natural Indian Male Neural Voice using Edge-TTS.
+    """
+    try:
+        clean_t = text.replace("*", "").replace("#", "").replace("`", "").replace("✨", "").replace("👋", "").replace("🚀", "").replace("💻", "").replace("😎", "").replace("💡", "").replace("🎯", "")
+        
+        async def _main():
+            communicate = edge_tts.Communicate(clean_t, "hi-IN-MadhurNeural")
+            await communicate.save(filename)
+        
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        
+        loop.run_until_complete(_main())
+        return True
+    except Exception as e:
+        print("TTS Error:", e)
+        return False
+
+# ==============================================================================
+# GROQ API DIRECT HTTP HANDLER (Bypasses SDK ModuleNotFoundError) (Lines 121 - 200)
 # ==============================================================================
 
 def get_groq_response(user_prompt):
+    """
+    Direct HTTP request implementation to Groq API endpoint for Llama 3.3 70B model.
+    100% reliable, zero dependency errors.
+    """
     if not api_key:
-        return "⚠️ Groq API Key missing! Set GROQ_API_KEY environment variable or secrets."
+        return "⚠️ Groq API Key missing in Streamlit Secrets!"
     
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {
@@ -47,7 +82,7 @@ def get_groq_response(user_prompt):
         "messages": [
             {
                 "role": "system",
-                "content": "You are Pyrox, an advanced, highly intelligent, and Gen-Z friendly AI assistant created for users in India (Delhi context). Talk in a smooth mix of natural Hindi and English (Hinglish) with cool emojis ✨. You have full awareness of current dates, news, and daily events in India. Give crisp, highly accurate, and engaging answers instantly."
+                "content": "You are Pyrox, an advanced, highly intelligent, and Gen-Z friendly AI assistant created for users in India (specifically Delhi/India context). Talk in a smooth mix of natural Hindi and English (Hinglish) with cool emojis ✨. You have full awareness of current dates, general knowledge, daily news, and latest happenings. Give crisp, highly accurate, and engaging answers instantly."
             },
             {
                 "role": "user",
@@ -68,28 +103,34 @@ def get_groq_response(user_prompt):
     except Exception as e:
         return f"⚠️ Network Exception: {str(e)}"
 
-def generate_edge_audio(text, filename="response.mp3"):
-    try:
-        clean_t = text.replace("*", "").replace("#", "").replace("`", "").replace("✨", "").replace("👋", "").replace("🚀", "").replace("💻", "").replace("😎", "").replace("💡", "").replace("🎯", "")
-        async def _main():
-            communicate = edge_tts.Communicate(clean_t, "hi-IN-MadhurNeural")
-            await communicate.save(filename)
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-        loop.run_until_complete(_main())
-        return True
-    except Exception as e:
-        print("TTS Error:", e)
-        return False
+# ==============================================================================
+# BACKEND QUERY PARAMETER PROCESSOR (Lines 201 - 250)
+# ==============================================================================
 
-# Safe Pass API key to Frontend for Pure AJAX Fetching
-safe_api_key = api_key if api_key else ""
+query_params = st.query_params
+if "q" in query_params:
+    user_prompt = query_params["q"]
+    st.query_params.clear()
+    
+    if user_prompt:
+        st.session_state.messages.append({"role": "user", "content": user_prompt})
+        reply = get_groq_response(user_prompt)
+        
+        audio_filename = f"audio_{len(st.session_state.messages)}.mp3"
+        success = generate_edge_audio(reply, audio_filename)
+        audio_path = audio_filename if success else None
+        
+        st.session_state.messages.append({
+            "role": "assistant",
+            "content": reply,
+            "audio_file": audio_path
+        })
+
+# Convert Python chat history into JSON string for frontend injection
+chat_history_json = json.dumps(st.session_state.messages)
 
 # ==============================================================================
-# FULL STUDIO UI & FRONTEND ENGINE (HTML/CSS/JS - NO RELOAD)
+# FULL STUDIO UI & FRONTEND ENGINE (HTML/CSS/JS) (Lines 251 - 850+)
 # ==============================================================================
 
 app_code = f"""
@@ -371,6 +412,12 @@ app_code = f"""
             width: 100%;
             max-width: 100%;
         }}
+        audio {{
+            width: 100%;
+            height: 32px;
+            margin-top: 6px;
+            filter: invert(100%) hue-rotate(180deg);
+        }}
 
         /* INPUT BAR AREA */
         .input-wrapper {{
@@ -549,4 +596,208 @@ app_code = f"""
                 <div class="dropdown-menu" id="dropdownMenu">
                     <div class="dropdown-item login-item" onclick="alert('Redirecting to Gmail Login...')">📧 Login with Gmail</div>
                     <div class="dropdown-item" onclick="alert('Conversation link copied!')">🔗 Share Conversation</div>
-                    <div class="dropdown-item" onclick="alert('Find in chat
+                    <div class="dropdown-item" onclick="alert('Find in chat')">🔍 Find in Chat</div>
+                    <div class="dropdown-item" onclick="alert('Chat pinned')">📌 Pin Chat</div>
+                    <div class="dropdown-item" onclick="alert('Exporting PDF...')">📄 Download PDF / Export</div>
+                    <div class="dropdown-item" style="color:#ef4444;" onclick="clearChat()">🗑️ Delete Chat</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CENTER LANDING HEADER -->
+        <div class="center-landing-header" id="landingHeader">
+            <div class="brand-title-box">
+                <svg class="brand-logo-large" viewBox="0 0 200 200">
+                    <circle cx="100" cy="100" r="85" fill="#000000" stroke="#ffffff" stroke-width="5"/>
+                    <path d="M 100 25 L 70 85 L 110 85 L 90 115 L 130 115 L 100 175" fill="none" stroke="#ffffff" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <span class="brand-name-large">Pyrox</span>
+            </div>
+            <div class="greeting-subtext">Hi, how can I help you today?</div>
+        </div>
+
+        <!-- CHAT MESSAGES CONTAINER -->
+        <div class="chat-container" id="chatContainer"></div>
+
+        <!-- INPUT BAR AREA -->
+        <div class="input-wrapper">
+            <div class="input-box" id="inputBox">
+                <svg class="star-btn" viewBox="0 0 24 24" data-tooltip="Attach File & Photo" onclick="alert('Select File / Photo to attach')">
+                    <defs>
+                        <linearGradient id="starGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#9C27B0"/>
+                            <stop offset="100%" stop-color="#03A9F4"/>
+                        </linearGradient>
+                    </defs>
+                    <path d="M12 0C12 6.627 6.627 12 0 12C6.627 12 12 17.373 12 24C12 17.373 17.373 12 24 12C17.373 12 12 6.627 12 0Z" fill="url(#starGrad)"/>
+                </svg>
+
+                <button id="micBtn" class="mic-btn" data-tooltip="Voice Input" onclick="toggleVoice()">
+                    <svg id="micIconSvg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                        <line x1="12" y1="19" x2="12" y2="23"></line>
+                    </svg>
+                </button>
+
+                <div class="gemini-wave-container" id="waveBox">
+                    <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+                </div>
+
+                <input type="text" id="chatInput" class="chat-input-field" placeholder="Ask Pyrox anything..." onkeypress="if(event.key==='Enter') triggerSend();" />
+
+                <button class="arrow-submit-btn" data-tooltip="Submit" onclick="triggerSend()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                        <polyline points="12 5 19 12 12 19"></polyline>
+                    </svg>
+                </button>
+            </div>
+            
+            <div class="footer-disclaimer">Pyrox is AI and can make mistakes</div>
+        </div>
+    </div>
+
+    <script>
+        let isListening = false;
+        let recognition = null;
+        let accumulatedSpeech = "";
+        const chatMessages = {chat_history_json};
+
+        window.onload = function() {{
+            const container = document.getElementById('chatContainer');
+            const landing = document.getElementById('landingHeader');
+
+            if (chatMessages.length > 0) {{
+                landing.style.display = 'none';
+                chatMessages.forEach(msg => {{
+                    const div = document.createElement('div');
+                    div.className = 'message ' + (msg.role === 'user' ? 'user-message' : 'ai-message');
+                    
+                    if (msg.role === 'user') {{
+                        div.innerText = msg.content;
+                    }} else {{
+                        let htmlContent = `<div>${{msg.content}}</div>`;
+                        if (msg.audio_file) {{
+                            htmlContent += `<audio controls autoplay><source src="${{msg.audio_file}}" type="audio/mp3"></audio>`;
+                        }}
+                        div.innerHTML = htmlContent;
+                    }}
+                    container.appendChild(div);
+                }});
+                container.scrollTop = container.scrollHeight;
+            }} else {{
+                landing.style.display = 'flex';
+            }}
+        }};
+
+        function toggleSidebar() {{
+            document.getElementById('sidebar').classList.toggle('expanded');
+        }}
+
+        function toggleDropdown() {{
+            document.getElementById('dropdownMenu').classList.toggle('show');
+        }}
+
+        window.onclick = function(event) {{
+            if (!event.target.closest('.three-dots-wrapper')) {{
+                const m = document.getElementById('dropdownMenu');
+                if(m) m.classList.remove('show');
+            }}
+        }}
+
+        function openStudentSetup() {{
+            let goal = prompt("आप किस परीक्षा या कक्षा की तैयारी कर रहे हैं? (जैसे: NEET, JEE, School, College)");
+            if(!goal) return;
+            let standard = prompt("आपकी कक्षा या वर्ष कौन सा है? (जैसे: Class 9, Class 11, B.Tech 1st Year)");
+            if(!standard) return;
+            alert("बहुत बढ़िया! " + standard + " (" + goal + ") के लिए आपका स्टडी रूटीन सेट कर दिया गया है।");
+        }}
+
+        function toggleVoice() {{
+            const micBtn = document.getElementById('micBtn');
+            const micSvg = document.getElementById('micIconSvg');
+            const inputBox = document.getElementById('inputBox');
+            const waveBox = document.getElementById('waveBox');
+            const inputField = document.getElementById('chatInput');
+
+            if (isListening) {{
+                if (recognition) recognition.stop();
+                stopVoiceUI();
+                return;
+            }}
+
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {{
+                alert("Speech recognition not supported in your browser.");
+                return;
+            }}
+
+            recognition = new SpeechRecognition();
+            recognition.lang = 'hi-IN';
+            recognition.continuous = true;
+            recognition.interimResults = true;
+
+            accumulatedSpeech = inputField.value ? inputField.value + " " : "";
+
+            recognition.onstart = function() {{
+                isListening = true;
+                micBtn.classList.add('active');
+                inputBox.classList.add('recording');
+                waveBox.classList.add('active');
+                inputField.placeholder = "Listening continuously...";
+                micSvg.innerHTML = `<rect x="6" y="4" width="4" height="16" fill="currentColor"/><rect x="14" y="4" width="4" height="16" fill="currentColor"/>`;
+            }};
+
+            recognition.onresult = function(event) {{
+                let interim = '';
+                for (let i = event.resultIndex; i < event.results.length; ++i) {{
+                    if (event.results[i].isFinal) {{
+                        accumulatedSpeech += event.results[i][0].transcript + " ";
+                    }} else {{
+                        interim += event.results[i][0].transcript;
+                    }}
+                }}
+                inputField.value = accumulatedSpeech + interim;
+            }};
+
+            recognition.onend = function() {{
+                if (isListening) {{ try {{ recognition.start(); }} catch(e) {{}} }}
+            }};
+
+            try {{ recognition.start(); }} catch(e) {{}}
+        }}
+
+        function stopVoiceUI() {{
+            isListening = false;
+            const micBtn = document.getElementById('micBtn');
+            const micSvg = document.getElementById('micIconSvg');
+            micBtn.classList.remove('active');
+            document.getElementById('inputBox').classList.remove('recording');
+            document.getElementById('waveBox').classList.remove('active');
+            document.getElementById('chatInput').placeholder = "Ask Pyrox anything...";
+            micSvg.innerHTML = `<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line>`;
+        }}
+
+        function triggerSend() {{
+            if (isListening && recognition) {{ recognition.stop(); stopVoiceUI(); }}
+            const inputField = document.getElementById('chatInput');
+            const text = inputField.value.trim();
+            if(!text) return;
+
+            const url = new URL(window.location.href);
+            url.searchParams.set('q', encodeURIComponent(text));
+            window.location.href = url.toString();
+        }}
+
+        function clearChat() {{
+            const url = new URL(window.location.href);
+            url.searchParams.delete('q');
+            window.location.href = url.toString();
+        }}
+    </script>
+</body>
+</html>
+"""
+
+st.components.v1.html(app_code, height=800, scrolling=True)
