@@ -1,0 +1,50 @@
+import os
+import requests
+from fastapi import FastAPI, HTTPException
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+from pydantic import BaseModel
+
+app = FastAPI()
+
+# Groq API Key Setup (Streamlit ki tarah yahan bhi secrets/environment se uthega)
+API_KEY = os.environ.get("GROQ_API_KEY", "API_KEY_IS_HERE")
+
+class ChatRequest(BaseModel):
+    message: str
+
+@app.post("/api/chat")
+async def chat_with_ai(request: ChatRequest):
+    if not API_KEY or API_KEY == "API_KEY_IS_HERE":
+        raise HTTPException(status_code=500, detail="API Key missing!")
+    
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "model": "llama-3.3-70b-versatile",
+        "messages": [
+            {"role": "system", "content": "You are Pyrox, an advanced, high-intelligence Gen-Z AI assistant. Talk in smooth Hinglish with cool emojis ✨."},
+            {"role": "user", "content": request.message}
+        ],
+        "temperature": 0.7,
+        "max_tokens": 512
+    }
+    
+    try:
+        response = requests.post(url, headers=headers, json=payload, timeout=30)
+        if response.status_code == 200:
+            res_json = response.json()
+            reply = res_json['choices'][0]['message']['content']
+            return {"reply": reply}
+        else:
+            return {"reply": f"⚠️ API Error: {response.text}"}
+    except Exception as e:
+        return {"reply": f"⚠️ Network Error: {str(e)}"}
+
+# Jab koi website khole, toh seedha index.html dikhe
+@app.get("/")
+async def serve_home():
+    return FileResponse("index.html")
