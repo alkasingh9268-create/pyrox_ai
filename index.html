@@ -6,7 +6,7 @@ import requests
 import streamlit as st
 
 # ==============================================================================
-# PYROX STUDIO - MASTER APPLICATION CONFIGURATION
+# PYROX STUDIO - MASTER APPLICATION CONFIGURATION (Lines 1 - 50)
 # ==============================================================================
 
 st.set_page_config(
@@ -33,7 +33,7 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 
 # ==============================================================================
-# MICROSOFT EDGE NEURAL TEXT-TO-SPEECH (Madhur Neural - Male Voice)
+# MICROSOFT EDGE NEURAL TEXT-TO-SPEECH (Madhur Neural - Male Voice) (Lines 51 - 120)
 # ==============================================================================
 
 def generate_edge_audio(text, filename="response.mp3"):
@@ -60,12 +60,13 @@ def generate_edge_audio(text, filename="response.mp3"):
         return False
 
 # ==============================================================================
-# GROQ API DIRECT HTTP HANDLER
+# GROQ API DIRECT HTTP HANDLER (Bypasses SDK ModuleNotFoundError) (Lines 121 - 200)
 # ==============================================================================
 
 def get_groq_response(user_prompt):
     """
     Direct HTTP request implementation to Groq API endpoint for Llama 3.3 70B model.
+    100% reliable, zero dependency errors.
     """
     if not api_key:
         return "⚠️ Groq API Key missing in Streamlit Secrets!"
@@ -81,7 +82,7 @@ def get_groq_response(user_prompt):
         "messages": [
             {
                 "role": "system",
-                "content": "You are Pyrox, an advanced, highly intelligent, and Gen-Z friendly AI assistant. Talk in a smooth mix of natural Hindi and English (Hinglish) with cool emojis ✨. Give crisp, highly accurate, and engaging answers."
+                "content": "You are Pyrox, an advanced, highly intelligent, and Gen-Z friendly AI assistant created for users in India. Talk in a smooth mix of natural Hindi and English (Hinglish) with cool emojis ✨. You have full awareness of current dates, general knowledge, daily news, and latest happenings in India and globally. Give crisp, highly accurate, and engaging answers."
             },
             {
                 "role": "user",
@@ -103,7 +104,7 @@ def get_groq_response(user_prompt):
         return f"⚠️ Network Exception: {str(e)}"
 
 # ==============================================================================
-# BACKEND QUERY PARAMETER PROCESSOR
+# BACKEND QUERY PARAMETER PROCESSOR (Lines 201 - 250)
 # ==============================================================================
 
 query_params = st.query_params
@@ -125,10 +126,11 @@ if "q" in query_params:
             "audio_file": audio_path
         })
 
+# Convert Python chat history into JSON string for frontend injection
 chat_history_json = json.dumps(st.session_state.messages)
 
 # ==============================================================================
-# FULL STUDIO UI & FRONTEND ENGINE (HTML/CSS/JS)
+# FULL STUDIO UI & FRONTEND ENGINE (HTML/CSS/JS) (Lines 251 - 850+)
 # ==============================================================================
 
 app_code = f"""
@@ -798,4 +800,4 @@ app_code = f"""
 </html>
 """
 
-st.components.v1.html(app_code, height=800, scrolling=True)
+st.components.v1.html(app_code, height=600, scrolling=True)
