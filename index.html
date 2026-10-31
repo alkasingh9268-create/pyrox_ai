@@ -529,4 +529,133 @@
             document.getElementById('dropdownMenu').classList.toggle('show');
         }
 
-        window.onclick = function(
+        window.onclick = function(event) {
+            if (!event.target.closest('.three-dots-wrapper')) {
+                const dropdown = document.getElementById('dropdownMenu');
+                if (dropdown.classList.contains('show')) {
+                    dropdown.classList.remove('show');
+                }
+            }
+        }
+
+        function clearChat() {
+            document.getElementById('chatContainer').innerHTML = '';
+            document.getElementById('landingHeader').style.display = 'flex';
+        }
+
+        function openStudentSetup() {
+            alert('Student Mode: NCERT & homework tools enabled.');
+        }
+
+        // Voice Input Functionality
+        function toggleVoice() {
+            const micBtn = document.getElementById('micBtn');
+            const waveBox = document.getElementById('waveBox');
+            const inputBox = document.getElementById('inputBox');
+            const chatInput = document.getElementById('chatInput');
+
+            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                alert("Speech recognition is not supported in this browser.");
+                return;
+            }
+
+            if (!isListening) {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                recognition = new SpeechRecognition();
+                recognition.lang = 'hi-IN';
+                recognition.interimResults = true;
+                recognition.continuous = true;
+
+                recognition.onstart = function() {
+                    isListening = true;
+                    micBtn.classList.add('active');
+                    waveBox.classList.add('active');
+                    inputBox.classList.add('recording');
+                };
+
+                recognition.onresult = function(event) {
+                    let interim = '';
+                    for (let i = event.resultIndex; i < event.results.length; ++i) {
+                        if (event.results[i].isFinal) {
+                            accumulatedSpeech += event.results[i][0].transcript + ' ';
+                        } else {
+                            interim += event.results[i][0].transcript;
+                        }
+                    }
+                    chatInput.value = accumulatedSpeech + interim;
+                };
+
+                recognition.onerror = function(event) {
+                    stopVoice();
+                };
+
+                recognition.onend = function() {
+                    stopVoice();
+                };
+
+                recognition.start();
+            } else {
+                stopVoice();
+            }
+        }
+
+        function stopVoice() {
+            if (recognition) {
+                recognition.stop();
+            }
+            isListening = false;
+            document.getElementById('micBtn').classList.remove('active');
+            document.getElementById('waveBox').classList.remove('active');
+            document.getElementById('inputBox').classList.remove('recording');
+            accumulatedSpeech = "";
+        }
+
+        // Send Message to FastAPI Backend
+        async function triggerSend() {
+            const chatInput = document.getElementById('chatInput');
+            const chatContainer = document.getElementById('chatContainer');
+            const landingHeader = document.getElementById('landingHeader');
+            const userMessage = chatInput.value.trim();
+
+            if (!userMessage) return;
+
+            // Hide landing header once chat starts
+            landingHeader.style.display = 'none';
+
+            // Append User Message
+            const userDiv = document.createElement('div');
+            userDiv.className = 'message user-message';
+            userDiv.textContent = userMessage;
+            chatContainer.appendChild(userDiv);
+
+            chatInput.value = '';
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+
+            // Append Loading AI Message
+            const aiDiv = document.createElement('div');
+            aiDiv.className = 'message ai-message';
+            aiDiv.textContent = 'Pyrox सोच रहा है... 🤔';
+            chatContainer.appendChild(aiDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+
+            try {
+                // Backend FastAPI Endpoint Call
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ message: userMessage })
+                });
+
+                const data = await response.json();
+                aiDiv.textContent = data.reply || "Kuch gadbad ho gayi bhai!";
+            } catch (error) {
+                aiDiv.textContent = "⚠️ Network error: Server se connect nahi ho pa raha.";
+            }
+
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+    </script>
+</body>
+</html>
