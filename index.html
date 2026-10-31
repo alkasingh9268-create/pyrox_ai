@@ -1,3 +1,131 @@
+import os
+import asyncio
+import json
+import edge_tts
+import requests
+import streamlit as st
+
+# ==============================================================================
+# PYROX STUDIO - MASTER APPLICATION CONFIGURATION
+# ==============================================================================
+
+st.set_page_config(
+    page_title="Pyrox",
+    page_icon="🤖",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
+
+# Hide Default Streamlit Elements & Force Zero Padding for Full Custom UI
+st.markdown("""
+    <style>
+    .stApp { background-color: #000000; color: #ffffff; }
+    #MainMenu, header, footer { visibility: hidden; }
+    .block-container { padding: 0rem !important; margin: 0rem !important; }
+    </style>
+""", unsafe_allow_html=True)
+
+# API Key Setup
+api_key = os.environ.get("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY")
+
+# Session State Management for Chat History
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+# ==============================================================================
+# MICROSOFT EDGE NEURAL TEXT-TO-SPEECH (Madhur Neural - Male Voice)
+# ==============================================================================
+
+def generate_edge_audio(text, filename="response.mp3"):
+    try:
+        clean_t = text.replace("*", "").replace("#", "").replace("`", "").replace("✨", "").replace("👋", "").replace("🚀", "").replace("💻", "").replace("😎", "").replace("💡", "").replace("🎯", "")
+        
+        async def _main():
+            communicate = edge_tts.Communicate(clean_t, "hi-IN-MadhurNeural")
+            await communicate.save(filename)
+        
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        
+        loop.run_until_complete(_main())
+        return True
+    except Exception as e:
+        print("TTS Error:", e)
+        return False
+
+# ==============================================================================
+# GROQ API DIRECT HTTP HANDLER
+# ==============================================================================
+
+def get_groq_response(user_prompt):
+    if not api_key:
+        return "⚠️ Groq API Key missing in Streamlit Secrets!"
+    
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    
+    payload = {
+        "model": "llama-3.3-70b-versatile",
+        "messages": [
+            {
+                "role": "system",
+                "content": "You are Pyrox, an advanced, highly intelligent, and Gen-Z friendly AI assistant. Talk in a smooth mix of natural Hindi and English (Hinglish) with cool emojis ✨. Give crisp, highly accurate, and engaging answers."
+            },
+            {
+                "role": "user",
+                "content": user_prompt
+            }
+        ],
+        "temperature": 0.7,
+        "max_tokens": 512
+    }
+    
+    try:
+        response = requests.post(url, headers=headers, data=json.dumps(payload), timeout=30)
+        if response.status_code == 200:
+            res_json = response.json()
+            return res_json['choices'][0]['message']['content']
+        else:
+            return f"⚠️ API Error ({response.status_code}): {response.text}"
+    except Exception as e:
+        return f"⚠️ Network Exception: {str(e)}"
+
+# ==============================================================================
+# BACKEND QUERY PARAMETER PROCESSOR
+# ==============================================================================
+
+query_params = st.query_params
+if "q" in query_params:
+    user_prompt = query_params["q"]
+    st.query_params.clear()
+    
+    if user_prompt:
+        st.session_state.messages.append({"role": "user", "content": user_prompt})
+        reply = get_groq_response(user_prompt)
+        
+        audio_filename = f"audio_{len(st.session_state.messages)}.mp3"
+        success = generate_edge_audio(reply, audio_filename)
+        audio_path = audio_filename if success else None
+        
+        st.session_state.messages.append({
+            "role": "assistant",
+            "content": reply,
+            "audio_file": audio_path
+        })
+
+chat_history_json = json.dumps(st.session_state.messages)
+
+# ==============================================================================
+# ALL-IN-ONE MASTER FRONTEND CODE (HTML, CSS, JS COMBINED)
+# ==============================================================================
+
+app_code = f"""
 <!DOCTYPE html>
 <html lang="hi">
 <head>
@@ -5,22 +133,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pyrox Studio</title>
     <style>
-        * {
+        * {{
             margin: 0;
             padding: 0;
             box-sizing: border-box;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        }
-        body {
+        }}
+        body {{
             background-color: #000000;
             color: #ffffff;
             display: flex;
             height: 100vh;
             overflow: hidden;
-        }
+        }}
 
         /* COLLAPSIBLE / EXPANDABLE SIDEBAR */
-        .sidebar {
+        .sidebar {{
             width: 0px;
             background-color: #050505;
             border-right: none;
@@ -31,35 +159,35 @@
             z-index: 20;
             overflow: hidden;
             transition: width 0.3s ease, padding 0.3s ease, border-right 0.3s ease;
-        }
-        .sidebar.expanded {
+        }}
+        .sidebar.expanded {{
             width: 230px;
             padding: 12px 10px;
             border-right: 1px solid #141414;
-        }
-        .sidebar-logo-header {
+        }}
+        .sidebar-logo-header {{
             display: flex;
             align-items: center;
             gap: 10px;
             padding: 4px 6px;
             margin-bottom: 10px;
-        }
-        .sidebar-logo-header svg {
+        }}
+        .sidebar-logo-header svg {{
             width: 24px;
             height: 24px;
-        }
-        .sidebar-brand-name {
+        }}
+        .sidebar-brand-name {{
             font-size: 1.1rem;
             font-weight: 700;
             color: #ffffff;
             letter-spacing: 0.5px;
-        }
-        .menu-list {
+        }}
+        .menu-list {{
             display: flex;
             flex-direction: column;
             gap: 3px;
-        }
-        .menu-btn {
+        }}
+        .menu-btn {{
             display: flex;
             align-items: center;
             gap: 12px;
@@ -71,29 +199,29 @@
             transition: background 0.2s, color 0.2s;
             position: relative;
             white-space: nowrap;
-        }
-        .menu-btn:hover {
+        }}
+        .menu-btn:hover {{
             background-color: #141414;
             color: #ffffff;
-        }
-        .menu-btn svg {
+        }}
+        .menu-btn svg {{
             width: 17px;
             height: 17px;
             stroke: currentColor;
             fill: none;
             stroke-width: 2;
             flex-shrink: 0;
-        }
-        .sidebar-bottom {
+        }}
+        .sidebar-bottom {{
             border-top: 1px solid #141414;
             padding-top: 8px;
-        }
+        }}
 
         /* TOOLTIP HOVER HELPER */
-        [data-tooltip] {
+        [data-tooltip] {{
             position: relative;
-        }
-        [data-tooltip]:hover::after {
+        }}
+        [data-tooltip]:hover::after {{
             content: attr(data-tooltip);
             position: absolute;
             bottom: 115%;
@@ -110,10 +238,10 @@
             pointer-events: none;
             z-index: 1000;
             box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-        }
+        }}
 
         /* MAIN CONTAINER */
-        .main-container {
+        .main-container {{
             flex: 1;
             display: flex;
             flex-direction: column;
@@ -122,18 +250,18 @@
             height: 100vh;
             padding-top: 4px;
             padding-bottom: 8px;
-        }
+        }}
 
         /* TOP NAVBAR */
-        .top-navbar {
+        .top-navbar {{
             width: 100%;
             display: flex;
             align-items: center;
             justify-content: space-between;
             padding: 4px 20px;
             position: relative;
-        }
-        .hamburger-btn {
+        }}
+        .hamburger-btn {{
             background: transparent;
             border: none;
             color: #aaaaaa;
@@ -144,15 +272,15 @@
             align-items: center;
             justify-content: center;
             transition: color 0.2s, background 0.2s;
-        }
-        .hamburger-btn:hover {
+        }}
+        .hamburger-btn:hover {{
             color: #ffffff;
             background-color: #1a1a1a;
-        }
-        .three-dots-wrapper {
+        }}
+        .three-dots-wrapper {{
             position: relative;
-        }
-        .dots-btn {
+        }}
+        .dots-btn {{
             background: transparent;
             border: none;
             color: #aaaaaa;
@@ -163,12 +291,12 @@
             align-items: center;
             justify-content: center;
             transition: color 0.2s, background 0.2s;
-        }
-        .dots-btn:hover {
+        }}
+        .dots-btn:hover {{
             color: #ffffff;
             background-color: #1a1a1a;
-        }
-        .dropdown-menu {
+        }}
+        .dropdown-menu {{
             position: absolute;
             top: 36px;
             right: 0;
@@ -181,11 +309,11 @@
             flex-direction: column;
             box-shadow: 0 10px 25px rgba(0,0,0,0.6);
             z-index: 100;
-        }
-        .dropdown-menu.show {
+        }}
+        .dropdown-menu.show {{
             display: flex;
-        }
-        .dropdown-item {
+        }}
+        .dropdown-item {{
             padding: 9px 16px;
             font-size: 13px;
             color: #cccccc;
@@ -194,49 +322,49 @@
             align-items: center;
             gap: 10px;
             transition: background 0.2s;
-        }
-        .dropdown-item:hover {
+        }}
+        .dropdown-item:hover {{
             background-color: #1a1a1a;
             color: #ffffff;
-        }
-        .dropdown-item.login-item {
+        }}
+        .dropdown-item.login-item {{
             border-bottom: 1px solid #222;
             color: #3b82f6;
             font-weight: 600;
-        }
+        }}
 
         /* CENTER LANDING HEADER */
-        .center-landing-header {
+        .center-landing-header {{
             display: flex;
             flex-direction: column;
             align-items: center;
             text-align: center;
             gap: 4px;
             margin-top: 2px;
-        }
-        .brand-title-box {
+        }}
+        .brand-title-box {{
             display: flex;
             align-items: center;
             gap: 10px;
-        }
-        .brand-logo-large {
+        }}
+        .brand-logo-large {{
             width: 38px;
             height: 38px;
-        }
-        .brand-name-large {
+        }}
+        .brand-name-large {{
             font-size: 1.9rem;
             font-weight: 800;
             color: #ffffff;
             letter-spacing: -0.5px;
-        }
-        .greeting-subtext {
+        }}
+        .greeting-subtext {{
             font-size: 1.2rem;
             font-weight: 500;
             color: #d1d5db;
-        }
+        }}
 
         /* CHAT MESSAGES AREA */
-        .chat-container {
+        .chat-container {{
             width: 100%;
             max-width: 800px;
             flex: 1;
@@ -246,24 +374,24 @@
             gap: 12px;
             padding: 5px 15px;
             margin-top: 5px;
-        }
-        .message {
+        }}
+        .message {{
             display: flex;
             flex-direction: column;
             max-width: 82%;
             line-height: 1.5;
             font-size: 0.95rem;
             gap: 8px;
-        }
-        .user-message {
+        }}
+        .user-message {{
             align-self: flex-end;
             background-color: #1c1c1e;
             color: #ffffff;
             padding: 10px 16px;
             border-radius: 16px 16px 4px 16px;
             border: 1px solid #2d2d2d;
-        }
-        .ai-message {
+        }}
+        .ai-message {{
             align-self: flex-start;
             background-color: #080808;
             color: #f0f0f0;
@@ -275,10 +403,16 @@
             gap: 8px;
             width: 100%;
             max-width: 100%;
-        }
+        }}
+        audio {{
+            width: 100%;
+            height: 32px;
+            margin-top: 6px;
+            filter: invert(100%) hue-rotate(180deg);
+        }}
 
         /* INPUT BAR AREA */
-        .input-wrapper {
+        .input-wrapper {{
             width: 100%;
             max-width: 800px;
             display: flex;
@@ -286,8 +420,8 @@
             align-items: center;
             gap: 4px;
             padding: 0 15px;
-        }
-        .input-box {
+        }}
+        .input-box {{
             width: 100%;
             background-color: #080808;
             border: 1px solid #222222;
@@ -298,49 +432,49 @@
             gap: 10px;
             position: relative;
             transition: border-color 0.3s, box-shadow 0.3s;
-        }
-        .input-box.recording {
+        }}
+        .input-box.recording {{
             border-color: #ef4444;
             box-shadow: 0 0 15px rgba(239, 68, 68, 0.25);
-        }
-        .star-btn {
+        }}
+        .star-btn {{
             cursor: pointer;
             width: 20px;
             height: 20px;
             flex-shrink: 0;
-        }
+        }}
 
         /* GEMINI WAVE BARS */
-        .gemini-wave-container {
+        .gemini-wave-container {{
             display: flex;
             align-items: center;
             gap: 3.5px;
             height: 20px;
             width: 120px;
             display: none;
-        }
-        .gemini-wave-container.active {
+        }}
+        .gemini-wave-container.active {{
             display: flex;
-        }
-        .wave-bar {
+        }}
+        .wave-bar {{
             flex: 1;
             background: linear-gradient(180deg, #ef4444, #3b82f6);
             border-radius: 3px;
             height: 20%;
             animation: waveMotion 0.6s infinite ease-in-out alternate;
-        }
-        .wave-bar:nth-child(1) { animation-delay: 0.1s; }
-        .wave-bar:nth-child(2) { animation-delay: 0.3s; }
-        .wave-bar:nth-child(3) { animation-delay: 0.2s; }
-        .wave-bar:nth-child(4) { animation-delay: 0.5s; }
-        .wave-bar:nth-child(5) { animation-delay: 0.15s; }
+        }}
+        .wave-bar:nth-child(1) {{ animation-delay: 0.1s; }}
+        .wave-bar:nth-child(2) {{ animation-delay: 0.3s; }}
+        .wave-bar:nth-child(3) {{ animation-delay: 0.2s; }}
+        .wave-bar:nth-child(4) {{ animation-delay: 0.5s; }}
+        .wave-bar:nth-child(5) {{ animation-delay: 0.15s; }}
 
-        @keyframes waveMotion {
-            0% { height: 15%; }
-            100% { height: 100%; }
-        }
+        @keyframes waveMotion {{
+            0% {{ height: 15%; }}
+            100% {{ height: 100%; }}
+        }}
 
-        .chat-input-field {
+        .chat-input-field {{
             flex: 1;
             background: transparent;
             border: none;
@@ -348,10 +482,10 @@
             color: #ffffff;
             font-size: 0.95rem;
             padding: 4px 0;
-        }
-        .chat-input-field::placeholder { color: #555555; }
+        }}
+        .chat-input-field::placeholder {{ color: #555555; }}
 
-        .mic-btn {
+        .mic-btn {{
             background: transparent;
             border: none;
             color: #aaaaaa;
@@ -360,11 +494,11 @@
             align-items: center;
             justify-content: center;
             transition: color 0.2s, transform 0.2s;
-        }
-        .mic-btn:hover { color: #ffffff; transform: scale(1.1); }
-        .mic-btn.active { color: #ef4444; }
+        }}
+        .mic-btn:hover {{ color: #ffffff; transform: scale(1.1); }}
+        .mic-btn.active {{ color: #ef4444; }}
 
-        .arrow-submit-btn {
+        .arrow-submit-btn {{
             width: 30px;
             height: 30px;
             background-color: #ffffff;
@@ -376,17 +510,17 @@
             justify-content: center;
             cursor: pointer;
             transition: transform 0.2s, opacity 0.2s;
-        }
-        .arrow-submit-btn:hover {
+        }}
+        .arrow-submit-btn:hover {{
             transform: scale(1.05);
             opacity: 0.9;
-        }
+        }}
 
-        .footer-disclaimer {
+        .footer-disclaimer {{
             font-size: 10.5px;
             color: #555555;
             text-align: center;
-        }
+        }}
     </style>
 </head>
 <body>
@@ -520,142 +654,142 @@
         let isListening = false;
         let recognition = null;
         let accumulatedSpeech = "";
+        const chatMessages = {chat_history_json};
 
-        function toggleSidebar() {
+        window.onload = function() {{
+            const container = document.getElementById('chatContainer');
+            const landing = document.getElementById('landingHeader');
+
+            if (chatMessages.length > 0) {{
+                landing.style.display = 'none';
+                chatMessages.forEach(msg => {{
+                    const div = document.createElement('div');
+                    div.className = 'message ' + (msg.role === 'user' ? 'user-message' : 'ai-message');
+                    
+                    if (msg.role === 'user') {{
+                        div.innerText = msg.content;
+                    }} else {{
+                        let htmlContent = `<div>${{msg.content}}</div>`;
+                        if (msg.audio_file) {{
+                            htmlContent += `<audio controls autoplay><source src="${{msg.audio_file}}" type="audio/mp3"></audio>`;
+                        }}
+                        div.innerHTML = htmlContent;
+                    }}
+                    container.appendChild(div);
+                }});
+                container.scrollTop = container.scrollHeight;
+            }} else {{
+                landing.style.display = 'flex';
+            }}
+        }};
+
+        function toggleSidebar() {{
             document.getElementById('sidebar').classList.toggle('expanded');
-        }
+        }}
 
-        function toggleDropdown() {
+        function toggleDropdown() {{
             document.getElementById('dropdownMenu').classList.toggle('show');
-        }
+        }}
 
-        window.onclick = function(event) {
-            if (!event.target.closest('.three-dots-wrapper')) {
-                const dropdown = document.getElementById('dropdownMenu');
-                if (dropdown.classList.contains('show')) {
-                    dropdown.classList.remove('show');
-                }
-            }
-        }
+        window.onclick = function(event) {{
+            if (!event.target.closest('.three-dots-wrapper')) {{
+                const m = document.getElementById('dropdownMenu');
+                if(m) m.classList.remove('show');
+            }}
+        }}
 
-        function clearChat() {
-            document.getElementById('chatContainer').innerHTML = '';
-            document.getElementById('landingHeader').style.display = 'flex';
-        }
+        function openStudentSetup() {{
+            let goal = prompt("आप किस परीक्षा या कक्षा की तैयारी कर रहे हैं? (जैसे: NEET, JEE, School, College)");
+            if(!goal) return;
+            let standard = prompt("आपकी कक्षा या वर्ष कौन सा है? (जैसे: Class 9, Class 11, B.Tech 1st Year)");
+            if(!standard) return;
+            alert("बहुत बढ़िया! " + standard + " (" + goal + ") के लिए आपका स्टडी रूटीन सेट कर दिया गया है।");
+        }}
 
-        function openStudentSetup() {
-            alert('Student Mode: NCERT & homework tools enabled.');
-        }
-
-        // Voice Input Functionality
-        function toggleVoice() {
+        function toggleVoice() {{
             const micBtn = document.getElementById('micBtn');
-            const waveBox = document.getElementById('waveBox');
+            const micSvg = document.getElementById('micIconSvg');
             const inputBox = document.getElementById('inputBox');
-            const chatInput = document.getElementById('chatInput');
+            const waveBox = document.getElementById('waveBox');
+            const inputField = document.getElementById('chatInput');
 
-            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-                alert("Speech recognition is not supported in this browser.");
+            if (isListening) {{
+                if (recognition) recognition.stop();
+                stopVoiceUI();
                 return;
-            }
+            }}
 
-            if (!isListening) {
-                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-                recognition = new SpeechRecognition();
-                recognition.lang = 'hi-IN';
-                recognition.interimResults = true;
-                recognition.continuous = true;
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {{
+                alert("Speech recognition not supported in your browser.");
+                return;
+            }}
 
-                recognition.onstart = function() {
-                    isListening = true;
-                    micBtn.classList.add('active');
-                    waveBox.classList.add('active');
-                    inputBox.classList.add('recording');
-                };
+            recognition = new SpeechRecognition();
+            recognition.lang = 'hi-IN';
+            recognition.continuous = true;
+            recognition.interimResults = true;
 
-                recognition.onresult = function(event) {
-                    let interim = '';
-                    for (let i = event.resultIndex; i < event.results.length; ++i) {
-                        if (event.results[i].isFinal) {
-                            accumulatedSpeech += event.results[i][0].transcript + ' ';
-                        } else {
-                            interim += event.results[i][0].transcript;
-                        }
-                    }
-                    chatInput.value = accumulatedSpeech + interim;
-                };
+            accumulatedSpeech = inputField.value ? inputField.value + " " : "";
 
-                recognition.onerror = function(event) {
-                    stopVoice();
-                };
+            recognition.onstart = function() {{
+                isListening = true;
+                micBtn.classList.add('active');
+                inputBox.classList.add('recording');
+                waveBox.classList.add('active');
+                inputField.placeholder = "Listening continuously...";
+                micSvg.innerHTML = `<rect x="6" y="4" width="4" height="16" fill="currentColor"/><rect x="14" y="4" width="4" height="16" fill="currentColor"/>`;
+            }};
 
-                recognition.onend = function() {
-                    stopVoice();
-                };
+            recognition.onresult = function(event) {{
+                let interim = '';
+                for (let i = event.resultIndex; i < event.results.length; ++i) {{
+                    if (event.results[i].isFinal) {{
+                        accumulatedSpeech += event.results[i][0].transcript + " ";
+                    }} else {{
+                        interim += event.results[i][0].transcript;
+                    }}
+                }}
+                inputField.value = accumulatedSpeech + interim;
+            }};
 
-                recognition.start();
-            } else {
-                stopVoice();
-            }
-        }
+            recognition.onend = function() {{
+                if (isListening) {{ try {{ recognition.start(); }} catch(e) {{}} }}
+            }};
 
-        function stopVoice() {
-            if (recognition) {
-                recognition.stop();
-            }
+            try {{ recognition.start(); }} catch(e) {{}}
+        }}
+
+        function stopVoiceUI() {{
             isListening = false;
-            document.getElementById('micBtn').classList.remove('active');
-            document.getElementById('waveBox').classList.remove('active');
+            const micBtn = document.getElementById('micBtn');
+            const micSvg = document.getElementById('micIconSvg');
+            micBtn.classList.remove('active');
             document.getElementById('inputBox').classList.remove('recording');
-            accumulatedSpeech = "";
-        }
+            document.getElementById('waveBox').classList.remove('active');
+            document.getElementById('chatInput').placeholder = "Ask Pyrox anything...";
+            micSvg.innerHTML = `<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line>`;
+        }}
 
-        // Send Message to FastAPI Backend
-        async function triggerSend() {
-            const chatInput = document.getElementById('chatInput');
-            const chatContainer = document.getElementById('chatContainer');
-            const landingHeader = document.getElementById('landingHeader');
-            const userMessage = chatInput.value.trim();
+        function triggerSend() {{
+            if (isListening && recognition) {{ recognition.stop(); stopVoiceUI(); }}
+            const inputField = document.getElementById('chatInput');
+            const text = inputField.value.trim();
+            if(!text) return;
 
-            if (!userMessage) return;
+            const url = new URL(window.location.href);
+            url.searchParams.set('q', encodeURIComponent(text));
+            window.location.href = url.toString();
+        }}
 
-            // Hide landing header once chat starts
-            landingHeader.style.display = 'none';
-
-            // Append User Message
-            const userDiv = document.createElement('div');
-            userDiv.className = 'message user-message';
-            userDiv.textContent = userMessage;
-            chatContainer.appendChild(userDiv);
-
-            chatInput.value = '';
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-
-            // Append Loading AI Message
-            const aiDiv = document.createElement('div');
-            aiDiv.className = 'message ai-message';
-            aiDiv.textContent = 'Pyrox सोच रहा है... 🤔';
-            chatContainer.appendChild(aiDiv);
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-
-            try {
-                // Backend FastAPI Endpoint Call
-                const response = await fetch('/api/chat', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ message: userMessage })
-                });
-
-                const data = await response.json();
-                aiDiv.textContent = data.reply || "Kuch gadbad ho gayi bhai!";
-            } catch (error) {
-                aiDiv.textContent = "⚠️ Network error: Server se connect nahi ho pa raha.";
-            }
-
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-        }
+        function clearChat() {{
+            const url = new URL(window.location.href);
+            url.searchParams.delete('q');
+            window.location.href = url.toString();
+        }}
     </script>
 </body>
 </html>
+"""
+
+st.components.v1.html(app_code, height=750, scrolling=True)
