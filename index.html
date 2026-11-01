@@ -1,19 +1,382 @@
-@app.get("/api/check-model")
-async def check_model():
-    """यह सीधे Groq से पूछकर बताएगा कि कौन सा मॉडल जिंदा है"""
-    if not API_KEY:
-        return {"active_model": "API Key Missing!"}
-    try:
-        headers = {"Authorization": f"Bearer {API_KEY}"}
-        res = requests.get("https://api.groq.com/openai/v1/models", headers=headers, timeout=5)
-        if res.status_code == 200:
-            models = res.json().get("data", [])
-            for m in models:
-                mid = m.get("id", "")
-                if "llama" in mid.lower() and ("70b" in mid.lower() or "8b" in mid.lower()):
-                    return {"active_model": mid}
-            if models:
-                return {"active_model": models[0]["id"]}
-    except Exception as e:
-        print("Error:", e)
-    return {"active_model": "llama-3.1-70b-versatile"}
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pyrox Studio</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+        body {
+            background-color: #000000;
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* LLAMA MODEL CHECKER BANNER */
+        .model-status-bar {
+            background-color: #0d0d0d;
+            border-bottom: 1px solid #1a1a1a;
+            color: #03A9F4;
+            font-size: 11.5px;
+            text-align: center;
+            padding: 5px;
+            font-family: monospace;
+            letter-spacing: 0.3px;
+            z-index: 50;
+        }
+
+        .app-layout {
+            display: flex;
+            flex: 1;
+            height: calc(100vh - 27px);
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* SIDEBAR */
+        .sidebar {
+            width: 0px;
+            background-color: #050505;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 0px;
+            z-index: 20;
+            overflow: hidden;
+            transition: width 0.3s ease, padding 0.3s ease;
+        }
+        .sidebar.expanded {
+            width: 230px;
+            padding: 12px 10px;
+            border-right: 1px solid #141414;
+        }
+        .sidebar-logo-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 6px 6px;
+            margin-bottom: 12px;
+        }
+        .sidebar-brand-name {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: #ffffff;
+        }
+        .menu-list {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .menu-btn {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 9px 10px;
+            color: #aaaaaa;
+            font-size: 13.5px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s;
+            white-space: nowrap;
+        }
+        .menu-btn:hover {
+            background-color: #141414;
+            color: #ffffff;
+        }
+        .menu-btn svg {
+            width: 18px;
+            height: 18px;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 2;
+        }
+
+        /* MAIN CONTAINER */
+        .main-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            height: 100%;
+            padding-top: 4px;
+            padding-bottom: 8px;
+            position: relative;
+        }
+
+        .top-navbar {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px 20px;
+            position: relative;
+            z-index: 10;
+        }
+        .hamburger-btn {
+            background: transparent;
+            border: none;
+            color: #aaaaaa;
+            cursor: pointer;
+            padding: 6px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .hamburger-btn:hover {
+            color: #ffffff;
+            background-color: #1a1a1a;
+        }
+
+        .center-landing-header {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            gap: 6px;
+            margin-top: 15px;
+        }
+        .brand-title-box {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .brand-name-large {
+            font-size: 2.2rem;
+            font-weight: 800;
+            color: #ffffff;
+        }
+        .greeting-subtext {
+            font-size: 1.15rem;
+            font-weight: 500;
+            color: #888888;
+        }
+
+        .chat-container {
+            width: 100%;
+            max-width: 800px;
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            padding: 10px 15px;
+        }
+        .message {
+            display: flex;
+            flex-direction: column;
+            max-width: 82%;
+            line-height: 1.5;
+            font-size: 0.95rem;
+            gap: 8px;
+        }
+        .user-message {
+            align-self: flex-end;
+            background-color: #1c1c1e;
+            color: #ffffff;
+            padding: 10px 16px;
+            border-radius: 16px 16px 4px 16px;
+            border: 1px solid #2d2d2d;
+        }
+        .ai-message {
+            align-self: flex-start;
+            background-color: #080808;
+            color: #f0f0f0;
+            padding: 14px 18px;
+            border-radius: 16px 16px 16px 4px;
+            border: 1px solid #1a1a1a;
+            width: 100%;
+        }
+
+        .input-wrapper {
+            width: 100%;
+            max-width: 800px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            padding: 0 15px;
+        }
+        .input-box {
+            width: 100%;
+            background-color: #080808;
+            border: 1px solid #222222;
+            border-radius: 26px;
+            padding: 8px 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .chat-input-field {
+            flex: 1;
+            background: transparent;
+            border: none;
+            outline: none;
+            color: #ffffff;
+            font-size: 0.95rem;
+        }
+        .chat-input-field::placeholder { color: #555555; }
+
+        .arrow-submit-btn {
+            width: 32px;
+            height: 32px;
+            background-color: #ffffff;
+            color: #000000;
+            border: none;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        .footer-disclaimer {
+            font-size: 10.5px;
+            color: #444444;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- TOP LLAMA STATUS BANNER -->
+    <div id="modelStatusBar" class="model-status-bar">
+        ⚡ Checking active Llama model from Groq API...
+    </div>
+
+    <div class="app-layout">
+        <!-- SIDEBAR -->
+        <div class="sidebar" id="sidebar">
+            <div>
+                <div class="sidebar-logo-header">
+                    <!-- MULTI-LAYERED ILLUSION STAR LOGO -->
+                    <svg width="28" height="28" viewBox="0 0 100 100" fill="none" stroke="#ffffff" stroke-width="4" stroke-linejoin="round">
+                        <polygon points="50,5 63,35 95,38 71,60 78,92 50,75 22,92 29,60 5,38 37,35" stroke-width="5" opacity="1.0" />
+                        <polygon points="50,22 59,42 80,44 64,59 69,80 50,68 31,80 36,59 20,44 41,42" stroke-width="3" opacity="0.65" />
+                        <polygon points="50,34 55,47 68,48 58,58 61,71 50,63 39,71 42,58 32,48 45,47" stroke-width="2" opacity="0.35" fill="#ffffff" />
+                    </svg>
+                    <span class="sidebar-brand-name">Pyrox</span>
+                </div>
+
+                <div class="menu-list">
+                    <div class="menu-btn" onclick="clearChat()">
+                        <svg viewBox="0 0 24 24"><path d="M12 4v16m8-8H4"></path></svg>
+                        <span>New Chat</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MAIN CONTAINER -->
+        <div class="main-container">
+            <div class="top-navbar">
+                <button type="button" class="hamburger-btn" onclick="toggleSidebar()">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="3" y1="12" x2="21" y2="12"></line>
+                        <line x1="3" y1="6" x2="21" y2="6"></line>
+                        <line x1="3" y1="18" x2="21" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+
+            <div class="center-landing-header" id="landingHeader">
+                <div class="brand-title-box">
+                    <svg width="52" height="52" viewBox="0 0 100 100" fill="none" stroke="#ffffff" stroke-linejoin="round">
+                        <polygon points="50,5 63,35 95,38 71,60 78,92 50,75 22,92 29,60 5,38 37,35" stroke-width="4.5" opacity="1.0" />
+                        <polygon points="50,22 59,42 80,44 64,59 69,80 50,68 31,80 36,59 20,44 41,42" stroke-width="3" opacity="0.6" />
+                        <polygon points="50,34 55,47 68,48 58,58 61,71 50,63 39,71 42,58 32,48 45,47" stroke-width="2" opacity="0.3" fill="#ffffff" />
+                    </svg>
+                    <span class="brand-name-large">Pyrox</span>
+                </div>
+                <div class="greeting-subtext">Hi, how can I help you today?</div>
+            </div>
+
+            <div class="chat-container" id="chatContainer"></div>
+
+            <div class="input-wrapper">
+                <div class="input-box">
+                    <input type="text" id="chatInput" class="chat-input-field" placeholder="Ask Pyrox anything..." onkeypress="if(event.key==='Enter'){ event.preventDefault(); triggerSend(); }" />
+                    <button type="button" class="arrow-submit-btn" onclick="triggerSend(event)">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                            <polyline points="12 5 19 12 12 19"></polyline>
+                        </svg>
+                    </button>
+                </div>
+                <div class="footer-disclaimer">Pyrox is AI and can make mistakes</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Page load hone par Llama model fetch karega
+        window.addEventListener('DOMContentLoaded', async () => {
+            try {
+                let response = await fetch('/api/check-model');
+                let data = await response.json();
+                document.getElementById('modelStatusBar').innerText = "🟢 Active Llama Model: " + data.active_model;
+            } catch (err) {
+                document.getElementById('modelStatusBar').innerText = "🔴 Model check failed!";
+            }
+        });
+
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('expanded');
+        }
+
+        async function triggerSend(e) {
+            if(e) e.preventDefault();
+            const inputField = document.getElementById('chatInput');
+            const text = inputField.value.trim();
+            if(!text) return;
+
+            inputField.value = '';
+            document.getElementById('landingHeader').style.display = 'none';
+
+            appendMsg('user', text);
+            const aiDiv = appendMsg('ai', '⚡ Pyrox सोच रहा है...');
+
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: text })
+                });
+
+                const data = await response.json();
+                if(response.ok) {
+                    aiDiv.innerHTML = `<div>${data.reply}</div>`;
+                } else {
+                    aiDiv.innerText = "⚠️ Error: " + (data.detail || "Something went wrong");
+                }
+            } catch(e) {
+                aiDiv.innerText = "⚠️ Network Exception: " + e.message;
+            }
+        }
+
+        function appendMsg(role, content) {
+            const container = document.getElementById('chatContainer');
+            const div = document.createElement('div');
+            div.className = 'message ' + (role === 'user' ? 'user-message' : 'ai-message');
+            div.innerText = content;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+            return div;
+        }
+
+        function clearChat() {
+            document.getElementById('chatContainer').innerHTML = '';
+            document.getElementById('landingHeader').style.display = 'flex';
+        }
+    </script>
+</body>
+</html>
