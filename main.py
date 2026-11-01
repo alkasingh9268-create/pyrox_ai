@@ -1,5 +1,7 @@
 import os
+import asyncio
 import requests
+import edge_tts
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -17,7 +19,7 @@ class ChatRequest(BaseModel):
 
 @app.get("/api/check-model")
 async def check_model():
-    """Groq API se puchta hai ki kaun sa Llama model active hai"""
+    """Groq API से खुद चेक करेगा कि इस समय कौन सा Llama मॉडल एक्टिव है"""
     if not API_KEY:
         return {"active_model": "API Key Missing!"}
     try:
@@ -33,13 +35,36 @@ async def check_model():
                 return {"active_model": models[0]["id"]}
     except Exception as e:
         print("Model fetch error:", e)
+    
     return {"active_model": "llama-3.1-70b-versatile"}
+
+async def generate_edge_audio(text, filename="static/response.mp3"):
+    try:
+        clean_t = (
+            text.replace("*", "")
+            .replace("#", "")
+            .replace("`", "")
+            .replace("✨", "")
+            .replace("👋", "")
+            .replace("🚀", "")
+            .replace("💻", "")
+            .replace("😎", "")
+            .replace("💡", "")
+            .replace("🎯", "")
+        )
+        communicate = edge_tts.Communicate(clean_t, "hi-IN-MadhurNeural")
+        await communicate.save(filename)
+        return True
+    except Exception as e:
+        print("TTS Error:", e)
+        return False
 
 @app.post("/api/chat")
 async def chat_endpoint(req: ChatRequest):
     if not API_KEY:
         raise HTTPException(status_code=400, detail="Groq API Key missing!")
     
+    # ऑटोमैटिक वर्किंग मॉडल उठाएगा
     model_data = await check_model()
     active_model = model_data.get("active_model", "llama-3.1-70b-versatile")
 
@@ -52,8 +77,14 @@ async def chat_endpoint(req: ChatRequest):
     payload = {
         "model": active_model,
         "messages": [
-            {"role": "system", "content": "You are Pyrox, an advanced Gen-Z AI assistant for India. Talk in natural Hinglish with cool emojis ✨."},
-            {"role": "user", "content": req.message}
+            {
+                "role": "system",
+                "content": "You are Pyrox, an advanced Gen-Z AI assistant created for users in India (specifically Delhi context). Talk in a smooth mix of natural Hindi and English (Hinglish) with cool emojis ✨."
+            },
+            {
+                "role": "user",
+                "content": req.message
+            }
         ],
         "temperature": 0.7,
         "max_tokens": 512
@@ -64,19 +95,9 @@ async def chat_endpoint(req: ChatRequest):
         if response.status_code == 200:
             res_json = response.json()
             reply = res_json['choices'][0]['message']['content']
-            return {"reply": reply, "audio_url": None}
-        else:
-            raise HTTPException(status_code=response.status_code, detail=response.text)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/", response_class=HTMLResponse)
-async def read_index():
-    if os.path.exists("index.html"):
-        with open("index.html", "r", encoding="utf-8") as f:
-            return f.read()
-    return "index.html missing!"
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+            
+            audio_path = "static/response.mp3"
+            success = await generate_edge_audio(reply, audio_path)
+            
+            return {
+                "reply": reply,
