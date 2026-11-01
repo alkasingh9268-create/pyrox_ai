@@ -1,80 +1,19 @@
-import os
-import requests
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse
-from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
-
-app = FastAPI()
-
-os.makedirs("static", exist_ok=True)
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
-API_KEY = os.environ.get("GROQ_API_KEY") or ""
-
-def print_available_groq_models():
-    """यह फंक्शन सीधे Groq सर्वर से पूछेगा कि तेरी की पर इस समय कौन से मॉडल चल रहे हैं और टर्मिनल में प्रिंट कर देगा।"""
+@app.get("/api/check-model")
+async def check_model():
+    """यह सीधे Groq से पूछकर बताएगा कि कौन सा मॉडल जिंदा है"""
     if not API_KEY:
-        print("❌ API Key गायब है भाई!")
-        return
+        return {"active_model": "API Key Missing!"}
     try:
         headers = {"Authorization": f"Bearer {API_KEY}"}
-        res = requests.get("https://api.groq.com/openai/v1/models", headers=headers, timeout=10)
+        res = requests.get("https://api.groq.com/openai/v1/models", headers=headers, timeout=5)
         if res.status_code == 200:
             models = res.json().get("data", [])
-            print("\n🔥 --- GROQ पर इस समय ये सारे मॉडल उपलब्ध हैं --- 🔥")
             for m in models:
-                print(f"👉 Model ID: {m.get('id')}")
-            print("--------------------------------------------------\n")
-        else:
-            print(f"⚠️ Model Fetch Error ({res.status_code}): {res.text}")
+                mid = m.get("id", "")
+                if "llama" in mid.lower() and ("70b" in mid.lower() or "8b" in mid.lower()):
+                    return {"active_model": mid}
+            if models:
+                return {"active_model": models[0]["id"]}
     except Exception as e:
-        print("💥 Exception in fetching models:", e)
-
-# सर्वर चालू होते ही टर्मिनल में सारे एक्टिव मॉडल प्रिंट हो जाएंगे
-print_available_groq_models()
-
-class ChatRequest(BaseModel):
-    message: str
-
-@app.post("/api/chat")
-async def chat_endpoint(req: ChatRequest):
-    if not API_KEY:
-        raise HTTPException(status_code=400, detail="API Key missing!")
-    
-    # यहाँ हम फिक्स मॉडल रख लेते हैं जो टर्मिनल में सबसे ऊपर दिखेगा (जैसे llama-3.1-70b-versatile या जो भी Groq दे रहा हो)
-    working_model = "llama-3.1-70b-versatile" 
-    
-    url = "https://api.groq.com/openai/v1/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {API_KEY}",
-        "Content-Type": "application/json"
-    }
-    
-    payload = {
-        "model": working_model,
-        "messages": [
-            {"role": "system", "content": "You are Pyrox, an AI assistant for India. Talk in natural Hinglish ✨."},
-            {"role": "user", "content": req.message}
-        ],
-        "temperature": 0.7,
-        "max_tokens": 512
-    }
-    
-    response = requests.post(url, headers=headers, json=payload, timeout=30)
-    if response.status_code == 200:
-        reply = response.json()['choices'][0]['message']['content']
-        return {"reply": reply, "audio_url": None}
-    else:
-        raise HTTPException(status_code=response.status_code, detail=response.text)
-
-@app.get("/", response_class=HTMLResponse)
-async def read_index():
-    if os.path.exists("index.html"):
-        with open("index.html", "r", encoding="utf-8") as f:
-            return f.read()
-    return "index.html missing!"
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+        print("Error:", e)
+    return {"active_model": "llama-3.1-70b-versatile"}
