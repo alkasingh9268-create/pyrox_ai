@@ -6,12 +6,12 @@ import requests
 import streamlit as st
 
 # ==============================================================================
-# PYROX STUDIO - MASTER APPLICATION CONFIGURATION (Lines 1 - 50)
+# PYROX STUDIO - MASTER APPLICATION CONFIGURATION
 # ==============================================================================
 
 st.set_page_config(
-    page_title="Pyrox",
-    page_icon="🤖",
+    page_title="Pyrox Studio",
+    page_icon="⭐",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
@@ -33,7 +33,7 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 
 # ==============================================================================
-# MICROSOFT EDGE NEURAL TEXT-TO-SPEECH (Madhur Neural - Male Voice) (Lines 51 - 120)
+# MICROSOFT EDGE NEURAL TEXT-TO-SPEECH (Madhur Neural - Male Voice)
 # ==============================================================================
 
 def generate_edge_audio(text, filename="response.mp3"):
@@ -60,13 +60,12 @@ def generate_edge_audio(text, filename="response.mp3"):
         return False
 
 # ==============================================================================
-# GROQ API DIRECT HTTP HANDLER (Bypasses SDK ModuleNotFoundError) (Lines 121 - 200)
+# GROQ API DIRECT HTTP HANDLER
 # ==============================================================================
 
 def get_groq_response(user_prompt):
     """
     Direct HTTP request implementation to Groq API endpoint for Llama 3.3 70B model.
-    100% reliable, zero dependency errors.
     """
     if not api_key:
         return "⚠️ Groq API Key missing in Streamlit Secrets!"
@@ -104,7 +103,7 @@ def get_groq_response(user_prompt):
         return f"⚠️ Network Exception: {str(e)}"
 
 # ==============================================================================
-# BACKEND QUERY PARAMETER PROCESSOR (Lines 201 - 250)
+# BACKEND QUERY PARAMETER PROCESSOR
 # ==============================================================================
 
 query_params = st.query_params
@@ -126,11 +125,10 @@ if "q" in query_params:
             "audio_file": audio_path
         })
 
-# Convert Python chat history into JSON string for frontend injection
 chat_history_json = json.dumps(st.session_state.messages)
 
 # ==============================================================================
-# FULL STUDIO UI & FRONTEND ENGINE (HTML/CSS/JS) (Lines 251 - 850+)
+# FULL STUDIO UI & FRONTEND ENGINE (HTML/CSS/JS)
 # ==============================================================================
 
 app_code = f"""
@@ -181,8 +179,8 @@ app_code = f"""
             margin-bottom: 10px;
         }}
         .sidebar-logo-header svg {{
-            width: 24px;
-            height: 24px;
+            width: 26px;
+            height: 26px;
         }}
         .sidebar-brand-name {{
             font-size: 1.1rem;
@@ -356,8 +354,8 @@ app_code = f"""
             gap: 10px;
         }}
         .brand-logo-large {{
-            width: 38px;
-            height: 38px;
+            width: 42px;
+            height: 42px;
         }}
         .brand-name-large {{
             font-size: 1.9rem;
@@ -537,9 +535,16 @@ app_code = f"""
     <div class="sidebar" id="sidebar">
         <div>
             <div class="sidebar-logo-header">
-                <svg viewBox="0 0 200 200">
-                    <circle cx="100" cy="100" r="85" fill="#050505" stroke="#ffffff" stroke-width="4"/>
-                    <path d="M 100 25 L 70 85 L 110 85 L 90 115 L 130 115 L 100 175" fill="none" stroke="#ffffff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+                <!-- MULTI-LAYERED PREMIUM STAR LOGO -->
+                <svg viewBox="0 0 100 100">
+                    <polygon points="50,5 61,35 95,35 68,57 79,91 50,70 21,91 32,57 5,35 39,35" fill="none" stroke="url(#starGradSidebar)" stroke-width="6" stroke-linejoin="round"/>
+                    <polygon points="50,20 57,40 78,40 61,52 67,73 50,60 33,73 39,52 22,40 43,40" fill="url(#starGradSidebar)" opacity="0.3"/>
+                    <defs>
+                        <linearGradient id="starGradSidebar" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#9C27B0"/>
+                            <stop offset="100%" stop-color="#03A9F4"/>
+                        </linearGradient>
+                    </defs>
                 </svg>
                 <span class="sidebar-brand-name">Pyrox</span>
             </div>
@@ -607,9 +612,16 @@ app_code = f"""
         <!-- CENTER LANDING HEADER -->
         <div class="center-landing-header" id="landingHeader">
             <div class="brand-title-box">
-                <svg class="brand-logo-large" viewBox="0 0 200 200">
-                    <circle cx="100" cy="100" r="85" fill="#000000" stroke="#ffffff" stroke-width="5"/>
-                    <path d="M 100 25 L 70 85 L 110 85 L 90 115 L 130 115 L 100 175" fill="none" stroke="#ffffff" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+                <!-- MULTI-LAYERED PREMIUM STAR LOGO (LARGE) -->
+                <svg class="brand-logo-large" viewBox="0 0 100 100">
+                    <polygon points="50,5 61,35 95,35 68,57 79,91 50,70 21,91 32,57 5,35 39,35" fill="none" stroke="url(#starGradLarge)" stroke-width="6" stroke-linejoin="round"/>
+                    <polygon points="50,20 57,40 78,40 61,52 67,73 50,60 33,73 39,52 22,40 43,40" fill="url(#starGradLarge)" opacity="0.35"/>
+                    <defs>
+                        <linearGradient id="starGradLarge" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#9C27B0"/>
+                            <stop offset="100%" stop-color="#03A9F4"/>
+                        </linearGradient>
+                    </defs>
                 </svg>
                 <span class="brand-name-large">Pyrox</span>
             </div>
@@ -624,12 +636,12 @@ app_code = f"""
             <div class="input-box" id="inputBox">
                 <svg class="star-btn" viewBox="0 0 24 24" data-tooltip="Attach File & Photo" onclick="alert('Select File / Photo to attach')">
                     <defs>
-                        <linearGradient id="starGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <linearGradient id="starGradBtn" x1="0%" y1="0%" x2="100%" y2="100%">
                             <stop offset="0%" stop-color="#9C27B0"/>
                             <stop offset="100%" stop-color="#03A9F4"/>
                         </linearGradient>
                     </defs>
-                    <path d="M12 0C12 6.627 6.627 12 0 12C6.627 12 12 17.373 12 24C12 17.373 17.373 12 24 12C17.373 12 12 6.627 12 0Z" fill="url(#starGrad)"/>
+                    <path d="M12 0C12 6.627 6.627 12 0 12C6.627 12 12 17.373 12 24C12 17.373 17.373 12 24 12C17.373 12 12 6.627 12 0Z" fill="url(#starGradBtn)"/>
                 </svg>
 
                 <button id="micBtn" class="mic-btn" data-tooltip="Voice Input" onclick="toggleVoice()">
