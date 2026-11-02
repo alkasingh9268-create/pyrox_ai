@@ -12,22 +12,23 @@ app = FastAPI()
 os.makedirs("static", exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-API_KEY = os.environ.get("GROQ_API_KEY") or ""
+# Render Environment Variable से सुरक्षित तरीके से की उठाएगा
+API_KEY = os.environ.get("GROQ_API_KEY", "").strip()
 
 class ChatRequest(BaseModel):
     message: str
 
 @app.get("/api/check-model")
 async def check_model():
-    """यह चेक करेगा कि कौन सा मॉडल एक्टिव है, और चैट के लिए हमेशा सही वर्किंग Llama मॉडल रिटर्न करेगा"""
+    """Groq API से चेक करेगा कि कौन सा जेनरेटिव Llama मॉडल एक्टिव है"""
     if not API_KEY:
-        return {"active_model": "API Key Missing!"}
+        return {"active_model": "API Key Missing in Render Environment!"}
     try:
         headers = {"Authorization": f"Bearer {API_KEY}"}
         res = requests.get("https://api.groq.com/openai/v1/models", headers=headers, timeout=5)
         if res.status_code == 200:
-            models = res.json().get("data", [])
-            # यहाँ हम पक्का करेंगे कि गार्ड या क्लासिफायर मॉडल चैट में न घुसे, सिर्फ असली Llama चैट मॉडल उठे
+            models = res.json().get("data", [], )
+            # क्लासिफायर/गार्ड मॉडल को छोड़कर सही चैट मॉडल पकड़ेगा
             for m in models:
                 mid = m.get("id", "")
                 if "llama" in mid.lower() and "guard" not in mid.lower() and ("70b" in mid.lower() or "8b" in mid.lower()):
@@ -65,9 +66,8 @@ async def generate_edge_audio(text, filename="static/response.mp3"):
 @app.post("/api/chat")
 async def chat_endpoint(req: ChatRequest):
     if not API_KEY:
-        raise HTTPException(status_code=400, detail="Groq API Key missing!")
+        raise HTTPException(status_code=400, detail="Groq API Key missing in environment variables!")
     
-    # हमेशा सही चैट Llama मॉडल ही इस्तेमाल होगा
     model_data = await check_model()
     active_model = model_data.get("active_model", "llama-3.1-70b-versatile")
     if "guard" in active_model.lower():
