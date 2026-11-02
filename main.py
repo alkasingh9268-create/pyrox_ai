@@ -19,7 +19,7 @@ class ChatRequest(BaseModel):
 
 @app.get("/api/check-model")
 async def check_model():
-    """Groq API से खुद चेक करेगा कि इस समय कौन सा Llama मॉडल एक्टिव है"""
+    """यह चेक करेगा कि कौन सा मॉडल एक्टिव है, और चैट के लिए हमेशा सही वर्किंग Llama मॉडल रिटर्न करेगा"""
     if not API_KEY:
         return {"active_model": "API Key Missing!"}
     try:
@@ -27,12 +27,15 @@ async def check_model():
         res = requests.get("https://api.groq.com/openai/v1/models", headers=headers, timeout=5)
         if res.status_code == 200:
             models = res.json().get("data", [])
+            # यहाँ हम पक्का करेंगे कि गार्ड या क्लासिफायर मॉडल चैट में न घुसे, सिर्फ असली Llama चैट मॉडल उठे
             for m in models:
                 mid = m.get("id", "")
-                if "llama" in mid.lower():
+                if "llama" in mid.lower() and "guard" not in mid.lower() and ("70b" in mid.lower() or "8b" in mid.lower()):
                     return {"active_model": mid}
-            if models:
-                return {"active_model": models[0]["id"]}
+            for m in models:
+                mid = m.get("id", "")
+                if "llama" in mid.lower() and "guard" not in mid.lower():
+                    return {"active_model": mid}
     except Exception as e:
         print("Model fetch error:", e)
     
@@ -64,9 +67,11 @@ async def chat_endpoint(req: ChatRequest):
     if not API_KEY:
         raise HTTPException(status_code=400, detail="Groq API Key missing!")
     
-    # ऑटोमैटिक वर्किंग मॉडल उठाएगा
+    # हमेशा सही चैट Llama मॉडल ही इस्तेमाल होगा
     model_data = await check_model()
     active_model = model_data.get("active_model", "llama-3.1-70b-versatile")
+    if "guard" in active_model.lower():
+        active_model = "llama-3.1-70b-versatile"
 
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {
@@ -101,3 +106,20 @@ async def chat_endpoint(req: ChatRequest):
             
             return {
                 "reply": reply,
+                "audio_url": f"/{audio_path}" if success else None
+            }
+        else:
+            raise HTTPException(status_code=response.status_code, detail=response.text)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/", response_class=HTMLResponse)
+async def read_index():
+    if os.path.exists("index.html"):
+        with open("index.html", "r", encoding="utf-8") as f:
+            return f.read()
+    return "index.html file missing!"
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
