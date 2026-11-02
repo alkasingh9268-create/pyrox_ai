@@ -27,8 +27,8 @@ async def check_model():
         headers = {"Authorization": f"Bearer {API_KEY}"}
         res = requests.get("https://api.groq.com/openai/v1/models", headers=headers, timeout=5)
         if res.status_code == 200:
-            models = res.json().get("data", [], )
-            # क्लासिफायर/गार्ड मॉडल को छोड़कर सही चैट मॉडल पकड़ेगा
+            models = res.json().get("data", [])
+            # क्लासिफायर/गार्ड मॉडल को छोड़कर सही चैट मॉडल पकड़ेगा
             for m in models:
                 mid = m.get("id", "")
                 if "llama" in mid.lower() and "guard" not in mid.lower() and ("70b" in mid.lower() or "8b" in mid.lower()):
