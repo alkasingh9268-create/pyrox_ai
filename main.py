@@ -9,10 +9,11 @@ from pydantic import BaseModel
 
 app = FastAPI()
 
+# Static folder ensure karega ki audio aur assets sahi se load hon
 os.makedirs("static", exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Render Environment Variable से सुरक्षित तरीके से की उठाएगा
+# Render Environment Variable se API key secure tarike se uthayega
 API_KEY = os.environ.get("GROQ_API_KEY", "").strip()
 
 class ChatRequest(BaseModel):
@@ -20,7 +21,7 @@ class ChatRequest(BaseModel):
 
 @app.get("/api/check-model")
 async def check_model():
-    """Groq API से चेक करेगा कि कौन सा जेनरेटिव Llama मॉडल एक्टिव है"""
+    """Groq API se check karega ki kaun sa generative Llama model active hai"""
     if not API_KEY:
         return {"active_model": "API Key Missing in Render Environment!"}
     try:
@@ -28,7 +29,7 @@ async def check_model():
         res = requests.get("https://api.groq.com/openai/v1/models", headers=headers, timeout=5)
         if res.status_code == 200:
             models = res.json().get("data", [])
-            # क्लासिफायर/गार्ड मॉडल को छोड़कर सही चैट मॉडल पकड़ेगा
+            # Guard/Classifier models ko chhor kar asli Llama chat model pakdega
             for m in models:
                 mid = m.get("id", "")
                 if "llama" in mid.lower() and "guard" not in mid.lower() and ("70b" in mid.lower() or "8b" in mid.lower()):
@@ -43,6 +44,7 @@ async def check_model():
     return {"active_model": "llama-3.1-70b-versatile"}
 
 async def generate_edge_audio(text, filename="static/response.mp3"):
+    """Edge-TTS ke zariye Madhur Neural aawaz me audio banayega"""
     try:
         clean_t = (
             text.replace("*", "")
@@ -115,10 +117,12 @@ async def chat_endpoint(req: ChatRequest):
 
 @app.get("/", response_class=HTMLResponse)
 async def read_index():
+    """Chrome par raw text code na dikha kar seedha sahi HTML webpage render karega"""
     if os.path.exists("index.html"):
         with open("index.html", "r", encoding="utf-8") as f:
-            return f.read()
-    return "index.html file missing!"
+            html_content = f.read()
+        return HTMLResponse(content=html_content, status_code=200)
+    return HTMLResponse(content="<h3>index.html file missing in root directory!</h3>", status_code=404)
 
 if __name__ == "__main__":
     import uvicorn
