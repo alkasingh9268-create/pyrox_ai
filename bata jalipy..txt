@@ -1,0 +1,21 @@
+import requests
+
+# Yahan apni asli Groq API key daal dena
+API_KEY = "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"
+
+url = "https://api.groq.com/openai/v1/models"
+headers = {"Authorization": f"Bearer {API_KEY}"}
+
+try:
+    response = requests.get(url, headers=headers)
+    if response.status_code == 200:
+        models = response.json().get("data", [])
+        print("✅ API Key Ekdam Sahi Hai! Yeh rahe available models:")
+        for m in models:
+            mid = m.get("id", "")
+            if "llama" in mid.lower():
+                print(f"👉 {mid}")
+    else:
+        print("❌ Error:", response.status_code, response.text)
+except Exception as e:
+    print("Connection Error:", e)
