@@ -13,7 +13,7 @@ app = FastAPI()
 os.makedirs("static", exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Render Environment Variable se API key secure tarike se uthayega
+# Render Environment Variable / Secret File se API key secure tarike se uthayega
 API_KEY = os.environ.get("GROQ_API_KEY", "").strip()
 
 class ChatRequest(BaseModel):
@@ -29,19 +29,20 @@ async def check_model():
         res = requests.get("https://api.groq.com/openai/v1/models", headers=headers, timeout=5)
         if res.status_code == 200:
             models = res.json().get("data", [])
-            # Guard/Classifier models ko chhor kar asli Llama chat model pakdega
+            # Active Llama chat model dhoondhega
+            for m in models:
+                mid = m.get("id", "")
+                if "llama-3.3" in mid.lower():
+                    return {"active_model": mid}
             for m in models:
                 mid = m.get("id", "")
                 if "llama" in mid.lower() and "guard" not in mid.lower() and ("70b" in mid.lower() or "8b" in mid.lower()):
                     return {"active_model": mid}
-            for m in models:
-                mid = m.get("id", "")
-                if "llama" in mid.lower() and "guard" not in mid.lower():
-                    return {"active_model": mid}
     except Exception as e:
         print("Model fetch error:", e)
     
-    return {"active_model": "llama-3.1-70b-versatile"}
+    # Dynamic fallback to Llama 3.3 70B Versatile
+    return {"active_model": "llama-3.3-70b-versatile"}
 
 async def generate_edge_audio(text, filename="static/response.mp3"):
     """Edge-TTS ke zariye Madhur Neural aawaz me audio banayega"""
@@ -71,9 +72,9 @@ async def chat_endpoint(req: ChatRequest):
         raise HTTPException(status_code=400, detail="Groq API Key missing in environment variables!")
     
     model_data = await check_model()
-    active_model = model_data.get("active_model", "llama-3.1-70b-versatile")
-    if "guard" in active_model.lower():
-        active_model = "llama-3.1-70b-versatile"
+    active_model = model_data.get("active_model", "llama-3.3-70b-versatile")
+    if "guard" in active_model.lower() or "3.1-70b" in active_model.lower():
+        active_model = "llama-3.3-70b-versatile"
 
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {
@@ -113,18 +114,4 @@ async def chat_endpoint(req: ChatRequest):
         else:
             raise HTTPException(status_code=response.status_code, detail=response.text)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/", response_class=HTMLResponse)
-async def read_index():
-    """Chrome par raw text code na dikha kar seedha sahi HTML webpage render karega"""
-    if os.path.exists("index.html"):
-        with open("index.html", "r", encoding="utf-8") as f:
-            html_content = f.read()
-        return HTMLResponse(content=html_content, status_code=200)
-    return HTMLResponse(content="<h3>index.html file missing in root directory!</h3>", status_code=404)
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
-            
+        raise HTTPException(status
