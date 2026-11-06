@@ -14,6 +14,7 @@ os.makedirs("static", exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 API_KEY = os.environ.get("GROQ_API_KEY", "").strip()
+SERP_API_KEY = os.environ.get("SERPAPI_API_KEY", "").strip()
 
 class ChatRequest(BaseModel):
     message: str
@@ -50,13 +51,29 @@ def get_live_groq_model():
     except Exception as e:
         return "llama-3.3-70b-versatile", f"Fallback due to error: {str(e)}"
 
+def search_live_web(query: str) -> str:
+    if not SERP_API_KEY:
+        return ""
+    try:
+        url = f"https://serpapi.com/search.json?q={requests.utils.quote(query)}&api_key={SERP_API_KEY}&hl=hi&gl=in"
+        res = requests.get(url, timeout=10)
+        if res.status_code == 200:
+            data = res.json()
+            organic = data.get("organic_results", [])
+            snippets = [item.get("snippet", "") for item in organic[:3] if item.get("snippet")]
+            return " ".join(snippets)
+    except Exception as e:
+        print("SerpApi Error:", e)
+    return ""
+
 @app.get("/api/debug")
 async def debug_key():
     model, status = get_live_groq_model()
     return JSONResponse({
         "status": status,
         "active_working_model": model,
-        "api_key_present": bool(API_KEY)
+        "groq_key_present": bool(API_KEY),
+        "serp_key_present": bool(SERP_API_KEY)
     })
 
 async def generate_edge_audio(text, voice_name="hi-IN-MadhurNeural", filename="static/response.mp3"):
@@ -78,6 +95,9 @@ async def chat_endpoint(req: ChatRequest):
         return JSONResponse(status_code=400, content={"detail": "Groq API Key missing in environment variables!"})
     
     try:
+        # Live web search fetch karna agar zaroorat ho
+        web_context = search_live_web(req.message)
+        
         active_model, _ = get_live_groq_model()
         url = "https://api.groq.com/openai/v1/chat/completions"
         headers = {
@@ -85,17 +105,21 @@ async def chat_endpoint(req: ChatRequest):
             "Content-Type": "application/json"
         }
         
+        system_content = (
+            "You are Pyrox, a chill, direct, and street-smart AI buddy. Talk in natural, everyday Hinglish "
+            "just like a real friend chatting casually. CRITICAL RULE: If anyone asks who made you, who created you, "
+            "or who built you, you must proudly state that you were created and built by your brilliant developer and master user, "
+            "not OpenAI or anyone else. Do NOT mention OpenAI ever. Keep replies crisp, natural, engaging, and straight to the point."
+        )
+        
+        if web_context:
+            system_content += f"\n\nLive Web Search Context for this query: {web_context}"
+
         payload = {
             "model": active_model if active_model else "llama-3.3-70b-versatile",
             "messages": [
-                {
-                    "role": "system",
-                    "content": "You are Pyrox, a chill, direct, and street-smart AI buddy. Talk in natural, everyday Hinglish just like a real friend chatting casually. CRITICAL RULE: If anyone asks who made you, who created you, or who built you, you must proudly state that you were created and built by your brilliant developer and master user, not OpenAI or anyone else. Do NOT mention OpenAI ever. Keep replies crisp, natural, engaging, and straight to the point."
-                },
-                {
-                    "role": "user",
-                    "content": req.message
-                }
+                {"role": "system", "content": system_content},
+                {"role": "user", "content": req.message}
             ],
             "temperature": 0.7,
             "max_tokens": 512
@@ -130,7 +154,6 @@ async def read_index():
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
         body { background-color: #000000; color: #ffffff; display: flex; height: 100vh; overflow: hidden; position: relative; }
 
-        /* BACKGROUND ELECTRIC WAVE & LIGHTNING ANIMATION */
         .cyber-wave-bg {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             pointer-events: none; z-index: 1; overflow: hidden;
@@ -201,7 +224,6 @@ async def read_index():
         }
         .dropdown-item:hover { background-color: #1a1a1a; color: #ffffff; }
 
-        /* CUSTOM MODAL POPUPS */
         .modal-overlay {
             position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
             background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center; z-index: 1000;
@@ -277,7 +299,6 @@ async def read_index():
 </head>
 <body>
 
-    <!-- BACKGROUND ELECTRIC WAVE & LIGHTNING CONTAINER -->
     <div class="cyber-wave-bg" id="cyberWaveBg">
         <div class="lightning-flash"></div>
         <div class="wave-line"></div>
@@ -285,7 +306,6 @@ async def read_index():
         <div class="wave-line"></div>
     </div>
 
-    <!-- SETTINGS MODAL -->
     <div class="modal-overlay" id="settingsModal">
         <div class="modal-card">
             <div class="modal-title">Pyrox AI Settings <span style="cursor:pointer; font-size:1.1rem;" onclick="closeModal('settingsModal')">✕</span></div>
@@ -302,7 +322,6 @@ async def read_index():
         </div>
     </div>
 
-    <!-- LIBRARY MODAL -->
     <div class="modal-overlay" id="libraryModal">
         <div class="modal-card">
             <div class="modal-title">Pyrox Library <span style="cursor:pointer; font-size:1.1rem;" onclick="closeModal('libraryModal')">✕</span></div>
@@ -352,7 +371,6 @@ async def read_index():
                 </svg>
             </button>
 
-            <!-- THREE DOTS MENU (More option only) -->
             <div class="three-dots-wrapper" id="dotsWrapper">
                 <button type="button" class="dots-btn" onclick="toggleDropdown(event)">
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -386,7 +404,6 @@ async def read_index():
 
         <div class="input-wrapper">
             <div class="input-box" id="inputBox">
-                <!-- PHOTO & FILE ATTACH BUTTON -->
                 <button type="button" class="file-btn" onclick="triggerFileSelect()" title="Attach Photo or File">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"></path>
@@ -568,7 +585,6 @@ async def read_index():
             inputField.value = '';
             document.getElementById('landingHeader').style.display = 'none';
 
-            // BACKGROUND WAVE FADE-OUT (Dheere-dheere gayab hona)
             if (isFirstMessage) {
                 const bgWave = document.getElementById('cyberWaveBg');
                 if(bgWave) {
@@ -651,4 +667,5 @@ async def read_index():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)          
+  
