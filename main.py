@@ -107,7 +107,7 @@ async def chat_endpoint(req: ChatRequest):
         system_content = (
             "You are Pyrox, a chill, direct, and street-smart AI buddy. Talk in natural, everyday Hinglish. "
             "CRITICAL FORMATTING RULE: NEVER output long wall-of-text paragraphs. Always format your responses using "
-            "clean bullet points, short sentences, and bold headers so it is easy to read at a glance. "
+            "clean bullet points, short sentences, and bold headers so it is extremely easy to read at a glance. "
             "CRITICAL IDENTITY RULE: If anyone asks who made you, who created you, or who built you, you must proudly "
             "state that you were created and built by your brilliant developer and master user, not OpenAI or anyone else. "
             "Do NOT mention OpenAI ever. Keep replies crisp, structured, engaging, and straight to the point."
@@ -155,7 +155,7 @@ async def read_index():
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
         body { background-color: #000000; color: #ffffff; display: flex; height: 100vh; overflow: hidden; position: relative; }
 
-        /* Background shifted to bottom 75% to protect top logo and navbar */
+        /* Background strictly restricted to bottom 75% to prevent top overlap */
         .cyber-wave-bg {
             position: absolute; top: 25%; left: 0; width: 100%; height: 75%;
             pointer-events: none; z-index: 1; overflow: hidden;
@@ -244,13 +244,19 @@ async def read_index():
             border-radius: 8px; font-weight: 600; cursor: pointer; align-self: flex-end; margin-top: 5px;
         }
 
-        .center-landing-header { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; margin-top: 15px; }
-        .festive-tag { background: linear-gradient(90deg, #ff9900, #ff0055); color: #ffffff; font-size: 0.78rem; font-weight: 700; padding: 4px 12px; border-radius: 20px; letter-spacing: 0.5px; text-transform: uppercase; }
-        .brand-title-box { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
+        /* Clean stacked header design to avoid khichdi */
+        .center-landing-header { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; margin-top: 10px; padding: 0 15px; }
+        .festive-tag { background: linear-gradient(90deg, #ff9900, #ff0055); color: #ffffff; font-size: 0.78rem; font-weight: 700; padding: 5px 14px; border-radius: 20px; letter-spacing: 0.5px; text-transform: uppercase; box-shadow: 0 4px 12px rgba(255, 153, 0, 0.3); }
+        .brand-title-box { display: flex; align-items: center; gap: 12px; margin-top: 2px; }
         .brand-name-large { font-size: 2.3rem; font-weight: 800; color: #ffffff; letter-spacing: -0.5px; }
-        .greeting-subtext { font-size: 1.15rem; font-weight: 500; color: #aaaaaa; }
+        
+        .greeting-box {
+            display: flex; flex-direction: column; gap: 4px; margin-top: 2px;
+        }
+        .greeting-title { font-size: 1.15rem; font-weight: 700; color: #ff9900; }
+        .greeting-subtext { font-size: 0.95rem; font-weight: 400; color: #a1a1aa; }
 
-        .suggestions-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; width: 100%; max-width: 720px; margin-top: 16px; padding: 0 10px; }
+        .suggestions-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; width: 100%; max-width: 720px; margin-top: 14px; padding: 0 10px; }
         .suggestion-card {
             background: #09090b; border: 1px solid #1f1f23; border-radius: 14px; padding: 12px 14px;
             cursor: pointer; text-align: left; transition: all 0.2s; display: flex; flex-direction: column; gap: 4px;
@@ -284,7 +290,7 @@ async def read_index():
         }
         .input-box.recording { border-color: #ff9900; box-shadow: 0 0 20px rgba(255, 153, 0, 0.3); }
 
-        /* High Frequency Sharp Equalizer Spikes ("Kaanto jaisi frequency") */
+        /* Sharp Equalizer Spikes ("Kaanto jaisi frequency") */
         .equalizer-wave-container { display: flex; align-items: center; gap: 3px; height: 26px; width: 140px; display: none; }
         .equalizer-wave-container.active { display: flex; }
         .freq-bar { flex: 1; background: linear-gradient(180deg, #ff9900, #ff0055, #ffffff); border-radius: 1px; height: 15%; animation: spikeMotion 0.4s infinite ease-in-out alternate; }
@@ -426,14 +432,19 @@ async def read_index():
         <div class="center-landing-header" id="landingHeader">
             <span class="festive-tag" id="festiveTag">🪔 Festive Special</span>
             <div class="brand-title-box">
-                <svg width="48" height="48" viewBox="0 0 100 100" fill="none" stroke="#ffffff" stroke-linejoin="round">
+                <svg width="44" height="44" viewBox="0 0 100 100" fill="none" stroke="#ffffff" stroke-linejoin="round">
                     <polygon points="50,5 63,35 95,38 71,60 78,92 50,75 22,92 29,60 5,38 37,35" stroke-width="4.5" opacity="1.0" />
                     <polygon points="50,22 59,42 80,44 64,59 69,80 50,68 31,80 36,59 20,44 41,42" stroke-width="3" opacity="0.6" />
                     <polygon points="50,34 55,47 68,48 58,58 61,71 50,63 39,71 42,58 32,48 45,47" stroke-width="2" opacity="0.3" fill="#ffffff" />
                 </svg>
                 <span class="brand-name-large">Pyrox</span>
             </div>
-            <div class="greeting-subtext" id="greetingUser">🪔 Happy Diwali, Master Creator! Pyrox yahan hai. Batao aaj kya madad karun?</div>
+            
+            <!-- Clean Stacked Greeting Layout -->
+            <div class="greeting-box">
+                <div class="greeting-title">🪔 Happy Diwali, Master Creator!</div>
+                <div class="greeting-subtext">Pyrox yahan hai. Batao aaj kya madad karun?</div>
+            </div>
 
             <!-- Assistant Suggestions Grid -->
             <div class="suggestions-grid">
@@ -475,7 +486,7 @@ async def read_index():
                     </svg>
                 </button>
 
-                <!-- High Frequency Equalizer Bars (16 Spikes) -->
+                <!-- Sharp Equalizer Spikes -->
                 <div class="equalizer-wave-container" id="waveBox">
                     <div class="freq-bar"></div><div class="freq-bar"></div><div class="freq-bar"></div><div class="freq-bar"></div>
                     <div class="freq-bar"></div><div class="freq-bar"></div><div class="freq-bar"></div><div class="freq-bar"></div>
