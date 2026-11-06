@@ -19,31 +19,6 @@ API_KEY = os.environ.get("GROQ_API_KEY", "").strip()
 class ChatRequest(BaseModel):
     message: str
 
-@app.get("/api/check-model")
-async def check_model():
-    """Groq API se live check karega ki is waqt teri key par kaun sa model active hai"""
-    if not API_KEY:
-        return {"active_model": "API Key Missing in Render Environment!"}
-    try:
-        headers = {"Authorization": f"Bearer {API_KEY}"}
-        res = requests.get("https://api.groq.com/openai/v1/models", headers=headers, timeout=5)
-        if res.status_code == 200:
-            models = res.json().get("data", [])
-            # Jo bhi Llama chat model pehle mil jaye, use turant utha lo
-            for m in models:
-                mid = m.get("id", "")
-                if "llama" in mid.lower() and "guard" not in mid.lower() and ("70b" in mid.lower() or "8b" in mid.lower() or "versatile" in mid.lower() or "instant" in mid.lower()):
-                    return {"active_model": mid}
-            for m in models:
-                mid = m.get("id", "")
-                if "llama" in mid.lower() and "guard" not in mid.lower():
-                    return {"active_model": mid}
-    except Exception as e:
-        print("Model fetch error:", e)
-    
-    # Fallback agar API se list na mile toh koi bhi common model
-    return {"active_model": "llama-3.1-8b-instant"}
-
 async def generate_edge_audio(text, filename="static/response.mp3"):
     """Edge-TTS ke zariye Madhur Neural aawaz me audio banayega"""
     try:
@@ -70,14 +45,6 @@ async def generate_edge_audio(text, filename="static/response.mp3"):
 async def chat_endpoint(req: ChatRequest):
     if not API_KEY:
         raise HTTPException(status_code=400, detail="Groq API Key missing in environment variables!")
-    
-    # Live check karega ki abhi kaun sa model chal raha hai
-    model_data = await check_model()
-    active_model = model_data.get("active_model", "llama-3.1-8b-instant")
-    
-    # Agar galti se koi decommissioned model aa jaye toh use bypass karo
-    if "3.1-70b" in active_model.lower():
-        active_model = "llama-3.1-8b-instant"
 
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {
@@ -85,8 +52,9 @@ async def chat_endpoint(req: ChatRequest):
         "Content-Type": "application/json"
     }
     
+    # Yahan hum Groq ka sabse stable aur current active model use kar rahe hain
     payload = {
-        "model": active_model,
+        "model": "llama-3.3-70b-versatile",
         "messages": [
             {
                 "role": "system",
