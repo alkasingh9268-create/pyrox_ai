@@ -19,6 +19,7 @@ SERP_API_KEY = os.environ.get("SERPAPI_API_KEY", "").strip()
 class ChatRequest(BaseModel):
     message: str
     voice: str = "hi-IN-MadhurNeural"
+    user_name: str = "Master Creator"
 
 def get_live_groq_model():
     if not API_KEY:
@@ -82,7 +83,7 @@ async def generate_edge_audio(text, voice_name="hi-IN-MadhurNeural", filename="s
         clean_t = clean_t.replace("*", "").replace("#", "").replace("`", "").replace("~", "")
         clean_t = clean_t.replace("Gen-Z", "मॉडर्न जनरेशन").replace("gen-z", "मॉडर्न जनरेशन")
 
-        communicate = edge_tts.Communicate(clean_t, voice_name, rate="+30%")
+        communicate = edge_tts.Communicate(clean_t, voice_name, rate="+25%")
         await communicate.save(filename)
         return True
     except Exception as e:
@@ -95,9 +96,7 @@ async def chat_endpoint(req: ChatRequest):
         return JSONResponse(status_code=400, content={"detail": "Groq API Key missing in environment variables!"})
     
     try:
-        # Live web search fetch karna agar zaroorat ho
         web_context = search_live_web(req.message)
-        
         active_model, _ = get_live_groq_model()
         url = "https://api.groq.com/openai/v1/chat/completions"
         headers = {
@@ -106,10 +105,12 @@ async def chat_endpoint(req: ChatRequest):
         }
         
         system_content = (
-            "You are Pyrox, a chill, direct, and street-smart AI buddy. Talk in natural, everyday Hinglish "
-            "just like a real friend chatting casually. CRITICAL RULE: If anyone asks who made you, who created you, "
-            "or who built you, you must proudly state that you were created and built by your brilliant developer and master user, "
-            "not OpenAI or anyone else. Do NOT mention OpenAI ever. Keep replies crisp, natural, engaging, and straight to the point."
+            "You are Pyrox, a chill, direct, and street-smart AI buddy. Talk in natural, everyday Hinglish. "
+            "CRITICAL FORMATTING RULE: NEVER output long wall-of-text paragraphs. Always format your responses using "
+            "clean bullet points, short sentences, and bold headers so it is easy to read at a glance. "
+            "CRITICAL IDENTITY RULE: If anyone asks who made you, who created you, or who built you, you must proudly "
+            "state that you were created and built by your brilliant developer and master user, not OpenAI or anyone else. "
+            "Do NOT mention OpenAI ever. Keep replies crisp, structured, engaging, and straight to the point."
         )
         
         if web_context:
@@ -154,21 +155,22 @@ async def read_index():
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
         body { background-color: #000000; color: #ffffff; display: flex; height: 100vh; overflow: hidden; position: relative; }
 
+        /* Background shifted to bottom 75% */
         .cyber-wave-bg {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            position: absolute; top: 25%; left: 0; width: 100%; height: 75%;
             pointer-events: none; z-index: 1; overflow: hidden;
             transition: opacity 1.5s ease-in-out; opacity: 1;
         }
         .cyber-wave-bg.fade-out { opacity: 0; }
         
         .wave-line {
-            position: absolute; width: 200%; height: 100px; opacity: 0.15;
-            background: linear-gradient(90deg, transparent, #3b82f6, #8b5cf6, #fff, #3b82f6, transparent);
+            position: absolute; width: 200%; height: 90px; opacity: 0.18;
+            background: linear-gradient(90deg, transparent, #ff9900, #ff0055, #3b82f6, #ff9900, transparent);
             animation: waveMove 6s infinite linear;
         }
-        .wave-line:nth-child(1) { top: 20%; animation-duration: 5s; filter: drop-shadow(0 0 10px #3b82f6); }
-        .wave-line:nth-child(2) { top: 50%; animation-duration: 8s; opacity: 0.1; filter: drop-shadow(0 0 15px #8b5cf6); }
-        .wave-line:nth-child(3) { top: 75%; animation-duration: 6s; opacity: 0.08; }
+        .wave-line:nth-child(1) { top: 20%; animation-duration: 5s; filter: drop-shadow(0 0 12px #ff9900); }
+        .wave-line:nth-child(2) { top: 55%; animation-duration: 8s; opacity: 0.12; filter: drop-shadow(0 0 15px #ff0055); }
+        .wave-line:nth-child(3) { top: 80%; animation-duration: 6s; opacity: 0.10; }
 
         @keyframes waveMove {
             0% { transform: translateX(-50%) translateY(0) rotate(0deg); }
@@ -176,15 +178,12 @@ async def read_index():
             100% { transform: translateX(-50%) translateY(0) rotate(0deg); }
         }
 
-        .lightning-flash {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: radial-gradient(circle, rgba(59,130,246,0.15) 0%, transparent 70%);
-            opacity: 0; animation: lightningPulse 4s infinite;
+        .festive-sparkles {
+            position: absolute; top: 25%; left: 0; width: 100%; height: 75%;
+            background: radial-gradient(circle, rgba(255, 153, 0, 0.12) 0%, transparent 65%);
+            opacity: 0.8; animation: festivePulse 4s infinite alternate; pointer-events: none;
         }
-        @keyframes lightningPulse {
-            0%, 90%, 95% { opacity: 0; }
-            92%, 97% { opacity: 1; }
-        }
+        @keyframes festivePulse { 0% { opacity: 0.3; } 100% { opacity: 0.9; } }
 
         .sidebar {
             width: 0px; background-color: #050505; border-right: none;
@@ -192,30 +191,30 @@ async def read_index():
             padding: 0px; z-index: 20; overflow: hidden;
             transition: width 0.3s ease, padding 0.3s ease, border-right 0.3s ease;
         }
-        .sidebar.expanded { width: 230px; padding: 12px 10px; border-right: 1px solid #141414; }
-        .sidebar-logo-header { display: flex; align-items: center; gap: 12px; padding: 6px 6px; margin-bottom: 12px; }
+        .sidebar.expanded { width: 240px; padding: 14px 12px; border-right: 1px solid #181818; }
+        .sidebar-logo-header { display: flex; align-items: center; gap: 12px; padding: 6px; margin-bottom: 14px; }
         .sidebar-brand-name { font-size: 1.15rem; font-weight: 700; color: #ffffff; letter-spacing: 0.5px; }
-        .menu-list { display: flex; flex-direction: column; gap: 4px; }
+        .menu-list { display: flex; flex-direction: column; gap: 6px; }
         .menu-btn {
-            display: flex; align-items: center; gap: 12px; padding: 9px 10px;
-            color: #aaaaaa; font-size: 13.5px; border-radius: 8px; cursor: pointer;
+            display: flex; align-items: center; gap: 12px; padding: 10px 12px;
+            color: #bbbbbb; font-size: 13.5px; border-radius: 8px; cursor: pointer;
             transition: background 0.2s, color 0.2s; white-space: nowrap;
         }
         .menu-btn:hover { background-color: #141414; color: #ffffff; }
         .menu-btn svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; flex-shrink: 0; }
-        .sidebar-bottom { border-top: 1px solid #141414; padding-top: 8px; }
+        .sidebar-bottom { border-top: 1px solid #141414; padding-top: 10px; }
 
         .main-container { flex: 1; display: flex; flex-direction: column; justify-content: space-between; align-items: center; height: 100vh; padding-top: 4px; padding-bottom: 8px; position: relative; z-index: 5; }
         
-        .top-navbar { width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 6px 20px; position: relative; z-index: 10; }
+        .top-navbar { width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 10px 20px; position: relative; z-index: 10; }
         .hamburger-btn, .dots-btn { background: transparent; border: none; color: #aaaaaa; cursor: pointer; padding: 6px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: color 0.2s, background 0.2s; }
         .hamburger-btn:hover, .dots-btn:hover { color: #ffffff; background-color: #1a1a1a; }
         
         .three-dots-wrapper { position: relative; }
         .dropdown-menu {
-            position: absolute; top: 38px; right: 0; width: 200px;
+            position: absolute; top: 40px; right: 0; width: 210px;
             background-color: #111111; border: 1px solid #222222; border-radius: 12px;
-            padding: 6px 0; display: none; flex-direction: column; box-shadow: 0 10px 25px rgba(0,0,0,0.7); z-index: 100;
+            padding: 6px 0; display: none; flex-direction: column; box-shadow: 0 10px 25px rgba(0,0,0,0.8); z-index: 100;
         }
         .dropdown-menu.show { display: flex; }
         .dropdown-item {
@@ -226,12 +225,12 @@ async def read_index():
 
         .modal-overlay {
             position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-            background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center; z-index: 1000;
+            background: rgba(0,0,0,0.75); display: none; align-items: center; justify-content: center; z-index: 1000;
         }
         .modal-card {
             background: #121212; border: 1px solid #2a2a2a; border-radius: 16px;
-            width: 90%; max-width: 400px; padding: 24px; display: flex; flex-direction: column; gap: 16px;
-            box-shadow: 0 15px 35px rgba(0,0,0,0.8);
+            width: 90%; max-width: 420px; padding: 24px; display: flex; flex-direction: column; gap: 16px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.9);
         }
         .modal-title { font-size: 1.1rem; font-weight: 700; color: #fff; display: flex; align-items: center; justify-content: space-between; }
         .modal-body { font-size: 0.9rem; color: #aaa; display: flex; flex-direction: column; gap: 10px; }
@@ -245,23 +244,37 @@ async def read_index():
             border-radius: 8px; font-weight: 600; cursor: pointer; align-self: flex-end; margin-top: 5px;
         }
 
-        .center-landing-header { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; margin-top: 15px; }
-        .brand-title-box { display: flex; align-items: center; gap: 12px; }
-        .brand-name-large { font-size: 2.2rem; font-weight: 800; color: #ffffff; letter-spacing: -0.5px; }
-        .greeting-subtext { font-size: 1.15rem; font-weight: 500; color: #888888; }
+        .center-landing-header { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; margin-top: 15px; }
+        .festive-tag { background: linear-gradient(90deg, #ff9900, #ff0055); color: #ffffff; font-size: 0.78rem; font-weight: 700; padding: 4px 12px; border-radius: 20px; letter-spacing: 0.5px; text-transform: uppercase; }
+        .brand-title-box { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
+        .brand-name-large { font-size: 2.3rem; font-weight: 800; color: #ffffff; letter-spacing: -0.5px; }
+        .greeting-subtext { font-size: 1.15rem; font-weight: 500; color: #aaaaaa; }
+
+        .suggestions-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; width: 100%; max-width: 720px; margin-top: 16px; padding: 0 10px; }
+        .suggestion-card {
+            background: #09090b; border: 1px solid #1f1f23; border-radius: 14px; padding: 12px 14px;
+            cursor: pointer; text-align: left; transition: all 0.2s; display: flex; flex-direction: column; gap: 4px;
+        }
+        .suggestion-card:hover { background: #141418; border-color: #ff9900; transform: translateY(-2px); }
+        .card-title { font-size: 0.88rem; font-weight: 600; color: #ffffff; }
+        .card-desc { font-size: 0.78rem; color: #71717a; }
 
         .chat-container { width: 100%; max-width: 800px; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; padding: 10px 15px; margin-top: 5px; }
-        .message { display: flex; flex-direction: column; max-width: 82%; line-height: 1.5; font-size: 0.95rem; gap: 8px; }
+        .message { display: flex; flex-direction: column; max-width: 85%; line-height: 1.6; font-size: 0.95rem; gap: 8px; }
         .user-message { align-self: flex-end; background-color: #1c1c1e; color: #ffffff; padding: 10px 16px; border-radius: 16px 16px 4px 16px; border: 1px solid #2d2d2d; }
-        .ai-message { align-self: flex-start; background-color: #080808; color: #f0f0f0; padding: 14px 18px; border-radius: 16px 16px 16px 4px; border: 1px solid #1a1a1a; display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 100%; }
+        .ai-message { align-self: flex-start; background-color: #080808; color: #f0f0f0; padding: 14px 18px; border-radius: 16px 16px 16px 4px; border: 1px solid #1a1a1a; width: 100%; max-width: 100%; }
         
-        .audio-player-box { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+        .ai-message ul, .ai-message ol { padding-left: 20px; margin: 6px 0; }
+        .ai-message li { margin-bottom: 4px; }
+        .ai-message p { margin-bottom: 6px; }
+
+        .audio-player-box { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
         .play-audio-btn {
             background: #222; border: 1px solid #444; color: #fff; padding: 6px 14px;
             border-radius: 20px; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 6px;
             transition: 0.2s;
         }
-        .play-audio-btn:hover { background: #333; border-color: #666; }
+        .play-audio-btn:hover { background: #333; border-color: #ff9900; }
 
         .input-wrapper { width: 100%; max-width: 800px; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 0 15px; }
         .input-box {
@@ -269,24 +282,37 @@ async def read_index():
             border-radius: 26px; padding: 8px 16px; display: flex; align-items: center; gap: 10px; position: relative;
             transition: border-color 0.3s, box-shadow 0.3s;
         }
-        .input-box.recording { border-color: #ef4444; box-shadow: 0 0 15px rgba(239, 68, 68, 0.25); }
+        .input-box.recording { border-color: #ff9900; box-shadow: 0 0 20px rgba(255, 153, 0, 0.3); }
 
-        .gemini-wave-container { display: flex; align-items: center; gap: 3.5px; height: 20px; width: 100px; display: none; }
-        .gemini-wave-container.active { display: flex; }
-        .wave-bar { flex: 1; background: linear-gradient(180deg, #888, #fff); border-radius: 3px; height: 20%; animation: waveMotion 0.6s infinite ease-in-out alternate; }
-        .wave-bar:nth-child(1) { animation-delay: 0.1s; }
-        .wave-bar:nth-child(2) { animation-delay: 0.3s; }
-        .wave-bar:nth-child(3) { animation-delay: 0.2s; }
-        .wave-bar:nth-child(4) { animation-delay: 0.5s; }
-        .wave-bar:nth-child(5) { animation-delay: 0.15s; }
-        @keyframes waveMotion { 0% { height: 15%; } 100% { height: 100%; } }
+        /* High Frequency Sharp Equalizer Spikes */
+        .equalizer-wave-container { display: flex; align-items: center; gap: 3px; height: 26px; width: 140px; display: none; }
+        .equalizer-wave-container.active { display: flex; }
+        .freq-bar { flex: 1; background: linear-gradient(180deg, #ff9900, #ff0055, #ffffff); border-radius: 1px; height: 15%; animation: spikeMotion 0.4s infinite ease-in-out alternate; }
+        .freq-bar:nth-child(1) { animation-delay: 0.05s; }
+        .freq-bar:nth-child(2) { animation-delay: 0.15s; }
+        .freq-bar:nth-child(3) { animation-delay: 0.25s; }
+        .freq-bar:nth-child(4) { animation-delay: 0.1s; }
+        .freq-bar:nth-child(5) { animation-delay: 0.35s; }
+        .freq-bar:nth-child(6) { animation-delay: 0.2s; }
+        .freq-bar:nth-child(7) { animation-delay: 0.3s; }
+        .freq-bar:nth-child(8) { animation-delay: 0.08s; }
+        .freq-bar:nth-child(9) { animation-delay: 0.22s; }
+        .freq-bar:nth-child(10) { animation-delay: 0.18s; }
+        .freq-bar:nth-child(11) { animation-delay: 0.32s; }
+        .freq-bar:nth-child(12) { animation-delay: 0.12s; }
+        .freq-bar:nth-child(13) { animation-delay: 0.28s; }
+        .freq-bar:nth-child(14) { animation-delay: 0.06s; }
+        .freq-bar:nth-child(15) { animation-delay: 0.24s; }
+        .freq-bar:nth-child(16) { animation-delay: 0.16s; }
+
+        @keyframes spikeMotion { 0% { height: 10%; } 100% { height: 100%; } }
 
         .chat-input-field { flex: 1; background: transparent; border: none; outline: none; color: #ffffff; font-size: 0.95rem; padding: 4px 0; }
         .chat-input-field::placeholder { color: #555555; }
 
         .mic-btn, .file-btn { background: transparent; border: none; color: #aaaaaa; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: color 0.2s, transform 0.2s; }
         .mic-btn:hover, .file-btn:hover { color: #ffffff; transform: scale(1.1); }
-        .mic-btn.active { color: #ef4444; }
+        .mic-btn.active { color: #ff9900; }
 
         .arrow-submit-btn {
             width: 32px; height: 32px; background-color: #ffffff; color: #000000;
@@ -300,38 +326,46 @@ async def read_index():
 <body>
 
     <div class="cyber-wave-bg" id="cyberWaveBg">
-        <div class="lightning-flash"></div>
+        <div class="festive-sparkles"></div>
         <div class="wave-line"></div>
         <div class="wave-line"></div>
         <div class="wave-line"></div>
     </div>
 
+    <!-- Settings Modal -->
     <div class="modal-overlay" id="settingsModal">
         <div class="modal-card">
-            <div class="modal-title">Pyrox AI Settings <span style="cursor:pointer; font-size:1.1rem;" onclick="closeModal('settingsModal')">✕</span></div>
+            <div class="modal-title">Pyrox Studio Settings <span style="cursor:pointer; font-size:1.1rem;" onclick="closeModal('settingsModal')">✕</span></div>
             <div class="modal-body">
-                <p style="font-size: 0.85rem; color:#888;">Voice Assistant Performance:</p>
-                <button class="voice-option-btn" onclick="setVoice('hi-IN-MadhurNeural', 'Madhur (Female)')">👩 Madhur (Female - Smooth & Expressive)</button>
-                <button class="voice-option-btn" onclick="setVoice('hi-IN-PrabhatNeural', 'Prabhat (Male)')">👨 Prabhat (Male - Deep & Bold)</button>
+                <p style="font-size: 0.85rem; color:#888;">Select Preferred Voice Assistant:</p>
+                <button class="voice-option-btn" onclick="setVoice('hi-IN-MadhurNeural', 'Madhur (Female)')">👩 Madhur (Female - Natural Expressive)</button>
+                <button class="voice-option-btn" onclick="setVoice('hi-IN-PrabhatNeural', 'Prabhat (Male)')">👨 Prabhat (Male - Deep Professional)</button>
+                
+                <p style="font-size: 0.85rem; color:#888; margin-top:10px;">Active Theme:</p>
+                <button class="voice-option-btn" onclick="alert('🪔 Diwali Glow Theme Enabled!')">🪔 Festive Glow (Active)</button>
+                <button class="voice-option-btn" onclick="alert('⚡ Cyber Classic Enabled!')">⚡ Cyber Classic Dark</button>
+
                 <div style="margin-top: 10px; padding-top: 12px; border-top: 1px solid #222; display: flex; justify-content: space-between; align-items: center;">
-                    <span style="font-size: 0.85rem; color:#aaa;">Pro Plan</span>
-                    <button style="background: linear-gradient(135deg, #3b82f6, #8b5cf6); color:#fff; border:none; padding:6px 12px; border-radius:6px; font-weight:600; cursor:pointer; font-size:0.8rem;" onclick="alert('⚡ Pyrox Pro features unlocked!')">✨ Upgrade</button>
+                    <span style="font-size: 0.85rem; color:#aaa;">Active Engine</span>
+                    <span style="font-size: 0.8rem; color:#ff9900; font-weight:600;">Llama-3.3 70B Versatile</span>
                 </div>
             </div>
             <button class="modal-close-btn" onclick="closeModal('settingsModal')">Done</button>
         </div>
     </div>
 
+    <!-- Library Modal -->
     <div class="modal-overlay" id="libraryModal">
         <div class="modal-card">
             <div class="modal-title">Pyrox Library <span style="cursor:pointer; font-size:1.1rem;" onclick="closeModal('libraryModal')">✕</span></div>
             <div class="modal-body">
-                <p style="color: #666; font-size: 0.85rem; text-align: center; padding: 20px 0;">No saved chats or bookmarks yet!</p>
+                <p style="color: #666; font-size: 0.85rem; text-align: center; padding: 15px 0;">Your saved chats, code snippets, and prompts will appear here.</p>
             </div>
             <button class="modal-close-btn" onclick="closeModal('libraryModal')">Close</button>
         </div>
     </div>
 
+    <!-- Sidebar -->
     <div class="sidebar" id="sidebar">
         <div>
             <div class="sidebar-logo-header">
@@ -361,6 +395,7 @@ async def read_index():
         </div>
     </div>
 
+    <!-- Main Container -->
     <div class="main-container" id="mainContainer">
         <div class="top-navbar">
             <button type="button" class="hamburger-btn" onclick="toggleSidebar(event)">
@@ -389,15 +424,36 @@ async def read_index():
         </div>
 
         <div class="center-landing-header" id="landingHeader">
+            <span class="festive-tag" id="festiveTag">🪔 Festive Special</span>
             <div class="brand-title-box">
-                <svg width="52" height="52" viewBox="0 0 100 100" fill="none" stroke="#ffffff" stroke-linejoin="round">
+                <svg width="48" height="48" viewBox="0 0 100 100" fill="none" stroke="#ffffff" stroke-linejoin="round">
                     <polygon points="50,5 63,35 95,38 71,60 78,92 50,75 22,92 29,60 5,38 37,35" stroke-width="4.5" opacity="1.0" />
                     <polygon points="50,22 59,42 80,44 64,59 69,80 50,68 31,80 36,59 20,44 41,42" stroke-width="3" opacity="0.6" />
                     <polygon points="50,34 55,47 68,48 58,58 61,71 50,63 39,71 42,58 32,48 45,47" stroke-width="2" opacity="0.3" fill="#ffffff" />
                 </svg>
                 <span class="brand-name-large">Pyrox</span>
             </div>
-            <div class="greeting-subtext">Hi, how can I help you today?</div>
+            <div class="greeting-subtext" id="greetingUser">🪔 Happy Diwali, Master Creator! Pyrox yahan hai. Batao aaj kya madad karun?</div>
+
+            <!-- Assistant Suggestions Grid -->
+            <div class="suggestions-grid">
+                <div class="suggestion-card" onclick="selectSuggestion('Schedule and weekly routine banana hai mujhe, meri help karo.')">
+                    <span class="card-title">📅 Schedule & Routine</span>
+                    <span class="card-desc">Weekly time-table & productivity planner</span>
+                </div>
+                <div class="suggestion-card" onclick="selectSuggestion('Ek healthy aur tasty daily meal plan ready karke do.')">
+                    <span class="card-title">🍳 Meal Planner</span>
+                    <span class="card-desc">Personalized daily food & diet strategy</span>
+                </div>
+                <div class="suggestion-card" onclick="selectSuggestion('Mujhe coding aur studies ke liye fast revision plan chahiye.')">
+                    <span class="card-title">📝 Study & Revision Strategy</span>
+                    <span class="card-desc">Smart exam & project preparation guide</span>
+                </div>
+                <div class="suggestion-card" onclick="selectSuggestion('Viral YouTube & Social Media Content Ideas batao.')">
+                    <span class="card-title">💡 Creative Content Ideas</span>
+                    <span class="card-desc">Trending script & video concepts</span>
+                </div>
+            </div>
         </div>
 
         <div class="chat-container" id="chatContainer"></div>
@@ -419,8 +475,12 @@ async def read_index():
                     </svg>
                 </button>
 
-                <div class="gemini-wave-container" id="waveBox">
-                    <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+                <!-- High Frequency Equalizer Bars (16 Spikes) -->
+                <div class="equalizer-wave-container" id="waveBox">
+                    <div class="freq-bar"></div><div class="freq-bar"></div><div class="freq-bar"></div><div class="freq-bar"></div>
+                    <div class="freq-bar"></div><div class="freq-bar"></div><div class="freq-bar"></div><div class="freq-bar"></div>
+                    <div class="freq-bar"></div><div class="freq-bar"></div><div class="freq-bar"></div><div class="freq-bar"></div>
+                    <div class="freq-bar"></div><div class="freq-bar"></div><div class="freq-bar"></div><div class="freq-bar"></div>
                 </div>
 
                 <input type="text" id="chatInput" class="chat-input-field" placeholder="Ask Pyrox anything..." onkeypress="if(event.key==='Enter'){ event.preventDefault(); triggerSend(); }" />
@@ -432,7 +492,7 @@ async def read_index():
                     </svg>
                 </button>
             </div>
-            <div class="footer-disclaimer">Pyrox is AI and can make mistakes</div>
+            <div class="footer-disclaimer">Pyrox AI • Built for Master Creator</div>
         </div>
     </div>
 
@@ -441,6 +501,7 @@ async def read_index():
         let recognition = null;
         let accumulatedSpeech = "";
         let currentVoice = localStorage.getItem('pyrox_voice') || 'hi-IN-MadhurNeural';
+        let currentUserName = localStorage.getItem('pyrox_user') || 'Master Creator';
         let isFirstMessage = true;
 
         function toggleSidebar(e) {
@@ -484,6 +545,12 @@ async def read_index():
             }
         }
 
+        function selectSuggestion(promptText) {
+            const inputField = document.getElementById('chatInput');
+            inputField.value = promptText;
+            triggerSend();
+        }
+
         window.onclick = function(event) {
             const sb = document.getElementById('sidebar');
             const menu = document.getElementById('dropdownMenu');
@@ -506,6 +573,32 @@ async def read_index():
             a.href = URL.createObjectURL(blob);
             a.download = 'Pyrox_Chat.txt';
             a.click();
+        }
+
+        function clearChat() {
+            document.getElementById('chatContainer').innerHTML = '';
+            document.getElementById('landingHeader').style.display = 'flex';
+            isFirstMessage = true;
+            const bgWave = document.getElementById('cyberWaveBg');
+            if(bgWave) {
+                bgWave.style.display = 'block';
+                bgWave.classList.remove('fade-out');
+            }
+        }
+
+        function appendMsg(sender, text) {
+            const container = document.getElementById('chatContainer');
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `message ${sender === 'user' ? 'user-message' : 'ai-message'}`;
+            msgDiv.innerHTML = text;
+            container.appendChild(msgDiv);
+            container.scrollTop = container.scrollHeight;
+            return msgDiv;
+        }
+
+        function playAudio(audioId) {
+            const audioEle = document.getElementById(audioId);
+            if(audioEle) audioEle.play();
         }
 
         function toggleVoice(e) {
@@ -540,7 +633,7 @@ async def read_index():
                 micBtn.classList.add('active');
                 inputBox.classList.add('recording');
                 waveBox.classList.add('active');
-                inputField.placeholder = "Listening continuously...";
+                inputField.placeholder = "Listening live audio frequency...";
                 micSvg.innerHTML = `<rect x="6" y="4" width="4" height="16" fill="currentColor"/><rect x="14" y="4" width="4" height="16" fill="currentColor"/>`;
             };
 
@@ -595,13 +688,13 @@ async def read_index():
             }
 
             appendMsg('user', text);
-            const aiDiv = appendMsg('ai', '⚡ Pyrox सोच रहा है...');
+            const aiDiv = appendMsg('ai', '⚡ Pyrox soch raha hai...');
 
             try {
                 const response = await fetch('/api/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: text, voice: currentVoice })
+                    body: JSON.stringify({ message: text, voice: currentVoice, user_name: currentUserName })
                 });
 
                 if(!response.ok) {
@@ -619,53 +712,21 @@ async def read_index():
                             <button class="play-audio-btn" onclick="playAudio('${uniqueAudioId}')">
                                 🔊 Play Audio
                             </button>
-                            <audio id="${uniqueAudioId}" style="display:none;"><source src="${data.audio_url}?t=${new Date().getTime()}" type="audio/mp3"></audio>
+                            <audio id="${uniqueAudioId}" src="${data.audio_url}"></audio>
                         </div>
                     `;
                 }
                 aiDiv.innerHTML = htmlContent;
-            } catch(e) {
-                aiDiv.innerText = "⚠️ Network Exception: " + e.message;
-            }
-        }
-
-        function playAudio(audioId) {
-            document.querySelectorAll('audio').forEach(aud => {
-                aud.pause();
-                aud.currentTime = 0;
-            });
-            const audioEl = document.getElementById(audioId);
-            if(audioEl) {
-                audioEl.play();
-            }
-        }
-
-        function appendMsg(role, content) {
-            const container = document.getElementById('chatContainer');
-            const div = document.createElement('div');
-            div.className = 'message ' + (role === 'user' ? 'user-message' : 'ai-message');
-            div.innerText = content;
-            container.appendChild(div);
-            container.scrollTop = container.scrollHeight;
-            return div;
-        }
-
-        function clearChat() {
-            document.getElementById('chatContainer').innerHTML = '';
-            document.getElementById('landingHeader').style.display = 'flex';
-            isFirstMessage = true;
-            const bgWave = document.getElementById('cyberWaveBg');
-            if(bgWave) {
-                bgWave.style.display = 'block';
-                bgWave.classList.remove('fade-out');
+            } catch (err) {
+                aiDiv.innerText = "⚠️ Server Connection Failed!";
             }
         }
     </script>
 </body>
-</html>"""
-    return HTMLResponse(content=html_content, status_code=200)
+</html>
+"""
+    return HTMLResponse(content=html_content)
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)          
-  
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
