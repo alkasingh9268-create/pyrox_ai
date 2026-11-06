@@ -372,55 +372,57 @@ async def read_index():
     </div>
 
     <script>
-        let isListening = false;
-        let recognition = null;
-        let accumulatedSpeech = "";
-        let isPinned = false;
+        window.isListening = false;
+        window.recognition = null;
+        window.accumulatedSpeech = "";
+        window.isPinned = false;
 
-        function toggleSidebar() { 
-            document.getElementById('sidebar').classList.toggle('expanded'); 
-        }
+        window.toggleSidebar = function() { 
+            const sb = document.getElementById('sidebar');
+            if(sb) sb.classList.toggle('expanded'); 
+        };
 
-        function toggleDropdown() { 
+        window.toggleDropdown = function() { 
             const menu = document.getElementById('dropdownMenu');
             if(menu) menu.classList.toggle('show'); 
-        }
+        };
 
         window.onclick = function(event) {
             if (!event.target.closest('.three-dots-wrapper')) {
                 const m = document.getElementById('dropdownMenu');
                 if(m) m.classList.remove('show');
             }
-        }
+        };
 
-        function loginWithGmail() {
-            toggleDropdown();
+        window.loginWithGmail = function() {
+            window.toggleDropdown();
             let email = prompt("Enter your Gmail address to log in:");
             if(email && email.includes("@")) { 
                 alert("✅ Welcome " + email + "! Logged in successfully to Pyrox."); 
             } else if(email) {
                 alert("⚠️ Please enter a valid Gmail address!");
             }
-        }
+        };
 
-        function shareConversation() {
-            toggleDropdown();
+        window.shareConversation = function() {
+            window.toggleDropdown();
             navigator.clipboard.writeText(window.location.href);
             alert("🔗 Conversation link copied to clipboard successfully!");
-        }
+        };
 
-        function toggleSearchOverlay() {
-            toggleDropdown();
+        window.toggleSearchOverlay = function() {
+            window.toggleDropdown();
             const overlay = document.getElementById('searchOverlay');
             if (overlay) {
                 overlay.style.display = (overlay.style.display === 'flex') ? 'none' : 'flex';
                 if(overlay.style.display === 'flex') {
-                    document.getElementById('searchInput').focus();
+                    const input = document.getElementById('searchInput');
+                    if(input) input.focus();
                 }
             }
-        }
+        };
 
-        function filterChatMessages(query) {
+        window.filterChatMessages = function(query) {
             const msgs = document.querySelectorAll('.message');
             const lowerQuery = query.toLowerCase();
             msgs.forEach(m => {
@@ -430,17 +432,18 @@ async def read_index():
                     m.style.display = 'none';
                 }
             });
-        }
+        };
 
-        function pinChatToggle() {
-            toggleDropdown();
-            isPinned = !isPinned;
-            document.getElementById('pinText').innerText = isPinned ? "Unpin Chat" : "Pin Chat";
-            alert(isPinned ? "📌 Chat pinned to the top!" : "📌 Chat unpinned!");
-        }
+        window.pinChatToggle = function() {
+            window.toggleDropdown();
+            window.isPinned = !window.isPinned;
+            const pt = document.getElementById('pinText');
+            if(pt) pt.innerText = window.isPinned ? "Unpin Chat" : "Pin Chat";
+            alert(window.isPinned ? "📌 Chat pinned to the top!" : "📌 Chat unpinned!");
+        };
 
-        function exportChatPDF() {
-            toggleDropdown();
+        window.exportChatPDF = function() {
+            window.toggleDropdown();
             const msgs = document.querySelectorAll('.message');
             if(msgs.length === 0) { 
                 alert("Nothing to export yet!"); 
@@ -454,175 +457,41 @@ async def read_index():
             anchor.download = 'Pyrox_Chat_Export.txt';
             anchor.click();
             alert("📄 Chat text exported successfully!");
-        }
+        };
 
-        function clearChat() {
-            toggleDropdown();
+        window.clearChat = function() {
+            window.toggleDropdown();
             if(confirm("Are you sure you want to clear this chat?")) {
-                document.getElementById('chatContainer').innerHTML = '';
-                document.getElementById('landingHeader').style.display = 'flex';
+                const container = document.getElementById('chatContainer');
+                if(container) container.innerHTML = '';
+                const landing = document.getElementById('landingHeader');
+                if(landing) landing.style.display = 'flex';
             }
-        }
+        };
 
-        function openLibrary() {
+        window.openLibrary = function() {
             alert("📚 Library: Your saved discussions, notes, and history will appear here!");
-        }
+        };
 
-        function openSettings() {
+        window.openSettings = function() {
             alert("⚙️ Settings: Theme, Audio preferences, and account configurations.");
-        }
+        };
 
-        function triggerFileAttach() { 
-            document.getElementById('hiddenFileInput').click(); 
-        }
+        window.triggerFileAttach = function() { 
+            const fileInput = document.getElementById('hiddenFileInput');
+            if(fileInput) fileInput.click(); 
+        };
 
-        function handleFileSelect(event) {
+        window.handleFileSelect = function(event) {
             const file = event.target.files[0];
             if(file) {
                 alert("📎 Attached file successfully: " + file.name);
                 const inputField = document.getElementById('chatInput');
-                inputField.value = "[Attached: " + file.name + "] " + inputField.value;
+                if(inputField) inputField.value = "[Attached: " + file.name + "] " + inputField.value;
             }
-        }
+        };
 
-        function openStudentSetup() {
+        window.openStudentSetup = function() {
             let goal = prompt("आप किस परीक्षा या कक्षा की तैयारी कर रहे हैं? (जैसे: NEET, JEE, School, College)");
             if(!goal) return;
-            let standard = prompt("आपकी कक्षा या वर्ष कौन सा है? (जैसे: Class 9, Class 11, B.Tech)");
-            if(!standard) return;
-            alert("बहुत बढ़िया! " + standard + " (" + goal + ") के लिए आपका स्टडी रूटीन सेट कर दिया गया है।");
-        }
-
-        function toggleVoice(e) {
-            if(e) e.preventDefault();
-            const micBtn = document.getElementById('micBtn');
-            const micSvg = document.getElementById('micIconSvg');
-            const inputBox = document.getElementById('inputBox');
-            const waveBox = document.getElementById('waveBox');
-            const inputField = document.getElementById('chatInput');
-
-            if (isListening) {
-                if (recognition) recognition.stop();
-                stopVoiceUI();
-                return;
-            }
-
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (!SpeechRecognition) { 
-                alert("Speech recognition is not supported in this browser."); 
-                return; 
-            }
-
-            recognition = new SpeechRecognition();
-            recognition.lang = 'hi-IN';
-            recognition.continuous = true;
-            recognition.interimResults = true;
-
-            accumulatedSpeech = inputField.value ? inputField.value + " " : "";
-
-            recognition.onstart = function() {
-                isListening = true;
-                micBtn.classList.add('active');
-                inputBox.classList.add('recording');
-                waveBox.classList.add('active');
-                inputField.placeholder = "Listening continuously...";
-                micSvg.innerHTML = `<rect x="6" y="4" width="4" height="16" fill="currentColor"/><rect x="14" y="4" width="4" height="16" fill="currentColor"/>`;
-            };
-
-            recognition.onresult = function(event) {
-                let interim = '';
-                for (let i = event.resultIndex; i < event.results.length; ++i) {
-                    if (event.results[i].isFinal) {
-                        accumulatedSpeech += event.results[i][0].transcript + " ";
-                    } else {
-                        interim += event.results[i][0].transcript;
-                    }
-                }
-                inputField.value = accumulatedSpeech + interim;
-            };
-
-            recognition.onend = function() {
-                if (isListening) { try { recognition.start(); } catch(e) {} }
-            };
-
-            try { recognition.start(); } catch(e) {}
-        }
-
-        function stopVoiceUI() {
-            isListening = false;
-            const micBtn = document.getElementById('micBtn');
-            const micSvg = document.getElementById('micIconSvg');
-            if(micBtn) micBtn.classList.remove('active');
-            const inputBox = document.getElementById('inputBox');
-            if(inputBox) inputBox.classList.remove('recording');
-            const waveBox = document.getElementById('waveBox');
-            if(waveBox) waveBox.classList.remove('active');
-            const chatInput = document.getElementById('chatInput');
-            if(chatInput) chatInput.placeholder = "Ask Pyrox anything...";
-            if(micSvg) micSvg.innerHTML = `<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line>`;
-        }
-
-        async function triggerSend(e) {
-            if(e) e.preventDefault();
-            if (isListening && recognition) { recognition.stop(); stopVoiceUI(); }
-            
-            const inputField = document.getElementById('chatInput');
-            const text = inputField.value.trim();
-            if(!text) return;
-
-            inputField.value = '';
-            const landing = document.getElementById('landingHeader');
-            if(landing) landing.style.display = 'none';
-
-            appendMsg('user', text);
-            const aiDiv = appendMsg('ai', '⚡ Pyrox सोच रहा है...');
-
-            try {
-                const response = await fetch('/api/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: text })
-                });
-
-                const data = await response.json();
-                if(response.ok) {
-                    let htmlContent = `<div>${data.reply}</div>`;
-                    if(data.audio_url) {
-                        htmlContent += `<audio controls autoplay onplay="pauseOtherAudios(this)"><source src="${data.audio_url}?t=${new Date().getTime()}" type="audio/mp3"></audio>`;
-                    }
-                    aiDiv.innerHTML = htmlContent;
-                } else {
-                    aiDiv.innerText = "⚠️ Error: " + (data.detail || "Something went wrong");
-                }
-            } catch(e) {
-                aiDiv.innerText = "⚠️ Network Exception: " + e.message;
-            }
-        }
-
-        function pauseOtherAudios(currentAudio) {
-            const audios = document.querySelectorAll('audio');
-            audios.forEach(aud => {
-                if(aud !== currentAudio) {
-                    aud.pause();
-                }
-            });
-        }
-
-        function appendMsg(role, content) {
-            const container = document.getElementById('chatContainer');
-            const div = document.createElement('div');
-            div.className = 'message ' + (role === 'user' ? 'user-message' : 'ai-message');
-            div.innerText = content;
-            container.appendChild(div);
-            container.scrollTop = container.scrollHeight;
-            return div;
-        }
-    </script>
-</body>
-</html>
-"""
-    return HTMLResponse(content=html_content, status_code=200)
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+            let standard = prompt("आपकी कक्षा या वर्ष कौन सा है? (जैसे: Class 9, Class 11,
