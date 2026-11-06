@@ -264,7 +264,7 @@ async def read_index():
                     <svg viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                     <span>Search Chat</span>
                 </div>
-                <div class="menu-btn" onclick="alert('📚 Library: Past notes & saved discussions loaded!')" data-tooltip="Library">
+                <div class="menu-btn" onclick="openLibrary()" data-tooltip="Library">
                     <svg viewBox="0 0 24 24"><path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
                     <span>Library</span>
                 </div>
@@ -275,7 +275,7 @@ async def read_index():
             </div>
         </div>
         <div class="sidebar-bottom">
-            <div class="menu-btn" onclick="alert('⚙️ Settings: Theme & System preferences')" data-tooltip="Settings">
+            <div class="menu-btn" onclick="openSettings()" data-tooltip="Settings">
                 <svg viewBox="0 0 24 24"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                 <span>Settings</span>
             </div>
@@ -288,7 +288,7 @@ async def read_index():
         <!-- SEARCH OVERLAY BAR -->
         <div class="search-bar-overlay" id="searchOverlay">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-            <input type="text" placeholder="Search in conversation..." onkeyup="filterChatMessages(this.value)">
+            <input type="text" id="searchInput" placeholder="Search in conversation..." onkeyup="filterChatMessages(this.value)">
             <span style="color:#666; font-size:12px; cursor:pointer;" onclick="toggleSearchOverlay()">✕</span>
         </div>
 
@@ -377,8 +377,14 @@ async def read_index():
         let accumulatedSpeech = "";
         let isPinned = false;
 
-        function toggleSidebar() { document.getElementById('sidebar').classList.toggle('expanded'); }
-        function toggleDropdown() { document.getElementById('dropdownMenu').classList.toggle('show'); }
+        function toggleSidebar() { 
+            document.getElementById('sidebar').classList.toggle('expanded'); 
+        }
+
+        function toggleDropdown() { 
+            const menu = document.getElementById('dropdownMenu');
+            if(menu) menu.classList.toggle('show'); 
+        }
 
         window.onclick = function(event) {
             if (!event.target.closest('.three-dots-wrapper')) {
@@ -388,49 +394,95 @@ async def read_index():
         }
 
         function loginWithGmail() {
+            toggleDropdown();
             let email = prompt("Enter your Gmail address to log in:");
-            if(email && email.includes("@")) { alert("✅ Welcome " + email + "! Logged in successfully."); }
+            if(email && email.includes("@")) { 
+                alert("✅ Welcome " + email + "! Logged in successfully to Pyrox."); 
+            } else if(email) {
+                alert("⚠️ Please enter a valid Gmail address!");
+            }
         }
 
         function shareConversation() {
+            toggleDropdown();
             navigator.clipboard.writeText(window.location.href);
-            alert("🔗 Conversation link copied to clipboard!");
+            alert("🔗 Conversation link copied to clipboard successfully!");
         }
 
         function toggleSearchOverlay() {
+            toggleDropdown();
             const overlay = document.getElementById('searchOverlay');
-            overlay.style.display = (overlay.style.display === 'flex') ? 'none' : 'flex';
+            if (overlay) {
+                overlay.style.display = (overlay.style.display === 'flex') ? 'none' : 'flex';
+                if(overlay.style.display === 'flex') {
+                    document.getElementById('searchInput').focus();
+                }
+            }
         }
 
         function filterChatMessages(query) {
             const msgs = document.querySelectorAll('.message');
+            const lowerQuery = query.toLowerCase();
             msgs.forEach(m => {
-                m.style.display = m.innerText.toLowerCase().includes(query.toLowerCase()) ? 'flex' : 'none';
+                if(m.innerText.toLowerCase().includes(lowerQuery)) {
+                    m.style.display = 'flex';
+                } else {
+                    m.style.display = 'none';
+                }
             });
         }
 
         function pinChatToggle() {
+            toggleDropdown();
             isPinned = !isPinned;
-            document.getElementById('pinText').innerText = isPinned ? "Unpin Chat (Pinned)" : "Pin Chat";
-            alert(isPinned ? "📌 Chat Pinned to Top!" : "📌 Chat Unpinned!");
+            document.getElementById('pinText').innerText = isPinned ? "Unpin Chat" : "Pin Chat";
+            alert(isPinned ? "📌 Chat pinned to the top!" : "📌 Chat unpinned!");
         }
 
         function exportChatPDF() {
+            toggleDropdown();
             const msgs = document.querySelectorAll('.message');
-            if(msgs.length === 0) { alert("Nothing to export!"); return; }
-            let textContent = "--- Pyrox Studio Conversation ---\n\n";
+            if(msgs.length === 0) { 
+                alert("Nothing to export yet!"); 
+                return; 
+            }
+            let textContent = "--- Pyrox Studio Conversation Export ---\n\n";
             msgs.forEach(m => { textContent += m.innerText + "\n\n"; });
             const blob = new Blob([textContent], { type: 'text/plain' });
             const anchor = document.createElement('a');
             anchor.href = URL.createObjectURL(blob);
             anchor.download = 'Pyrox_Chat_Export.txt';
             anchor.click();
+            alert("📄 Chat text exported successfully!");
         }
 
-        function triggerFileAttach() { document.getElementById('hiddenFileInput').click(); }
+        function clearChat() {
+            toggleDropdown();
+            if(confirm("Are you sure you want to clear this chat?")) {
+                document.getElementById('chatContainer').innerHTML = '';
+                document.getElementById('landingHeader').style.display = 'flex';
+            }
+        }
+
+        function openLibrary() {
+            alert("📚 Library: Your saved discussions, notes, and history will appear here!");
+        }
+
+        function openSettings() {
+            alert("⚙️ Settings: Theme, Audio preferences, and account configurations.");
+        }
+
+        function triggerFileAttach() { 
+            document.getElementById('hiddenFileInput').click(); 
+        }
+
         function handleFileSelect(event) {
             const file = event.target.files[0];
-            if(file) alert("📎 Attached file: " + file.name);
+            if(file) {
+                alert("📎 Attached file successfully: " + file.name);
+                const inputField = document.getElementById('chatInput');
+                inputField.value = "[Attached: " + file.name + "] " + inputField.value;
+            }
         }
 
         function openStudentSetup() {
@@ -456,7 +508,10 @@ async def read_index():
             }
 
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (!SpeechRecognition) { alert("Speech recognition not supported."); return; }
+            if (!SpeechRecognition) { 
+                alert("Speech recognition is not supported in this browser."); 
+                return; 
+            }
 
             recognition = new SpeechRecognition();
             recognition.lang = 'hi-IN';
@@ -497,11 +552,14 @@ async def read_index():
             isListening = false;
             const micBtn = document.getElementById('micBtn');
             const micSvg = document.getElementById('micIconSvg');
-            micBtn.classList.remove('active');
-            document.getElementById('inputBox').classList.remove('recording');
-            document.getElementById('waveBox').classList.remove('active');
-            document.getElementById('chatInput').placeholder = "Ask Pyrox anything...";
-            micSvg.innerHTML = `<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line>`;
+            if(micBtn) micBtn.classList.remove('active');
+            const inputBox = document.getElementById('inputBox');
+            if(inputBox) inputBox.classList.remove('recording');
+            const waveBox = document.getElementById('waveBox');
+            if(waveBox) waveBox.classList.remove('active');
+            const chatInput = document.getElementById('chatInput');
+            if(chatInput) chatInput.placeholder = "Ask Pyrox anything...";
+            if(micSvg) micSvg.innerHTML = `<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line>`;
         }
 
         async function triggerSend(e) {
@@ -513,7 +571,8 @@ async def read_index():
             if(!text) return;
 
             inputField.value = '';
-            document.getElementById('landingHeader').style.display = 'none';
+            const landing = document.getElementById('landingHeader');
+            if(landing) landing.style.display = 'none';
 
             appendMsg('user', text);
             const aiDiv = appendMsg('ai', '⚡ Pyrox सोच रहा है...');
@@ -529,7 +588,6 @@ async def read_index():
                 if(response.ok) {
                     let htmlContent = `<div>${data.reply}</div>`;
                     if(data.audio_url) {
-                        // Audio Overlap Fix: Purana audio pause karke naya play karega
                         htmlContent += `<audio controls autoplay onplay="pauseOtherAudios(this)"><source src="${data.audio_url}?t=${new Date().getTime()}" type="audio/mp3"></audio>`;
                     }
                     aiDiv.innerHTML = htmlContent;
@@ -559,11 +617,6 @@ async def read_index():
             container.scrollTop = container.scrollHeight;
             return div;
         }
-
-        function clearChat() {
-            document.getElementById('chatContainer').innerHTML = '';
-            document.getElementById('landingHeader').style.display = 'flex';
-        }
     </script>
 </body>
 </html>
@@ -573,6 +626,3 @@ async def read_index():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
-            
-            
-                     
