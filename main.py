@@ -494,4 +494,143 @@ async def read_index():
         window.openStudentSetup = function() {
             let goal = prompt("आप किस परीक्षा या कक्षा की तैयारी कर रहे हैं? (जैसे: NEET, JEE, School, College)");
             if(!goal) return;
-            let standard = prompt("आपकी कक्षा या वर्ष कौन सा है? (जैसे: Class 9, Class 11,
+            let standard = prompt("आपकी कक्षा या वर्ष कौन सा है? (जैसे: Class 9, Class 11, B.Tech)");
+            if(!standard) return;
+            alert("बहुत बढ़िया! " + standard + " (" + goal + ") के लिए आपका स्टडी रूटीन सेट कर दिया गया है।");
+        };
+
+        window.toggleVoice = function(e) {
+            if(e) e.preventDefault();
+            const micBtn = document.getElementById('micBtn');
+            const micSvg = document.getElementById('micIconSvg');
+            const inputBox = document.getElementById('inputBox');
+            const waveBox = document.getElementById('waveBox');
+            const inputField = document.getElementById('chatInput');
+
+            if (window.isListening) {
+                if (window.recognition) window.recognition.stop();
+                window.stopVoiceUI();
+                return;
+            }
+
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) { 
+                alert("Speech recognition is not supported in this browser."); 
+                return; 
+            }
+
+            window.recognition = new SpeechRecognition();
+            window.recognition.lang = 'hi-IN';
+            window.recognition.continuous = true;
+            window.recognition.interimResults = true;
+
+            window.accumulatedSpeech = inputField && inputField.value ? inputField.value + " " : "";
+
+            window.recognition.onstart = function() {
+                window.isListening = true;
+                if(micBtn) micBtn.classList.add('active');
+                if(inputBox) inputBox.classList.add('recording');
+                if(waveBox) waveBox.classList.add('active');
+                if(inputField) inputField.placeholder = "Listening continuously...";
+                if(micSvg) micSvg.innerHTML = `<rect x="6" y="4" width="4" height="16" fill="currentColor"/><rect x="14" y="4" width="4" height="16" fill="currentColor"/>`;
+            };
+
+            window.recognition.onresult = function(event) {
+                let interim = '';
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    if (event.results[i].isFinal) {
+                        window.accumulatedSpeech += event.results[i][0].transcript + " ";
+                    } else {
+                        interim += event.results[i][0].transcript;
+                    }
+                }
+                if(inputField) inputField.value = window.accumulatedSpeech + interim;
+            };
+
+            window.recognition.onend = function() {
+                if (window.isListening) { try { window.recognition.start(); } catch(e) {} }
+            };
+
+            try { window.recognition.start(); } catch(e) {}
+        };
+
+        window.stopVoiceUI = function() {
+            window.isListening = false;
+            const micBtn = document.getElementById('micBtn');
+            const micSvg = document.getElementById('micIconSvg');
+            if(micBtn) micBtn.classList.remove('active');
+            const inputBox = document.getElementById('inputBox');
+            if(inputBox) inputBox.classList.remove('recording');
+            const waveBox = document.getElementById('waveBox');
+            if(waveBox) waveBox.classList.remove('active');
+            const chatInput = document.getElementById('chatInput');
+            if(chatInput) chatInput.placeholder = "Ask Pyrox anything...";
+            if(micSvg) micSvg.innerHTML = `<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line>`;
+        };
+
+        window.triggerSend = async function(e) {
+            if(e) e.preventDefault();
+            if (window.isListening && window.recognition) { window.recognition.stop(); window.stopVoiceUI(); }
+            
+            const inputField = document.getElementById('chatInput');
+            const text = inputField ? inputField.value.trim() : '';
+            if(!text) return;
+
+            if(inputField) inputField.value = '';
+            const landing = document.getElementById('landingHeader');
+            if(landing) landing.style.display = 'none';
+
+            window.appendMsg('user', text);
+            const aiDiv = window.appendMsg('ai', '⚡ Pyrox सोच रहा है...');
+
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: text })
+                });
+
+                const data = await response.json();
+                if(response.ok) {
+                    let htmlContent = `<div>${data.reply}</div>`;
+                    if(data.audio_url) {
+                        htmlContent += `<audio controls autoplay onplay="pauseOtherAudios(this)"><source src="${data.audio_url}?t=${new Date().getTime()}" type="audio/mp3"></audio>`;
+                    }
+                    aiDiv.innerHTML = htmlContent;
+                } else {
+                    aiDiv.innerText = "⚠️ Error: " + (data.detail || "Something went wrong");
+                }
+            } catch(e) {
+                aiDiv.innerText = "⚠️ Network Exception: " + e.message;
+            }
+        };
+
+        window.pauseOtherAudios = function(currentAudio) {
+            const audios = document.querySelectorAll('audio');
+            audios.forEach(aud => {
+                if(aud !== currentAudio) {
+                    aud.pause();
+                }
+            });
+        };
+
+        window.appendMsg = function(role, content) {
+            const container = document.getElementById('chatContainer');
+            const div = document.createElement('div');
+            div.className = 'message ' + (role === 'user' ? 'user-message' : 'ai-message');
+            div.innerText = content;
+            if(container) {
+                container.appendChild(div);
+                container.scrollTop = container.scrollHeight;
+            }
+            return div;
+        };
+    </script>
+</body>
+</html>
+"""
+    return HTMLResponse(content=html_content, status_code=200)
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
