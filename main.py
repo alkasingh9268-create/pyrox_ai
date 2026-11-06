@@ -61,14 +61,15 @@ async def debug_key():
 
 async def generate_edge_audio(text, voice_name="hi-IN-MadhurNeural", filename="static/response.mp3"):
     try:
-        # Emojis aur saare ulte-seedhe symbols hata rahe hain taaki TTS machine ki tarah na fande
+        # Emojis aur faltu symbols hata rahe hain taaki TTS machine ki tarah na fande
         clean_t = re.sub(r'[^\w\s.,!?-]', '', text)
         clean_t = clean_t.replace("*", "").replace("#", "").replace("`", "").replace("~", "")
         
-        # 'Gen-Z' ko speech engine galat na bole isliye audio ke liye seedha 'Jee-En-Zed' ya 'Yahin' me badal do taaki sateek bole
+        # 'Gen-Z' ko speech engine ke liye sateek badal rahe hain
         clean_t = clean_t.replace("Gen-Z", "मॉडर्न जनरेशन").replace("gen-z", "मॉडर्न जनरेशन")
 
-        communicate = edge_tts.Communicate(clean_t, voice_name)
+        # Edge-TTSunicate mein rate="+10%" lagaya hai taaki na zyada slow ho (neend na aaye) aur na hi zyada fast ho
+        communicate = edge_tts.Communicate(clean_t, voice_name, rate="+10%")
         await communicate.save(filename)
         return True
     except Exception as e:
@@ -95,7 +96,7 @@ async def chat_endpoint(req: ChatRequest):
         "messages": [
             {
                 "role": "system",
-                "content": "You are Pyrox, a sharp and street-smart AI buddy from Delhi. Speak in smooth, natural, everyday Hindi and Hinglish (like a true Delhiite). Do NOT keep repeating your name or say awkward robotic phrases. Keep your tone friendly, cool, and direct. Avoid complicated English words that TTS mispronounces."
+                "content": "You are Pyrox, a chill, direct, and street-smart AI buddy. Talk in natural, everyday Hinglish just like a real friend chatting casually. Do NOT use fake poetic lines, do NOT make random weird claims about Delhi weather or traffic unless asked, and do NOT keep repeating your name. Keep your replies crisp, natural, engaging, and straight to the point."
             },
             {
                 "role": "user",
