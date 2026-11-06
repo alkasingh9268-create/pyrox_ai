@@ -155,7 +155,7 @@ async def read_index():
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
         body { background-color: #000000; color: #ffffff; display: flex; height: 100vh; overflow: hidden; position: relative; }
 
-        /* Background shifted to bottom 75% */
+        /* Background shifted to bottom 75% to protect top logo and navbar */
         .cyber-wave-bg {
             position: absolute; top: 25%; left: 0; width: 100%; height: 75%;
             pointer-events: none; z-index: 1; overflow: hidden;
@@ -284,7 +284,7 @@ async def read_index():
         }
         .input-box.recording { border-color: #ff9900; box-shadow: 0 0 20px rgba(255, 153, 0, 0.3); }
 
-        /* High Frequency Sharp Equalizer Spikes */
+        /* High Frequency Sharp Equalizer Spikes ("Kaanto jaisi frequency") */
         .equalizer-wave-container { display: flex; align-items: center; gap: 3px; height: 26px; width: 140px; display: none; }
         .equalizer-wave-container.active { display: flex; }
         .freq-bar { flex: 1; background: linear-gradient(180deg, #ff9900, #ff0055, #ffffff); border-radius: 1px; height: 15%; animation: spikeMotion 0.4s infinite ease-in-out alternate; }
