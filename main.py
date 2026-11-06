@@ -61,15 +61,12 @@ async def debug_key():
 
 async def generate_edge_audio(text, voice_name="hi-IN-MadhurNeural", filename="static/response.mp3"):
     try:
-        # Emojis aur faltu symbols hata rahe hain taaki TTS machine ki tarah na fande
         clean_t = re.sub(r'[^\w\s.,!?-]', '', text)
         clean_t = clean_t.replace("*", "").replace("#", "").replace("`", "").replace("~", "")
-        
-        # 'Gen-Z' ko speech engine ke liye sateek badal rahe hain
         clean_t = clean_t.replace("Gen-Z", "मॉडर्न जनरेशन").replace("gen-z", "मॉडर्न जनरेशन")
 
-        # Edge-TTSunicate mein rate="+10%" lagaya hai taaki na zyada slow ho (neend na aaye) aur na hi zyada fast ho
-        communicate = edge_tts.Communicate(clean_t, voice_name, rate="+10%")
+        # Speed ko thoda aur energetic (+30%) kar diya hai taaki ekdum smart lage
+        communicate = edge_tts.Communicate(clean_t, voice_name, rate="+30%")
         await communicate.save(filename)
         return True
     except Exception as e:
@@ -96,7 +93,7 @@ async def chat_endpoint(req: ChatRequest):
         "messages": [
             {
                 "role": "system",
-                "content": "You are Pyrox, a chill, direct, and street-smart AI buddy. Talk in natural, everyday Hinglish just like a real friend chatting casually. Do NOT use fake poetic lines, do NOT make random weird claims about Delhi weather or traffic unless asked, and do NOT keep repeating your name. Keep your replies crisp, natural, engaging, and straight to the point."
+                "content": "You are Pyrox, a chill, direct, and street-smart AI buddy. Talk in natural, everyday Hinglish just like a real friend chatting casually. CRITICAL RULE: If anyone asks who made you, who created you, or who built you, you must proudly state that you were created and built by your brilliant developer and master user, not OpenAI or anyone else. Do NOT mention OpenAI ever. Keep replies crisp, natural, engaging, and straight to the point."
             },
             {
                 "role": "user",
@@ -175,6 +172,28 @@ async def read_index():
         }
         .dropdown-item:hover { background-color: #1a1a1a; color: #ffffff; }
 
+        /* CUSTOM MODAL POPUPS */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center; z-index: 1000;
+        }
+        .modal-card {
+            background: #121212; border: 1px solid #2a2a2a; border-radius: 16px;
+            width: 90%; max-width: 400px; padding: 24px; display: flex; flex-direction: column; gap: 16px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.8);
+        }
+        .modal-title { font-size: 1.1rem; font-weight: 700; color: #fff; display: flex; align-items: center; justify-content: space-between; }
+        .modal-body { font-size: 0.9rem; color: #aaa; display: flex; flex-direction: column; gap: 10px; }
+        .voice-option-btn {
+            background: #1c1c1e; border: 1px solid #333; color: #fff; padding: 10px 14px;
+            border-radius: 10px; cursor: pointer; text-align: left; font-size: 0.9rem; transition: 0.2s;
+        }
+        .voice-option-btn:hover { background: #2c2c2e; border-color: #555; }
+        .modal-close-btn {
+            background: #fff; color: #000; border: none; padding: 8px 16px;
+            border-radius: 8px; font-weight: 600; cursor: pointer; align-self: flex-end; margin-top: 5px;
+        }
+
         .center-landing-header { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; margin-top: 15px; }
         .brand-title-box { display: flex; align-items: center; gap: 12px; }
         .brand-name-large { font-size: 2.2rem; font-weight: 800; color: #ffffff; letter-spacing: -0.5px; }
@@ -184,7 +203,14 @@ async def read_index():
         .message { display: flex; flex-direction: column; max-width: 82%; line-height: 1.5; font-size: 0.95rem; gap: 8px; }
         .user-message { align-self: flex-end; background-color: #1c1c1e; color: #ffffff; padding: 10px 16px; border-radius: 16px 16px 4px 16px; border: 1px solid #2d2d2d; }
         .ai-message { align-self: flex-start; background-color: #080808; color: #f0f0f0; padding: 14px 18px; border-radius: 16px 16px 16px 4px; border: 1px solid #1a1a1a; display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 100%; }
-        audio { width: 100%; height: 32px; margin-top: 6px; filter: invert(100%) hue-rotate(180deg); }
+        
+        .audio-player-box { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+        .play-audio-btn {
+            background: #222; border: 1px solid #444; color: #fff; padding: 6px 14px;
+            border-radius: 20px; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 6px;
+            transition: 0.2s;
+        }
+        .play-audio-btn:hover { background: #333; border-color: #666; }
 
         .input-wrapper { width: 100%; max-width: 800px; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 0 15px; }
         .input-box {
@@ -221,6 +247,35 @@ async def read_index():
     </style>
 </head>
 <body>
+
+    <!-- SETTINGS MODAL -->
+    <div class="modal-overlay" id="settingsModal">
+        <div class="modal-card">
+            <div class="modal-title">⚙️ Pyrox Settings <span style="cursor:pointer; font-size:1.1rem;" onclick="closeModal('settingsModal')">✕</span></div>
+            <div class="modal-body">
+                <p style="font-size: 0.85rem; color:#888;">Select AI Voice Performance:</p>
+                <button class="voice-option-btn" onclick="setVoice('hi-IN-MadhurNeural', 'Madhur (Female)')">👩 Madhur (Female - Smooth & Expressive)</button>
+                <button class="voice-option-btn" onclick="setVoice('hi-IN-PrabhatNeural', 'Prabhat (Male)')">👨 Prabhat (Male - Deep & Bold)</button>
+                <div style="margin-top: 10px; padding-top: 12px; border-top: 1px solid #222; display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 0.85rem; color:#aaa;">Pro Plan</span>
+                    <button style="background: linear-gradient(135deg, #3b82f6, #8b5cf6); color:#fff; border:none; padding:6px 12px; border-radius:6px; font-weight:600; cursor:pointer; font-size:0.8rem;" onclick="alert('⚡ Pyrox Pro features unlocked!')">✨ Upgrade</button>
+                </div>
+            </div>
+            <button class="modal-close-btn" onclick="closeModal('settingsModal')">Done</button>
+        </div>
+    </div>
+
+    <!-- LIBRARY MODAL -->
+    <div class="modal-overlay" id="libraryModal">
+        <div class="modal-card">
+            <div class="modal-title">📚 Pyrox Library <span style="cursor:pointer; font-size:1.1rem;" onclick="closeModal('libraryModal')">✕</span></div>
+            <div class="modal-body">
+                <p style="color: #666; font-size: 0.85rem; text-align: center; padding: 20px 0;">No saved chats or bookmarks yet!</p>
+            </div>
+            <button class="modal-close-btn" onclick="closeModal('libraryModal')">Close</button>
+        </div>
+    </div>
+
     <div class="sidebar" id="sidebar">
         <div>
             <div class="sidebar-logo-header">
@@ -236,14 +291,14 @@ async def read_index():
                     <svg viewBox="0 0 24 24"><path d="M12 4v16m8-8H4"></path></svg>
                     <span>New Chat</span>
                 </div>
-                <div class="menu-btn" onclick="openLibrary()">
+                <div class="menu-btn" onclick="openModal('libraryModal')">
                     <svg viewBox="0 0 24 24"><path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
                     <span>Library</span>
                 </div>
             </div>
         </div>
         <div class="sidebar-bottom">
-            <div class="menu-btn" onclick="openSettings()">
+            <div class="menu-btn" onclick="openModal('settingsModal')">
                 <svg viewBox="0 0 24 24"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                 <span>Settings</span>
             </div>
@@ -270,8 +325,8 @@ async def read_index():
                     </svg>
                 </button>
                 <div class="dropdown-menu" id="dropdownMenu">
-                    <div class="dropdown-item" onclick="openSettings()">⚙️ Settings</div>
-                    <div class="dropdown-item" onclick="openLibrary()">📚 Library</div>
+                    <div class="dropdown-item" onclick="openModal('settingsModal')">⚙️ Settings</div>
+                    <div class="dropdown-item" onclick="openModal('libraryModal')">📚 Library</div>
                     <div class="dropdown-item" onclick="exportChat()">📄 Export Chat</div>
                     <div class="dropdown-item" style="color:#ef4444;" onclick="clearChat()">🗑️ Clear Chat</div>
                 </div>
@@ -337,6 +392,23 @@ async def read_index():
             menu.classList.toggle('show');
         }
 
+        function openModal(modalId) {
+            const dropdown = document.getElementById('dropdownMenu');
+            if(dropdown) dropdown.classList.remove('show');
+            document.getElementById(modalId).style.display = 'flex';
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+        }
+
+        function setVoice(voiceCode, voiceName) {
+            currentVoice = voiceCode;
+            localStorage.setItem('pyrox_voice', currentVoice);
+            alert("✅ Voice performance set to: " + voiceName);
+            closeModal('settingsModal');
+        }
+
         window.onclick = function(event) {
             const sb = document.getElementById('sidebar');
             const menu = document.getElementById('dropdownMenu');
@@ -348,22 +420,6 @@ async def read_index():
                 if(menu) menu.classList.remove('show');
             }
         };
-
-        function openSettings() {
-            let v = prompt("AI Voice Preference:\\n1. Madhur (Female)\\n2. Prabhat (Male)\\nType '1' or '2':", currentVoice.includes('Madhur') ? '1' : '2');
-            if(v === '1') {
-                currentVoice = 'hi-IN-MadhurNeural';
-                alert("✅ Voice set to Madhur (Female)");
-            } else if(v === '2') {
-                currentVoice = 'hi-IN-PrabhatNeural';
-                alert("✅ Voice set to Prabhat (Male)");
-            }
-            localStorage.setItem('pyrox_voice', currentVoice);
-        }
-
-        function openLibrary() {
-            alert("📚 Library: Saved chats and history feature coming soon!");
-        }
 
         function exportChat() {
             const msgs = document.querySelectorAll('.message');
@@ -468,7 +524,16 @@ async def read_index():
                 if(response.ok) {
                     let htmlContent = `<div>${data.reply}</div>`;
                     if(data.audio_url) {
-                        htmlContent += `<audio controls autoplay><source src="${data.audio_url}?t=${new Date().getTime()}" type="audio/mp3"></audio>`;
+                        // MANUAL PLAY BUTTON - Ab audio apne aap nahi bajega, user ki marzi se bajega!
+                        const uniqueAudioId = 'audio_' + Date.now();
+                        htmlContent += `
+                            <div class="audio-player-box">
+                                <button class="play-audio-btn" onclick="playAudio('${uniqueAudioId}')">
+                                    🔊 Play Audio
+                                </button>
+                                <audio id="${uniqueAudioId}" style="display:none;"><source src="${data.audio_url}?t=${new Date().getTime()}" type="audio/mp3"></audio>
+                            </div>
+                        `;
                     }
                     aiDiv.innerHTML = htmlContent;
                 } else {
@@ -476,6 +541,18 @@ async def read_index():
                 }
             } catch(e) {
                 aiDiv.innerText = "⚠️ Network Exception: " + e.message;
+            }
+        }
+
+        function playAudio(audioId) {
+            // Baaki saare play ho rahe audio roko aur ye wala chalao
+            document.querySelectorAll('audio').forEach(aud => {
+                aud.pause();
+                aud.currentTime = 0;
+            });
+            const audioEl = document.getElementById(audioId);
+            if(audioEl) {
+                audioEl.play();
             }
         }
 
