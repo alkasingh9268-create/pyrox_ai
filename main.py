@@ -17,10 +17,9 @@ API_KEY = os.environ.get("GROQ_API_KEY", "").strip()
 
 class ChatRequest(BaseModel):
     message: str
-    voice: str = "hi-IN-MadhurNeural" # Default Female, settings se change hoga
+    voice: str = "hi-IN-MadhurNeural"
 
 def get_live_groq_model():
-    """Groq server se seedha active models ki list maangta hai"""
     if not API_KEY:
         return None, "GROQ_API_KEY Missing in Render Environment!"
     
@@ -62,10 +61,13 @@ async def debug_key():
 
 async def generate_edge_audio(text, voice_name="hi-IN-MadhurNeural", filename="static/response.mp3"):
     try:
-        # Markdown symbols aur duniya bhar ke saare emojis ko Regex se hata do taaki TTS unhe na bole!
+        # Emojis aur saare ulte-seedhe symbols hata rahe hain taaki TTS machine ki tarah na fande
         clean_t = re.sub(r'[^\w\s.,!?-]', '', text)
         clean_t = clean_t.replace("*", "").replace("#", "").replace("`", "").replace("~", "")
         
+        # 'Gen-Z' ko speech engine galat na bole isliye audio ke liye seedha 'Jee-En-Zed' ya 'Yahin' me badal do taaki sateek bole
+        clean_t = clean_t.replace("Gen-Z", "मॉडर्न जनरेशन").replace("gen-z", "मॉडर्न जनरेशन")
+
         communicate = edge_tts.Communicate(clean_t, voice_name)
         await communicate.save(filename)
         return True
@@ -93,7 +95,7 @@ async def chat_endpoint(req: ChatRequest):
         "messages": [
             {
                 "role": "system",
-                "content": "You are Pyrox, an advanced Gen-Z AI assistant created for users in India (specifically Delhi context). Talk in a smooth mix of natural Hindi and English (Hinglish) with cool emojis ✨."
+                "content": "You are Pyrox, a sharp and street-smart AI buddy from Delhi. Speak in smooth, natural, everyday Hindi and Hinglish (like a true Delhiite). Do NOT keep repeating your name or say awkward robotic phrases. Keep your tone friendly, cool, and direct. Avoid complicated English words that TTS mispronounces."
             },
             {
                 "role": "user",
@@ -334,7 +336,6 @@ async def read_index():
             menu.classList.toggle('show');
         }
 
-        // Bahar kahi bhi click karne par Sidebar aur Dropdown dono auto-close ho jayenge
         window.onclick = function(event) {
             const sb = document.getElementById('sidebar');
             const menu = document.getElementById('dropdownMenu');
