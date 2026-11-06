@@ -3,24 +3,66 @@ import asyncio
 import requests
 import edge_tts
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 app = FastAPI()
 
-# Static folder ensure karega ki audio aur assets sahi se load hon
 os.makedirs("static", exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Render Environment Variable se API key secure tarike se uthayega
 API_KEY = os.environ.get("GROQ_API_KEY", "").strip()
 
 class ChatRequest(BaseModel):
     message: str
 
+def get_live_groq_model():
+    """Groq server se seedha active models ki list maangta hai"""
+    if not API_KEY:
+        return None, "GROQ_API_KEY Missing in Render Environment!"
+    
+    url = "https://api.groq.com/openai/v1/models"
+    headers = {"Authorization": f"Bearer {API_KEY}"}
+    
+    try:
+        res = requests.get(url, headers=headers, timeout=10)
+        if res.status_code == 200:
+            models_data = res.json().get("data", [])
+            valid_ids = [m.get("id") for m in models_data if m.get("id")]
+            
+            # Non-guard active chat models filter karo
+            chat_models = [
+                m_id for m_id in valid_ids 
+                if "guard" not in m_id.lower() and "whisper" not in m_id.lower()
+            ]
+            
+            if chat_models:
+                # Priority: koi bhi active Llama ya GPT-OSS model utha lo
+                for priority in ["llama", "gpt-oss", "qwen"]:
+                    for m_id in chat_models:
+                        if priority in m_id.lower():
+                            return m_id, f"Success (Picked {m_id})"
+                
+                return chat_models[0], f"Success (Picked {chat_models[0]})"
+            
+            return None, "No active chat models found for this API Key."
+        else:
+            return None, f"API Key Invalid or Groq Error: {res.status_code} - {res.text}"
+    except Exception as e:
+        return None, f"Connection Error: {str(e)}"
+
+@app.get("/api/debug")
+async def debug_key():
+    """Browser me /api/debug khol kar check kar sakte ho ki konsa model live hai"""
+    model, status = get_live_groq_model()
+    return JSONResponse({
+        "status": status,
+        "active_working_model": model,
+        "api_key_present": bool(API_KEY)
+    })
+
 async def generate_edge_audio(text, filename="static/response.mp3"):
-    """Edge-TTS ke zariye Madhur Neural aawaz me audio banayega"""
     try:
         clean_t = (
             text.replace("*", "")
@@ -45,6 +87,10 @@ async def generate_edge_audio(text, filename="static/response.mp3"):
 async def chat_endpoint(req: ChatRequest):
     if not API_KEY:
         raise HTTPException(status_code=400, detail="Groq API Key missing in environment variables!")
+    
+    active_model, status_msg = get_live_groq_model()
+    if not active_model:
+        raise HTTPException(status_code=400, detail=f"Groq API Error: {status_msg}")
 
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {
@@ -52,9 +98,8 @@ async def chat_endpoint(req: ChatRequest):
         "Content-Type": "application/json"
     }
     
-    # Yahan hum Groq ka sabse stable aur current active model use kar rahe hain
     payload = {
-        "model": "llama-3.3-70b-versatile",
+        "model": active_model,
         "messages": [
             {
                 "role": "system",
@@ -83,13 +128,12 @@ async def chat_endpoint(req: ChatRequest):
                 "audio_url": f"/{audio_path}?t={asyncio.get_event_loop().time()}" if success else None
             }
         else:
-            raise HTTPException(status_code=response.status_code, detail=response.text)
+            raise HTTPException(status_code=response.status_code, detail=f"Groq API ({active_model}): {response.text}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/", response_class=HTMLResponse)
 async def read_index():
-    """Tera pura original HTML, CSS, collapsible sidebar, star logo aur mic/waves ke sath"""
     html_content = """<!DOCTYPE html>
 <html lang="hi">
 <head>
@@ -100,7 +144,6 @@ async def read_index():
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
         body { background-color: #000000; color: #ffffff; display: flex; height: 100vh; overflow: hidden; }
 
-        /* COLLAPSIBLE SIDEBAR */
         .sidebar {
             width: 0px; background-color: #050505; border-right: none;
             display: flex; flex-direction: column; justify-content: space-between;
@@ -120,26 +163,22 @@ async def read_index():
         .menu-btn svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; flex-shrink: 0; }
         .sidebar-bottom { border-top: 1px solid #141414; padding-top: 8px; }
 
-        /* MAIN WORKSPACE */
         .main-container { flex: 1; display: flex; flex-direction: column; justify-content: space-between; align-items: center; height: 100vh; padding-top: 4px; padding-bottom: 8px; position: relative; }
         .top-navbar { width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 6px 20px; position: relative; z-index: 10; }
         .hamburger-btn { background: transparent; border: none; color: #aaaaaa; cursor: pointer; padding: 6px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: color 0.2s, background 0.2s; }
         .hamburger-btn:hover { color: #ffffff; background-color: #1a1a1a; }
 
-        /* CENTER LANDING HEADER */
         .center-landing-header { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; margin-top: 15px; }
         .brand-title-box { display: flex; align-items: center; gap: 12px; }
         .brand-name-large { font-size: 2.2rem; font-weight: 800; color: #ffffff; letter-spacing: -0.5px; }
         .greeting-subtext { font-size: 1.15rem; font-weight: 500; color: #888888; }
 
-        /* CHAT MESSAGES */
         .chat-container { width: 100%; max-width: 800px; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; padding: 10px 15px; margin-top: 5px; }
         .message { display: flex; flex-direction: column; max-width: 82%; line-height: 1.5; font-size: 0.95rem; gap: 8px; }
         .user-message { align-self: flex-end; background-color: #1c1c1e; color: #ffffff; padding: 10px 16px; border-radius: 16px 16px 4px 16px; border: 1px solid #2d2d2d; }
         .ai-message { align-self: flex-start; background-color: #080808; color: #f0f0f0; padding: 14px 18px; border-radius: 16px 16px 16px 4px; border: 1px solid #1a1a1a; display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 100%; }
         audio { width: 100%; height: 32px; margin-top: 6px; filter: invert(100%) hue-rotate(180deg); }
 
-        /* INPUT BAR */
         .input-wrapper { width: 100%; max-width: 800px; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 0 15px; }
         .input-box {
             width: 100%; background-color: #080808; border: 1px solid #222222;
@@ -148,7 +187,6 @@ async def read_index():
         }
         .input-box.recording { border-color: #ef4444; box-shadow: 0 0 15px rgba(239, 68, 68, 0.25); }
 
-        /* GEMINI WAVE BARS */
         .gemini-wave-container { display: flex; align-items: center; gap: 3.5px; height: 20px; width: 100px; display: none; }
         .gemini-wave-container.active { display: flex; }
         .wave-bar { flex: 1; background: linear-gradient(180deg, #888, #fff); border-radius: 3px; height: 20%; animation: waveMotion 0.6s infinite ease-in-out alternate; }
@@ -176,8 +214,6 @@ async def read_index():
     </style>
 </head>
 <body>
-
-    <!-- COLLAPSIBLE SIDEBAR -->
     <div class="sidebar" id="sidebar">
         <div>
             <div class="sidebar-logo-header">
@@ -197,7 +233,6 @@ async def read_index():
         </div>
     </div>
 
-    <!-- MAIN CONTAINER -->
     <div class="main-container">
         <div class="top-navbar">
             <button type="button" class="hamburger-btn" onclick="toggleSidebar()">
@@ -209,7 +244,6 @@ async def read_index():
             </button>
         </div>
 
-        <!-- CENTER LANDING HEADER WITH STAR LOGO -->
         <div class="center-landing-header" id="landingHeader">
             <div class="brand-title-box">
                 <svg width="52" height="52" viewBox="0 0 100 100" fill="none" stroke="#ffffff" stroke-linejoin="round">
@@ -256,9 +290,7 @@ async def read_index():
         let recognition = null;
         let accumulatedSpeech = "";
 
-        function toggleSidebar() {
-            document.getElementById('sidebar').classList.toggle('expanded');
-        }
+        function toggleSidebar() { document.getElementById('sidebar').classList.toggle('expanded'); }
 
         function toggleVoice(e) {
             if(e) e.preventDefault();
