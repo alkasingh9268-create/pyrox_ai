@@ -1,5 +1,6 @@
 import os
 import asyncio
+import re
 import requests
 import edge_tts
 from fastapi import FastAPI, HTTPException
@@ -9,7 +10,6 @@ from pydantic import BaseModel
 
 app = FastAPI()
 
-# Static folder taaki audio files securely save aur serve ho sakein
 os.makedirs("static", exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -17,6 +17,7 @@ API_KEY = os.environ.get("GROQ_API_KEY", "").strip()
 
 class ChatRequest(BaseModel):
     message: str
+    voice: str = "hi-IN-MadhurNeural" # Default Female, settings se change hoga
 
 def get_live_groq_model():
     """Groq server se seedha active models ki list maangta hai"""
@@ -32,19 +33,16 @@ def get_live_groq_model():
             models_data = res.json().get("data", [])
             valid_ids = [m.get("id") for m in models_data if m.get("id")]
             
-            # Non-guard active chat models filter karo
             chat_models = [
                 m_id for m_id in valid_ids 
                 if "guard" not in m_id.lower() and "whisper" not in m_id.lower()
             ]
             
             if chat_models:
-                # Priority: koi bhi active Llama ya GPT-OSS model utha lo
                 for priority in ["llama", "gpt-oss", "qwen"]:
                     for m_id in chat_models:
                         if priority in m_id.lower():
                             return m_id, f"Success (Picked {m_id})"
-                
                 return chat_models[0], f"Success (Picked {chat_models[0]})"
             
             return None, "No active chat models found for this API Key."
@@ -55,7 +53,6 @@ def get_live_groq_model():
 
 @app.get("/api/debug")
 async def debug_key():
-    """Browser me /api/debug khol kar check kar sakte ho ki konsa model live hai"""
     model, status = get_live_groq_model()
     return JSONResponse({
         "status": status,
@@ -63,21 +60,13 @@ async def debug_key():
         "api_key_present": bool(API_KEY)
     })
 
-async def generate_edge_audio(text, filename="static/response.mp3"):
+async def generate_edge_audio(text, voice_name="hi-IN-MadhurNeural", filename="static/response.mp3"):
     try:
-        clean_t = (
-            text.replace("*", "")
-            .replace("#", "")
-            .replace("`", "")
-            .replace("✨", "")
-            .replace("👋", "")
-            .replace("🚀", "")
-            .replace("💻", "")
-            .replace("😎", "")
-            .replace("💡", "")
-            .replace("🎯", "")
-        )
-        communicate = edge_tts.Communicate(clean_t, "hi-IN-MadhurNeural")
+        # Markdown symbols aur duniya bhar ke saare emojis ko Regex se hata do taaki TTS unhe na bole!
+        clean_t = re.sub(r'[^\w\s.,!?-]', '', text)
+        clean_t = clean_t.replace("*", "").replace("#", "").replace("`", "").replace("~", "")
+        
+        communicate = edge_tts.Communicate(clean_t, voice_name)
         await communicate.save(filename)
         return True
     except Exception as e:
@@ -122,7 +111,7 @@ async def chat_endpoint(req: ChatRequest):
             reply = res_json['choices'][0]['message']['content']
             
             audio_path = "static/response.mp3"
-            success = await generate_edge_audio(reply, audio_path)
+            success = await generate_edge_audio(reply, req.voice, audio_path)
             
             return {
                 "reply": reply,
@@ -165,9 +154,23 @@ async def read_index():
         .sidebar-bottom { border-top: 1px solid #141414; padding-top: 8px; }
 
         .main-container { flex: 1; display: flex; flex-direction: column; justify-content: space-between; align-items: center; height: 100vh; padding-top: 4px; padding-bottom: 8px; position: relative; }
+        
         .top-navbar { width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 6px 20px; position: relative; z-index: 10; }
-        .hamburger-btn { background: transparent; border: none; color: #aaaaaa; cursor: pointer; padding: 6px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: color 0.2s, background 0.2s; }
-        .hamburger-btn:hover { color: #ffffff; background-color: #1a1a1a; }
+        .hamburger-btn, .dots-btn { background: transparent; border: none; color: #aaaaaa; cursor: pointer; padding: 6px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: color 0.2s, background 0.2s; }
+        .hamburger-btn:hover, .dots-btn:hover { color: #ffffff; background-color: #1a1a1a; }
+        
+        .three-dots-wrapper { position: relative; }
+        .dropdown-menu {
+            position: absolute; top: 38px; right: 0; width: 200px;
+            background-color: #111111; border: 1px solid #222222; border-radius: 12px;
+            padding: 6px 0; display: none; flex-direction: column; box-shadow: 0 10px 25px rgba(0,0,0,0.7); z-index: 100;
+        }
+        .dropdown-menu.show { display: flex; }
+        .dropdown-item {
+            padding: 10px 16px; font-size: 13px; color: #cccccc; cursor: pointer;
+            display: flex; align-items: center; gap: 10px; transition: background 0.2s;
+        }
+        .dropdown-item:hover { background-color: #1a1a1a; color: #ffffff; }
 
         .center-landing-header { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; margin-top: 15px; }
         .brand-title-box { display: flex; align-items: center; gap: 12px; }
@@ -230,19 +233,46 @@ async def read_index():
                     <svg viewBox="0 0 24 24"><path d="M12 4v16m8-8H4"></path></svg>
                     <span>New Chat</span>
                 </div>
+                <div class="menu-btn" onclick="openLibrary()">
+                    <svg viewBox="0 0 24 24"><path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                    <span>Library</span>
+                </div>
+            </div>
+        </div>
+        <div class="sidebar-bottom">
+            <div class="menu-btn" onclick="openSettings()">
+                <svg viewBox="0 0 24 24"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                <span>Settings</span>
             </div>
         </div>
     </div>
 
-    <div class="main-container">
+    <div class="main-container" id="mainContainer">
         <div class="top-navbar">
-            <button type="button" class="hamburger-btn" onclick="toggleSidebar()">
+            <button type="button" class="hamburger-btn" onclick="toggleSidebar(event)">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <line x1="3" y1="12" x2="21" y2="12"></line>
                     <line x1="3" y1="6" x2="21" y2="6"></line>
                     <line x1="3" y1="18" x2="21" y2="18"></line>
                 </svg>
             </button>
+
+            <!-- THREE DOTS MENU -->
+            <div class="three-dots-wrapper" id="dotsWrapper">
+                <button type="button" class="dots-btn" onclick="toggleDropdown(event)">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="5" r="1.5"></circle>
+                        <circle cx="12" cy="12" r="1.5"></circle>
+                        <circle cx="12" cy="19" r="1.5"></circle>
+                    </svg>
+                </button>
+                <div class="dropdown-menu" id="dropdownMenu">
+                    <div class="dropdown-item" onclick="openSettings()">⚙️ Settings</div>
+                    <div class="dropdown-item" onclick="openLibrary()">📚 Library</div>
+                    <div class="dropdown-item" onclick="exportChat()">📄 Export Chat</div>
+                    <div class="dropdown-item" style="color:#ef4444;" onclick="clearChat()">🗑️ Clear Chat</div>
+                </div>
+            </div>
         </div>
 
         <div class="center-landing-header" id="landingHeader">
@@ -290,10 +320,59 @@ async def read_index():
         let isListening = false;
         let recognition = null;
         let accumulatedSpeech = "";
+        let currentVoice = localStorage.getItem('pyrox_voice') || 'hi-IN-MadhurNeural';
 
-        function toggleSidebar() { 
+        function toggleSidebar(e) {
+            if(e) e.stopPropagation();
             const sb = document.getElementById('sidebar');
-            if(sb) sb.classList.toggle('expanded'); 
+            sb.classList.toggle('expanded');
+        }
+
+        function toggleDropdown(e) {
+            if(e) e.stopPropagation();
+            const menu = document.getElementById('dropdownMenu');
+            menu.classList.toggle('show');
+        }
+
+        // Bahar kahi bhi click karne par Sidebar aur Dropdown dono auto-close ho jayenge
+        window.onclick = function(event) {
+            const sb = document.getElementById('sidebar');
+            const menu = document.getElementById('dropdownMenu');
+            
+            if (!event.target.closest('#sidebar') && !event.target.closest('.hamburger-btn')) {
+                if(sb) sb.classList.remove('expanded');
+            }
+            if (!event.target.closest('.three-dots-wrapper')) {
+                if(menu) menu.classList.remove('show');
+            }
+        };
+
+        function openSettings() {
+            let v = prompt("AI Voice Preference:\\n1. Madhur (Female)\\n2. Prabhat (Male)\\nType '1' or '2':", currentVoice.includes('Madhur') ? '1' : '2');
+            if(v === '1') {
+                currentVoice = 'hi-IN-MadhurNeural';
+                alert("✅ Voice set to Madhur (Female)");
+            } else if(v === '2') {
+                currentVoice = 'hi-IN-PrabhatNeural';
+                alert("✅ Voice set to Prabhat (Male)");
+            }
+            localStorage.setItem('pyrox_voice', currentVoice);
+        }
+
+        function openLibrary() {
+            alert("📚 Library: Saved chats and history feature coming soon!");
+        }
+
+        function exportChat() {
+            const msgs = document.querySelectorAll('.message');
+            if(msgs.length === 0) { alert("No chat to export!"); return; }
+            let text = "--- Pyrox Chat Export ---\\n\\n";
+            msgs.forEach(m => text += m.innerText + "\\n\\n");
+            const blob = new Blob([text], {type: 'text/plain'});
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'Pyrox_Chat.txt';
+            a.click();
         }
 
         function toggleVoice(e) {
@@ -325,11 +404,11 @@ async def read_index():
 
             recognition.onstart = function() {
                 isListening = true;
-                if(micBtn) micBtn.classList.add('active');
-                if(inputBox) inputBox.classList.add('recording');
-                if(waveBox) waveBox.classList.add('active');
-                if(inputField) inputField.placeholder = "Listening continuously...";
-                if(micSvg) micSvg.innerHTML = `<rect x="6" y="4" width="4" height="16" fill="currentColor"/><rect x="14" y="4" width="4" height="16" fill="currentColor"/>`;
+                micBtn.classList.add('active');
+                inputBox.classList.add('recording');
+                waveBox.classList.add('active');
+                inputField.placeholder = "Listening continuously...";
+                micSvg.innerHTML = `<rect x="6" y="4" width="4" height="16" fill="currentColor"/><rect x="14" y="4" width="4" height="16" fill="currentColor"/>`;
             };
 
             recognition.onresult = function(event) {
@@ -341,7 +420,7 @@ async def read_index():
                         interim += event.results[i][0].transcript;
                     }
                 }
-                if(inputField) inputField.value = accumulatedSpeech + interim;
+                inputField.value = accumulatedSpeech + interim;
             };
 
             recognition.onend = function() {
@@ -355,14 +434,11 @@ async def read_index():
             isListening = false;
             const micBtn = document.getElementById('micBtn');
             const micSvg = document.getElementById('micIconSvg');
-            if(micBtn) micBtn.classList.remove('active');
-            const inputBox = document.getElementById('inputBox');
-            if(inputBox) inputBox.classList.remove('recording');
-            const waveBox = document.getElementById('waveBox');
-            if(waveBox) waveBox.classList.remove('active');
-            const inputField = document.getElementById('chatInput');
-            if(inputField) inputField.placeholder = "Ask Pyrox anything...";
-            if(micSvg) micSvg.innerHTML = `<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line>`;
+            micBtn.classList.remove('active');
+            document.getElementById('inputBox').classList.remove('recording');
+            document.getElementById('waveBox').classList.remove('active');
+            document.getElementById('chatInput').placeholder = "Ask Pyrox anything...";
+            micSvg.innerHTML = `<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line>`;
         }
 
         async function triggerSend(e) {
@@ -370,12 +446,11 @@ async def read_index():
             if (isListening && recognition) { recognition.stop(); stopVoiceUI(); }
             
             const inputField = document.getElementById('chatInput');
-            const text = inputField ? inputField.value.trim() : '';
+            const text = inputField.value.trim();
             if(!text) return;
 
-            if(inputField) inputField.value = '';
-            const landing = document.getElementById('landingHeader');
-            if(landing) landing.style.display = 'none';
+            inputField.value = '';
+            document.getElementById('landingHeader').style.display = 'none';
 
             appendMsg('user', text);
             const aiDiv = appendMsg('ai', '⚡ Pyrox सोच रहा है...');
@@ -384,7 +459,7 @@ async def read_index():
                 const response = await fetch('/api/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: text })
+                    body: JSON.stringify({ message: text, voice: currentVoice })
                 });
 
                 const data = await response.json();
@@ -407,18 +482,14 @@ async def read_index():
             const div = document.createElement('div');
             div.className = 'message ' + (role === 'user' ? 'user-message' : 'ai-message');
             div.innerText = content;
-            if(container) {
-                container.appendChild(div);
-                container.scrollTop = container.scrollHeight;
-            }
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
             return div;
         }
 
         function clearChat() {
-            const container = document.getElementById('chatContainer');
-            if(container) container.innerHTML = '';
-            const landing = document.getElementById('landingHeader');
-            if(landing) landing.style.display = 'flex';
+            document.getElementById('chatContainer').innerHTML = '';
+            document.getElementById('landingHeader').style.display = 'flex';
         }
     </script>
 </body>
