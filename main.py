@@ -44,11 +44,11 @@ def get_live_groq_model():
                             return m_id, f"Success (Picked {m_id})"
                 return chat_models[0], f"Success (Picked {chat_models[0]})"
             
-            return None, "No active chat models found for this API Key."
+            return "llama-3.3-70b-versatile", "Fallback Model"
         else:
-            return None, f"API Key Invalid or Groq Error: {res.status_code} - {res.text}"
+            return "llama-3.3-70b-versatile", "Fallback Model due to API status"
     except Exception as e:
-        return None, f"Connection Error: {str(e)}"
+        return "llama-3.3-70b-versatile", f"Fallback due to error: {str(e)}"
 
 @app.get("/api/debug")
 async def debug_key():
@@ -65,7 +65,6 @@ async def generate_edge_audio(text, voice_name="hi-IN-MadhurNeural", filename="s
         clean_t = clean_t.replace("*", "").replace("#", "").replace("`", "").replace("~", "")
         clean_t = clean_t.replace("Gen-Z", "मॉडर्न जनरेशन").replace("gen-z", "मॉडर्न जनरेशन")
 
-        # Speed ko thoda aur energetic (+30%) kar diya hai taaki ekdum smart lage
         communicate = edge_tts.Communicate(clean_t, voice_name, rate="+30%")
         await communicate.save(filename)
         return True
@@ -76,35 +75,32 @@ async def generate_edge_audio(text, voice_name="hi-IN-MadhurNeural", filename="s
 @app.post("/api/chat")
 async def chat_endpoint(req: ChatRequest):
     if not API_KEY:
-        raise HTTPException(status_code=400, detail="Groq API Key missing in environment variables!")
-    
-    active_model, status_msg = get_live_groq_model()
-    if not active_model:
-        raise HTTPException(status_code=400, detail=f"Groq API Error: {status_msg}")
-
-    url = "https://api.groq.com/openai/v1/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {API_KEY}",
-        "Content-Type": "application/json"
-    }
-    
-    payload = {
-        "model": active_model,
-        "messages": [
-            {
-                "role": "system",
-                "content": "You are Pyrox, a chill, direct, and street-smart AI buddy. Talk in natural, everyday Hinglish just like a real friend chatting casually. CRITICAL RULE: If anyone asks who made you, who created you, or who built you, you must proudly state that you were created and built by your brilliant developer and master user, not OpenAI or anyone else. Do NOT mention OpenAI ever. Keep replies crisp, natural, engaging, and straight to the point."
-            },
-            {
-                "role": "user",
-                "content": req.message
-            }
-        ],
-        "temperature": 0.7,
-        "max_tokens": 512
-    }
+        return JSONResponse(status_code=400, content={"detail": "Groq API Key missing in environment variables!"})
     
     try:
+        active_model, _ = get_live_groq_model()
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {API_KEY}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "model": active_model if active_model else "llama-3.3-70b-versatile",
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "You are Pyrox, a chill, direct, and street-smart AI buddy. Talk in natural, everyday Hinglish just like a real friend chatting casually. CRITICAL RULE: If anyone asks who made you, who created you, or who built you, you must proudly state that you were created and built by your brilliant developer and master user, not OpenAI or anyone else. Do NOT mention OpenAI ever. Keep replies crisp, natural, engaging, and straight to the point."
+                },
+                {
+                    "role": "user",
+                    "content": req.message
+                }
+            ],
+            "temperature": 0.7,
+            "max_tokens": 512
+        }
+        
         response = requests.post(url, headers=headers, json=payload, timeout=30)
         if response.status_code == 200:
             res_json = response.json()
@@ -118,9 +114,9 @@ async def chat_endpoint(req: ChatRequest):
                 "audio_url": f"/{audio_path}?t={asyncio.get_event_loop().time()}" if success else None
             }
         else:
-            raise HTTPException(status_code=response.status_code, detail=f"Groq API ({active_model}): {response.text}")
+            return JSONResponse(status_code=response.status_code, content={"detail": f"Groq API Error: {response.text}"})
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return JSONResponse(status_code=500, content={"detail": f"Server Exception: {str(e)}"})
 
 @app.get("/", response_class=HTMLResponse)
 async def read_index():
@@ -132,7 +128,40 @@ async def read_index():
     <title>Pyrox Studio</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-        body { background-color: #000000; color: #ffffff; display: flex; height: 100vh; overflow: hidden; }
+        body { background-color: #000000; color: #ffffff; display: flex; height: 100vh; overflow: hidden; position: relative; }
+
+        /* BACKGROUND ELECTRIC WAVE & LIGHTNING ANIMATION */
+        .cyber-wave-bg {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 1; overflow: hidden;
+            transition: opacity 1.5s ease-in-out; opacity: 1;
+        }
+        .cyber-wave-bg.fade-out { opacity: 0; }
+        
+        .wave-line {
+            position: absolute; width: 200%; height: 100px; opacity: 0.15;
+            background: linear-gradient(90deg, transparent, #3b82f6, #8b5cf6, #fff, #3b82f6, transparent);
+            animation: waveMove 6s infinite linear;
+        }
+        .wave-line:nth-child(1) { top: 20%; animation-duration: 5s; filter: drop-shadow(0 0 10px #3b82f6); }
+        .wave-line:nth-child(2) { top: 50%; animation-duration: 8s; opacity: 0.1; filter: drop-shadow(0 0 15px #8b5cf6); }
+        .wave-line:nth-child(3) { top: 75%; animation-duration: 6s; opacity: 0.08; }
+
+        @keyframes waveMove {
+            0% { transform: translateX(-50%) translateY(0) rotate(0deg); }
+            50% { transform: translateX(0%) translateY(20px) rotate(2deg); }
+            100% { transform: translateX(-50%) translateY(0) rotate(0deg); }
+        }
+
+        .lightning-flash {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle, rgba(59,130,246,0.15) 0%, transparent 70%);
+            opacity: 0; animation: lightningPulse 4s infinite;
+        }
+        @keyframes lightningPulse {
+            0%, 90%, 95% { opacity: 0; }
+            92%, 97% { opacity: 1; }
+        }
 
         .sidebar {
             width: 0px; background-color: #050505; border-right: none;
@@ -153,7 +182,7 @@ async def read_index():
         .menu-btn svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; flex-shrink: 0; }
         .sidebar-bottom { border-top: 1px solid #141414; padding-top: 8px; }
 
-        .main-container { flex: 1; display: flex; flex-direction: column; justify-content: space-between; align-items: center; height: 100vh; padding-top: 4px; padding-bottom: 8px; position: relative; }
+        .main-container { flex: 1; display: flex; flex-direction: column; justify-content: space-between; align-items: center; height: 100vh; padding-top: 4px; padding-bottom: 8px; position: relative; z-index: 5; }
         
         .top-navbar { width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 6px 20px; position: relative; z-index: 10; }
         .hamburger-btn, .dots-btn { background: transparent; border: none; color: #aaaaaa; cursor: pointer; padding: 6px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: color 0.2s, background 0.2s; }
@@ -233,8 +262,8 @@ async def read_index():
         .chat-input-field { flex: 1; background: transparent; border: none; outline: none; color: #ffffff; font-size: 0.95rem; padding: 4px 0; }
         .chat-input-field::placeholder { color: #555555; }
 
-        .mic-btn { background: transparent; border: none; color: #aaaaaa; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: color 0.2s, transform 0.2s; }
-        .mic-btn:hover { color: #ffffff; transform: scale(1.1); }
+        .mic-btn, .file-btn { background: transparent; border: none; color: #aaaaaa; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: color 0.2s, transform 0.2s; }
+        .mic-btn:hover, .file-btn:hover { color: #ffffff; transform: scale(1.1); }
         .mic-btn.active { color: #ef4444; }
 
         .arrow-submit-btn {
@@ -248,12 +277,20 @@ async def read_index():
 </head>
 <body>
 
+    <!-- BACKGROUND ELECTRIC WAVE & LIGHTNING CONTAINER -->
+    <div class="cyber-wave-bg" id="cyberWaveBg">
+        <div class="lightning-flash"></div>
+        <div class="wave-line"></div>
+        <div class="wave-line"></div>
+        <div class="wave-line"></div>
+    </div>
+
     <!-- SETTINGS MODAL -->
     <div class="modal-overlay" id="settingsModal">
         <div class="modal-card">
-            <div class="modal-title">⚙️ Pyrox Settings <span style="cursor:pointer; font-size:1.1rem;" onclick="closeModal('settingsModal')">✕</span></div>
+            <div class="modal-title">Pyrox AI Settings <span style="cursor:pointer; font-size:1.1rem;" onclick="closeModal('settingsModal')">✕</span></div>
             <div class="modal-body">
-                <p style="font-size: 0.85rem; color:#888;">Select AI Voice Performance:</p>
+                <p style="font-size: 0.85rem; color:#888;">Voice Assistant Performance:</p>
                 <button class="voice-option-btn" onclick="setVoice('hi-IN-MadhurNeural', 'Madhur (Female)')">👩 Madhur (Female - Smooth & Expressive)</button>
                 <button class="voice-option-btn" onclick="setVoice('hi-IN-PrabhatNeural', 'Prabhat (Male)')">👨 Prabhat (Male - Deep & Bold)</button>
                 <div style="margin-top: 10px; padding-top: 12px; border-top: 1px solid #222; display: flex; justify-content: space-between; align-items: center;">
@@ -268,7 +305,7 @@ async def read_index():
     <!-- LIBRARY MODAL -->
     <div class="modal-overlay" id="libraryModal">
         <div class="modal-card">
-            <div class="modal-title">📚 Pyrox Library <span style="cursor:pointer; font-size:1.1rem;" onclick="closeModal('libraryModal')">✕</span></div>
+            <div class="modal-title">Pyrox Library <span style="cursor:pointer; font-size:1.1rem;" onclick="closeModal('libraryModal')">✕</span></div>
             <div class="modal-body">
                 <p style="color: #666; font-size: 0.85rem; text-align: center; padding: 20px 0;">No saved chats or bookmarks yet!</p>
             </div>
@@ -315,7 +352,7 @@ async def read_index():
                 </svg>
             </button>
 
-            <!-- THREE DOTS MENU -->
+            <!-- THREE DOTS MENU (More option only) -->
             <div class="three-dots-wrapper" id="dotsWrapper">
                 <button type="button" class="dots-btn" onclick="toggleDropdown(event)">
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -349,6 +386,14 @@ async def read_index():
 
         <div class="input-wrapper">
             <div class="input-box" id="inputBox">
+                <!-- PHOTO & FILE ATTACH BUTTON -->
+                <button type="button" class="file-btn" onclick="triggerFileSelect()" title="Attach Photo or File">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"></path>
+                    </svg>
+                </button>
+                <input type="file" id="hiddenFileInput" style="display:none;" onchange="handleFileAttach(event)">
+
                 <button type="button" id="micBtn" class="mic-btn" onclick="toggleVoice(event)">
                     <svg id="micIconSvg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
@@ -379,6 +424,7 @@ async def read_index():
         let recognition = null;
         let accumulatedSpeech = "";
         let currentVoice = localStorage.getItem('pyrox_voice') || 'hi-IN-MadhurNeural';
+        let isFirstMessage = true;
 
         function toggleSidebar(e) {
             if(e) e.stopPropagation();
@@ -407,6 +453,18 @@ async def read_index():
             localStorage.setItem('pyrox_voice', currentVoice);
             alert("✅ Voice performance set to: " + voiceName);
             closeModal('settingsModal');
+        }
+
+        function triggerFileSelect() {
+            document.getElementById('hiddenFileInput').click();
+        }
+
+        function handleFileAttach(event) {
+            const file = event.target.files[0];
+            if(file) {
+                const inputField = document.getElementById('chatInput');
+                inputField.value = `[Attached File: ${file.name}] ` + inputField.value;
+            }
         }
 
         window.onclick = function(event) {
@@ -510,6 +568,16 @@ async def read_index():
             inputField.value = '';
             document.getElementById('landingHeader').style.display = 'none';
 
+            // BACKGROUND WAVE FADE-OUT (Dheere-dheere gayab hona)
+            if (isFirstMessage) {
+                const bgWave = document.getElementById('cyberWaveBg');
+                if(bgWave) {
+                    bgWave.classList.add('fade-out');
+                    setTimeout(() => { bgWave.style.display = 'none'; }, 1500);
+                }
+                isFirstMessage = false;
+            }
+
             appendMsg('user', text);
             const aiDiv = appendMsg('ai', '⚡ Pyrox सोच रहा है...');
 
@@ -520,32 +588,32 @@ async def read_index():
                     body: JSON.stringify({ message: text, voice: currentVoice })
                 });
 
-                const data = await response.json();
-                if(response.ok) {
-                    let htmlContent = `<div>${data.reply}</div>`;
-                    if(data.audio_url) {
-                        // MANUAL PLAY BUTTON - Ab audio apne aap nahi bajega, user ki marzi se bajega!
-                        const uniqueAudioId = 'audio_' + Date.now();
-                        htmlContent += `
-                            <div class="audio-player-box">
-                                <button class="play-audio-btn" onclick="playAudio('${uniqueAudioId}')">
-                                    🔊 Play Audio
-                                </button>
-                                <audio id="${uniqueAudioId}" style="display:none;"><source src="${data.audio_url}?t=${new Date().getTime()}" type="audio/mp3"></audio>
-                            </div>
-                        `;
-                    }
-                    aiDiv.innerHTML = htmlContent;
-                } else {
-                    aiDiv.innerText = "⚠️ Error: " + (data.detail || "Something went wrong");
+                if(!response.ok) {
+                    const errData = await response.json();
+                    aiDiv.innerText = "⚠️ Error: " + (errData.detail || "Something went wrong");
+                    return;
                 }
+
+                const data = await response.json();
+                let htmlContent = `<div>${data.reply}</div>`;
+                if(data.audio_url) {
+                    const uniqueAudioId = 'audio_' + Date.now();
+                    htmlContent += `
+                        <div class="audio-player-box">
+                            <button class="play-audio-btn" onclick="playAudio('${uniqueAudioId}')">
+                                🔊 Play Audio
+                            </button>
+                            <audio id="${uniqueAudioId}" style="display:none;"><source src="${data.audio_url}?t=${new Date().getTime()}" type="audio/mp3"></audio>
+                        </div>
+                    `;
+                }
+                aiDiv.innerHTML = htmlContent;
             } catch(e) {
                 aiDiv.innerText = "⚠️ Network Exception: " + e.message;
             }
         }
 
         function playAudio(audioId) {
-            // Baaki saare play ho rahe audio roko aur ye wala chalao
             document.querySelectorAll('audio').forEach(aud => {
                 aud.pause();
                 aud.currentTime = 0;
@@ -569,6 +637,12 @@ async def read_index():
         function clearChat() {
             document.getElementById('chatContainer').innerHTML = '';
             document.getElementById('landingHeader').style.display = 'flex';
+            isFirstMessage = true;
+            const bgWave = document.getElementById('cyberWaveBg');
+            if(bgWave) {
+                bgWave.style.display = 'block';
+                bgWave.classList.remove('fade-out');
+            }
         }
     </script>
 </body>
