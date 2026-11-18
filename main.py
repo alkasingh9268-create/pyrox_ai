@@ -82,7 +82,6 @@ async def generate_edge_audio(text, voice_name="hi-IN-MadhurNeural", filename="s
     try:
         clean_t = re.sub(r'[^\w\s.,!?-]', '', text)
         clean_t = clean_t.replace("*", "").replace("#", "").replace("`", "").replace("~", "")
-        # Ensure full words are spoken cleanly without clipping
         communicate = edge_tts.Communicate(clean_t, voice_name, rate="+15%")
         await communicate.save(filename)
         return True
@@ -104,11 +103,12 @@ async def chat_endpoint(req: ChatRequest):
             "Content-Type": "application/json"
         }
         
+        # Yahan par humne system prompt ko aur bhi tight aur clear kar diya hai
         system_content = (
             f"You are Pyrox, a brilliant, chill, direct, and professional AI buddy created by your master developer. "
             f"The user mode is set to: {req.student_mode}. "
-            "CRITICAL FORMATTING RULE: NEVER write long, boring paragraphs. You MUST ALWAYS structure your answers using "
-            "bold section headings, clear bullet points, and numbered steps so it is extremely easy to read instantly. "
+            "CRITICAL FORMATTING RULE: NEVER write long, boring, or single giant paragraphs. You MUST ALWAYS structure your answers using "
+            "bold section headings, clear bullet points, and numbered steps with empty lines between them so it is extremely easy to read instantly. "
             "CRITICAL LANGUAGE RULE: Talk in smooth, natural Hinglish. Keep sentences crisp, direct, and perfectly clear. "
             "CRITICAL IDENTITY RULE: If anyone asks who created you, proudly state you were built by your master developer. Never mention OpenAI."
         )
@@ -151,11 +151,12 @@ async def read_index():
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pyrox Studio - AI Assistant</title>
+    <!-- Marked.js for Clean Markdown & Formatting -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
         body { background-color: #000000; color: #ffffff; display: flex; height: 100vh; overflow: hidden; position: relative; }
 
-        /* Background strictly restricted to bottom 75% */
         .cyber-wave-bg {
             position: absolute; top: 25%; left: 0; width: 100%; height: 75%;
             pointer-events: none; z-index: 1; overflow: hidden;
@@ -178,7 +179,6 @@ async def read_index():
             100% { transform: translateX(-50%) translateY(0) rotate(0deg); }
         }
 
-        /* Sidebar & Expand Menu */
         .sidebar {
             width: 0px; background-color: #060608; border-right: none;
             display: flex; flex-direction: column; justify-content: space-between;
@@ -219,7 +219,6 @@ async def read_index():
         }
         .dropdown-item:hover { background-color: #1f1f23; color: #ffffff; }
 
-        /* Modals */
         .modal-overlay {
             position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
             background: rgba(0,0,0,0.75); display: none; align-items: center; justify-content: center; z-index: 1000;
@@ -241,7 +240,6 @@ async def read_index():
             border-radius: 8px; font-weight: 600; cursor: pointer; align-self: flex-end; margin-top: 5px;
         }
 
-        /* Clean Header & Rotational Dynamic Greetings */
         .center-landing-header { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; margin-top: 15px; padding: 0 15px; }
         .brand-title-box { display: flex; align-items: center; gap: 12px; }
         .brand-name-large { font-size: 2.3rem; font-weight: 800; color: #ffffff; letter-spacing: -0.5px; }
@@ -250,7 +248,6 @@ async def read_index():
         .greeting-title { font-size: 1.2rem; font-weight: 700; color: #3b82f6; }
         .greeting-subtext { font-size: 0.95rem; font-weight: 400; color: #9ca3af; }
 
-        /* Working Suggestions Grid */
         .suggestions-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; width: 100%; max-width: 720px; margin-top: 16px; padding: 0 10px; }
         .suggestion-card {
             background: #09090d; border: 1px solid #1a1a22; border-radius: 14px; padding: 12px 14px;
@@ -260,16 +257,25 @@ async def read_index():
         .card-title { font-size: 0.88rem; font-weight: 600; color: #ffffff; }
         .card-desc { font-size: 0.78rem; color: #6b7280; }
 
-        /* Chat Container & Structured Formatting */
         .chat-container { width: 100%; max-width: 800px; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; padding: 10px 15px; margin-top: 5px; }
         .message { display: flex; flex-direction: column; max-width: 85%; line-height: 1.6; font-size: 0.95rem; gap: 8px; }
         .user-message { align-self: flex-end; background-color: #1c1c24; color: #ffffff; padding: 10px 16px; border-radius: 16px 16px 4px 16px; border: 1px solid #2d2d3a; }
         .ai-message { align-self: flex-start; background-color: #08080c; color: #f3f4f6; padding: 14px 18px; border-radius: 16px 16px 16px 4px; border: 1px solid #16161f; width: 100%; max-width: 100%; }
         
-        .ai-message ul, .ai-message ol { padding-left: 20px; margin: 6px 0; }
-        .ai-message li { margin-bottom: 4px; }
-        .ai-message p { margin-bottom: 6px; }
+        /* Markdown formatting styles */
+        .ai-message ul, .ai-message ol { padding-left: 20px; margin: 8px 0; }
+        .ai-message li { margin-bottom: 6px; }
+        .ai-message p { margin-bottom: 10px; }
         .ai-message strong { color: #60a5fa; }
+        .ai-message h2, .ai-message h3 { color: #60a5fa; margin-top: 12px; margin-bottom: 6px; }
+
+        /* Code block styles with copy button */
+        .code-block-wrapper { margin: 12px 0; border-radius: 8px; overflow: hidden; border: 1px solid #2a2a35; background: #0d0d12; }
+        .code-block-header { display: flex; justify-content: space-between; align-items: center; padding: 6px 12px; background: #16161f; font-size: 11px; color: #9ca3af; font-family: monospace; }
+        .copy-code-btn { background: transparent; border: 1px solid #333340; color: #ccc; padding: 2px 8px; border-radius: 4px; font-size: 10px; cursor: pointer; }
+        .copy-code-btn:hover { background: #2c2c38; color: #fff; }
+        .code-block-wrapper pre { padding: 12px; overflow-x: auto; margin: 0; }
+        .code-block-wrapper pre code { background: transparent; border: none; padding: 0; color: #e4e4e7; font-size: 0.85rem; }
 
         .audio-player-box { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
         .play-audio-btn {
@@ -287,7 +293,6 @@ async def read_index():
         }
         .input-box.recording { border-color: #3b82f6; box-shadow: 0 0 20px rgba(59, 130, 246, 0.3); }
 
-        /* High-Frequency Sharp Equalizer Spikes */
         .equalizer-wave-container { display: flex; align-items: center; gap: 3px; height: 26px; width: 140px; display: none; }
         .equalizer-wave-container.active { display: flex; }
         .freq-bar { flex: 1; background: linear-gradient(180deg, #3b82f6, #8b5cf6, #ffffff); border-radius: 1px; height: 15%; animation: spikeMotion 0.4s infinite ease-in-out alternate; }
@@ -454,13 +459,11 @@ async def read_index():
                 <span class="brand-name-large">Pyrox</span>
             </div>
             
-            <!-- Rotational Dynamic Greetings -->
             <div class="greeting-box" id="dynamicGreetingBox">
                 <div class="greeting-title" id="greetingTitle">Namaste, Master Creator!</div>
                 <div class="greeting-subtext" id="greetingSubtitle">Aaj padhai, coding ya content creation me kahan help chahiye?</div>
             </div>
 
-            <!-- Assistant Suggestions Grid -->
             <div class="suggestions-grid">
                 <div class="suggestion-card" onclick="selectSuggestion('Schedule and weekly routine banana hai mujhe, meri help karo.')">
                     <span class="card-title">📅 Schedule & Routine</span>
@@ -500,7 +503,6 @@ async def read_index():
                     </svg>
                 </button>
 
-                <!-- Sharp Equalizer Spikes -->
                 <div class="equalizer-wave-container" id="waveBox">
                     <div class="freq-bar"></div><div class="freq-bar"></div><div class="freq-bar"></div><div class="freq-bar"></div>
                     <div class="freq-bar"></div><div class="freq-bar"></div><div class="freq-bar"></div><div class="freq-bar"></div>
@@ -530,7 +532,6 @@ async def read_index():
         let currentStudentMode = localStorage.getItem('pyrox_mode') || 'General Student';
         let isFirstMessage = true;
 
-        // Rotational Dynamic Greetings on Load
         const greetingsList = [
             { title: "Namaste, Master Creator!", sub: "Aaj padhai, coding ya content creation me kahan help chahiye?" },
             { title: "Hello Bhai! Pyrox is ready.", sub: "Batao aaj konsa project ya goal tackle karna hai?" },
@@ -556,28 +557,70 @@ async def read_index():
             menu.classList.toggle('show');
         }
 
+        window.onclick = function(event) {
+            if (!event.target.matches('.dots-btn') && !event.target.closest('.three-dots-wrapper')) {
+                const dropdowns = document.getElementsByClassName("dropdown-menu");
+                for (let i = 0; i < dropdowns.length; i++) {
+                    let openDropdown = dropdowns[i];
+                    if (openDropdown.classList.contains('show')) {
+                        openDropdown.classList.remove('show');
+                    }
+                }
+            }
+            if (!event.target.closest('.sidebar') && !event.target.closest('.hamburger-btn')) {
+                document.getElementById('sidebar').classList.remove('expanded');
+            }
+        }
+
         function openModal(modalId) {
-            const dropdown = document.getElementById('dropdownMenu');
-            if(dropdown) dropdown.classList.remove('show');
             document.getElementById(modalId).style.display = 'flex';
+            document.getElementById('dropdownMenu').classList.remove('show');
         }
 
         function closeModal(modalId) {
             document.getElementById(modalId).style.display = 'none';
         }
 
-        function setVoice(voiceCode, voiceName) {
-            currentVoice = voiceCode;
-            localStorage.setItem('pyrox_voice', currentVoice);
-            alert("✅ Voice set to: " + voiceName);
+        function setVoice(voiceId, voiceName) {
+            currentVoice = voiceId;
+            localStorage.setItem('pyrox_voice', voiceId);
+            alert('Voice updated to: ' + voiceName);
             closeModal('settingsModal');
         }
 
         function setStudentMode(modeName) {
             currentStudentMode = modeName;
-            localStorage.setItem('pyrox_mode', currentStudentMode);
-            alert("🎓 Student Mode updated to: " + modeName);
+            localStorage.setItem('pyrox_mode', modeName);
+            alert('Academic Mode set to: ' + modeName);
             closeModal('settingsModal');
+        }
+
+        function selectSuggestion(text) {
+            document.getElementById('chatInput').value = text;
+            triggerSend();
+        }
+
+        function clearChat() {
+            document.getElementById('chatContainer').innerHTML = '';
+            document.getElementById('landingHeader').style.display = 'flex';
+            document.getElementById('cyberWaveBg').classList.remove('fade-out');
+            isFirstMessage = true;
+            document.getElementById('dropdownMenu').classList.remove('show');
+        }
+
+        function exportChat() {
+            const chatContent = document.getElementById('chatContainer').innerText;
+            if(!chatContent) {
+                alert('No chat conversation to export yet!');
+                return;
+            }
+            const blob = new Blob([chatContent], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'Pyrox_Chat_Export.txt';
+            a.click();
+            document.getElementById('dropdownMenu').classList.remove('show');
         }
 
         function triggerFileSelect() {
@@ -587,193 +630,211 @@ async def read_index():
         function handleFileAttach(event) {
             const file = event.target.files[0];
             if(file) {
-                const inputField = document.getElementById('chatInput');
-                inputField.value = `[Attached File: ${file.name}] ` + inputField.value;
+                document.getElementById('chatInput').value = `[Attached File: ${file.name}] `;
             }
         }
 
-        function selectSuggestion(promptText) {
-            const inputField = document.getElementById('chatInput');
-            inputField.value = promptText;
-            triggerSend();
-        }
-
-        window.onclick = function(event) {
-            const sb = document.getElementById('sidebar');
-            const menu = document.getElementById('dropdownMenu');
-            
-            if (!event.target.closest('#sidebar') && !event.target.closest('.hamburger-btn')) {
-                if(sb) sb.classList.remove('expanded');
+        function toggleVoice(event) {
+            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                alert('Speech Recognition is not supported in your browser. Please use Chrome or Edge.');
+                return;
             }
-            if (!event.target.closest('.three-dots-wrapper')) {
-                if(menu) menu.classList.remove('show');
-            }
-        };
 
-        function exportChat() {
-            const msgs = document.querySelectorAll('.message');
-            if(msgs.length === 0) { alert("No chat to export!"); return; }
-            let text = "--- Pyrox Chat Export ---\\n\\n";
-            msgs.forEach(m => text += m.innerText + "\\n\\n");
-            const blob = new Blob([text], {type: 'text/plain'});
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = 'Pyrox_Chat.txt';
-            a.click();
-        }
-
-        function clearChat() {
-            document.getElementById('chatContainer').innerHTML = '';
-            document.getElementById('landingHeader').style.display = 'flex';
-            isFirstMessage = true;
-            const bgWave = document.getElementById('cyberWaveBg');
-            if(bgWave) {
-                bgWave.style.display = 'block';
-                bgWave.classList.remove('fade-out');
-            }
-        }
-
-        function appendMsg(sender, text) {
-            const container = document.getElementById('chatContainer');
-            const msgDiv = document.createElement('div');
-            msgDiv.className = `message ${sender === 'user' ? 'user-message' : 'ai-message'}`;
-            msgDiv.innerHTML = text;
-            container.appendChild(msgDiv);
-            container.scrollTop = container.scrollHeight;
-            return msgDiv;
-        }
-
-        function playAudio(audioId) {
-            const audioEle = document.getElementById(audioId);
-            if(audioEle) audioEle.play();
-        }
-
-        function toggleVoice(e) {
-            if(e) e.preventDefault();
             const micBtn = document.getElementById('micBtn');
-            const micSvg = document.getElementById('micIconSvg');
             const inputBox = document.getElementById('inputBox');
             const waveBox = document.getElementById('waveBox');
-            const inputField = document.getElementById('chatInput');
 
-            if (isListening) {
-                if (recognition) recognition.stop();
-                stopVoiceUI();
-                return;
-            }
+            if (!isListening) {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                recognition = new SpeechRecognition();
+                recognition.lang = 'hi-IN';
+                recognition.continuous = true;
+                recognition.interimResults = true;
 
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (!SpeechRecognition) {
-                alert("Speech recognition not supported in your browser.");
-                return;
-            }
+                recognition.onstart = function() {
+                    isListening = true;
+                    micBtn.classList.add('active');
+                    inputBox.classList.add('recording');
+                    waveBox.classList.add('active');
+                    accumulatedSpeech = "";
+                };
 
-            recognition = new SpeechRecognition();
-            recognition.lang = 'hi-IN';
-            recognition.continuous = true;
-            recognition.interimResults = true;
-
-            accumulatedSpeech = inputField.value ? inputField.value + " " : "";
-
-            recognition.onstart = function() {
-                isListening = true;
-                micBtn.classList.add('active');
-                inputBox.classList.add('recording');
-                waveBox.classList.add('active');
-                inputField.placeholder = "Listening live audio frequency...";
-                micSvg.innerHTML = `<rect x="6" y="4" width="4" height="16" fill="currentColor"/><rect x="14" y="4" width="4" height="16" fill="currentColor"/>`;
-            };
-
-            recognition.onresult = function(event) {
-                let interim = '';
-                for (let i = event.resultIndex; i < event.results.length; ++i) {
-                    if (event.results[i].isFinal) {
-                        accumulatedSpeech += event.results[i][0].transcript + " ";
-                    } else {
-                        interim += event.results[i][0].transcript;
+                recognition.onresult = function(event) {
+                    let interim = '';
+                    for (let i = event.resultIndex; i < event.results.length; ++i) {
+                        if (event.results[i].isFinal) {
+                            accumulatedSpeech += event.results[i][0].transcript + ' ';
+                        } else {
+                            interim += event.results[i][0].transcript;
+                        }
                     }
-                }
-                inputField.value = accumulatedSpeech + interim;
-            };
+                    document.getElementById('chatInput').value = accumulatedSpeech + interim;
+                };
 
-            recognition.onend = function() {
-                if (isListening) { try { recognition.start(); } catch(e) {} }
-            };
+                recognition.onerror = function(event) {
+                    console.error('Speech recognition error', event.error);
+                    stopVoice();
+                };
 
-            try { recognition.start(); } catch(e) {}
+                recognition.onend = function() {
+                    stopVoice();
+                };
+
+                recognition.start();
+            } else {
+                stopVoice();
+            }
         }
 
-        function stopVoiceUI() {
+        function stopVoice() {
             isListening = false;
             const micBtn = document.getElementById('micBtn');
-            const micSvg = document.getElementById('micIconSvg');
-            micBtn.classList.remove('active');
-            document.getElementById('inputBox').classList.remove('recording');
-            document.getElementById('waveBox').classList.remove('active');
-            document.getElementById('chatInput').placeholder = "Ask Pyrox anything...";
-            micSvg.innerHTML = `<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line>`;
+            const inputBox = document.getElementById('inputBox');
+            const waveBox = document.getElementById('waveBox');
+            if(micBtn) micBtn.classList.remove('active');
+            if(inputBox) inputBox.classList.remove('recording');
+            if(waveBox) waveBox.classList.remove('active');
+            if(recognition) {
+                try { recognition.stop(); } catch(e){}
+            }
+            const finalVal = document.getElementById('chatInput').value.trim();
+            if(finalVal) {
+                triggerSend();
+            }
+        }
+
+        // Marked.js & Code Block Formatter Function
+        function formatAIResponse(rawText) {
+            let parsedHtml = (typeof marked !== 'undefined') ? marked.parse(rawText) : rawText.replace(/\\n/g, '<br>');
+            
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = parsedHtml;
+
+            const preBlocks = tempDiv.querySelectorAll('pre');
+            preBlocks.forEach((pre) => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'code-block-wrapper';
+
+                const header = document.createElement('div');
+                header.className = 'code-block-header';
+                
+                const codeEl = pre.querySelector('code');
+                let lang = 'code';
+                if (codeEl && codeEl.className) {
+                    const match = codeEl.className.match(/language-(\\w+)/);
+                    if (match) lang = match[1];
+                }
+
+                header.innerHTML = `<span>${lang.toUpperCase()}</span>`;
+                
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'copy-code-btn';
+                copyBtn.innerText = 'Copy';
+                copyBtn.onclick = function() {
+                    navigator.clipboard.writeText(pre.innerText);
+                    copyBtn.innerText = 'Copied!';
+                    setTimeout(() => copyBtn.innerText = 'Copy', 2000);
+                };
+
+                header.appendChild(copyBtn);
+                pre.parentNode.insertBefore(wrapper, pre);
+                wrapper.appendChild(header);
+                wrapper.appendChild(pre);
+            });
+
+            return tempDiv.innerHTML;
         }
 
         async function triggerSend(e) {
             if(e) e.preventDefault();
-            if (isListening && recognition) { recognition.stop(); stopVoiceUI(); }
-            
             const inputField = document.getElementById('chatInput');
-            const text = inputField.value.trim();
-            if(!text) return;
+            const message = inputField.value.trim();
+            if(!message) return;
 
-            inputField.value = '';
-            document.getElementById('landingHeader').style.display = 'none';
-
-            if (isFirstMessage) {
-                const bgWave = document.getElementById('cyberWaveBg');
-                if(bgWave) {
-                    bgWave.classList.add('fade-out');
-                    setTimeout(() => { bgWave.style.display = 'none'; }, 1500);
-                }
+            if(isFirstMessage) {
+                document.getElementById('landingHeader').style.display = 'none';
+                document.getElementById('cyberWaveBg').classList.add('fade-out');
                 isFirstMessage = false;
             }
 
-            appendMsg('user', text);
-            const aiDiv = appendMsg('ai', '⚡ Pyrox soch raha hai...');
+            inputField.value = '';
+
+            const chatContainer = document.getElementById('chatContainer');
+            
+            const userMsgDiv = document.createElement('div');
+            userMsgDiv.className = 'message user-message';
+            userMsgDiv.innerText = message;
+            chatContainer.appendChild(userMsgDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+
+            const aiMsgDiv = document.createElement('div');
+            aiMsgDiv.className = 'message ai-message';
+            aiMsgDiv.innerHTML = '<strong>Pyrox:</strong> Thinking...';
+            chatContainer.appendChild(aiMsgDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
 
             try {
-                const response = await fetch('/api/chat', {
+                const res = await fetch('/api/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: text, voice: currentVoice, user_name: currentUserName, student_mode: currentStudentMode })
+                    body: JSON.stringify({
+                        message: message,
+                        voice: currentVoice,
+                        user_name: currentUserName,
+                        student_mode: currentStudentMode
+                    })
                 });
 
-                if(!response.ok) {
-                    const errData = await response.json();
-                    aiDiv.innerText = "⚠️ Error: " + (errData.detail || "Something went wrong");
-                    return;
-                }
+                if(res.ok) {
+                    const data = await res.json();
+                    let formattedReply = formatAIResponse(data.reply);
+                    
+                    let audioHtml = '';
+                    if(data.audio_url) {
+                        audioHtml = `
+                            <div class="audio-player-box">
+                                <button type="button" class="play-audio-btn" onclick="playAudioResponse(this, '${data.audio_url}')">
+                                    ▶ Play Voice Response
+                                </button>
+                                <audio src="${data.audio_url}"></audio>
+                            </div>
+                        `;
+                    }
 
-                const data = await response.json();
-                let htmlContent = `<div>${data.reply}</div>`;
-                if(data.audio_url) {
-                    const uniqueAudioId = 'audio_' + Date.now();
-                    htmlContent += `
-                        <div class="audio-player-box">
-                            <button class="play-audio-btn" onclick="playAudio('${uniqueAudioId}')">
-                                🔊 Play Audio
-                            </button>
-                            <audio id="${uniqueAudioId}" src="${data.audio_url}"></audio>
-                        </div>
-                    `;
+                    aiMsgDiv.innerHTML = `<strong>Pyrox:</strong><br><br>${formattedReply}${audioHtml}`;
+                } else {
+                    const errJson = await res.json();
+                    aiMsgDiv.innerHTML = `<strong>Pyrox Error:</strong> ${errJson.detail || 'Server processing error'}`;
                 }
-                aiDiv.innerHTML = htmlContent;
-            } catch (err) {
-                aiDiv.innerText = "⚠️ Server Connection Failed!";
+            } catch(err) {
+                aiMsgDiv.innerHTML = `<strong>Network Error:</strong> ${err.message}`;
+            }
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function playAudioResponse(btnEl, url) {
+            const audioBox = btnEl.parentElement;
+            const audio = audioBox.querySelector('audio');
+            if(audio.paused) {
+                audio.play();
+                btnEl.innerText = '⏸ Pause Voice';
+                audio.onended = function() {
+                    btnEl.innerText = '▶ Play Voice Response';
+                };
+            } else {
+                audio.pause();
+                btnEl.innerText = '▶ Play Voice Response';
             }
         }
     </script>
 </body>
 </html>
 """
-    return HTMLResponse(content=html_content)
+    return html_content
+    
+          
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+      
+              
+
+ 
