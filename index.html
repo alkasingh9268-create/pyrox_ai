@@ -4,25 +4,59 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pyrox Studio</title>
+    <!-- Marked.js for Clean Markdown Formatting -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif;
         }
+
+        :root {
+            --bg-main: #09090b;
+            --bg-sidebar: #0c0c0e;
+            --bg-surface: #121215;
+            --bg-elevated: #18181b;
+            --border-subtle: #27272a;
+            --border-focus: #3f3f46;
+            --text-primary: #f4f4f5;
+            --text-secondary: #a1a1aa;
+            --text-muted: #71717a;
+            --accent-blue: #3b82f6;
+            --danger-red: #ef4444;
+        }
+
         body {
-            background-color: #000000;
-            color: #ffffff;
+            background-color: var(--bg-main);
+            color: var(--text-primary);
             display: flex;
             height: 100vh;
             overflow: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* CUSTOM SCROLLBAR */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #27272a;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #3f3f46;
         }
 
         /* COLLAPSIBLE SIDEBAR */
         .sidebar {
             width: 0px;
-            background-color: #050505;
+            background-color: var(--bg-sidebar);
             border-right: none;
             display: flex;
             flex-direction: column;
@@ -30,25 +64,25 @@
             padding: 0px;
             z-index: 20;
             overflow: hidden;
-            transition: width 0.3s ease, padding 0.3s ease, border-right 0.3s ease;
+            transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), padding 0.25s ease;
         }
         .sidebar.expanded {
-            width: 230px;
-            padding: 12px 10px;
-            border-right: 1px solid #141414;
+            width: 240px;
+            padding: 14px 12px;
+            border-right: 1px solid var(--border-subtle);
         }
         .sidebar-logo-header {
             display: flex;
             align-items: center;
             gap: 12px;
-            padding: 6px 6px;
-            margin-bottom: 12px;
+            padding: 6px 8px;
+            margin-bottom: 16px;
         }
         .sidebar-brand-name {
             font-size: 1.15rem;
             font-weight: 700;
-            color: #ffffff;
-            letter-spacing: 0.5px;
+            color: var(--text-primary);
+            letter-spacing: 0.4px;
         }
         .menu-list {
             display: flex;
@@ -58,31 +92,47 @@
         .menu-btn {
             display: flex;
             align-items: center;
-            gap: 12px;
-            padding: 9px 10px;
-            color: #aaaaaa;
+            justify-content: space-between;
+            padding: 10px 12px;
+            color: var(--text-secondary);
             font-size: 13.5px;
+            font-weight: 500;
             border-radius: 8px;
             cursor: pointer;
-            transition: background 0.2s, color 0.2s;
-            position: relative;
+            transition: all 0.15s ease;
             white-space: nowrap;
         }
+        .menu-btn-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
         .menu-btn:hover {
-            background-color: #141414;
-            color: #ffffff;
+            background-color: var(--bg-elevated);
+            color: var(--text-primary);
+        }
+        .menu-btn:active {
+            transform: scale(0.98);
         }
         .menu-btn svg {
-            width: 18px;
-            height: 18px;
+            width: 17px;
+            height: 17px;
             stroke: currentColor;
             fill: none;
             stroke-width: 2;
             flex-shrink: 0;
         }
+        .shortcut-badge {
+            font-size: 10px;
+            color: var(--text-muted);
+            background-color: var(--bg-main);
+            border: 1px solid var(--border-subtle);
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
         .sidebar-bottom {
-            border-top: 1px solid #141414;
-            padding-top: 8px;
+            border-top: 1px solid var(--border-subtle);
+            padding-top: 10px;
         }
 
         /* TOOLTIP HOVER HELPER */
@@ -92,20 +142,20 @@
         [data-tooltip]:hover::after {
             content: attr(data-tooltip);
             position: absolute;
-            bottom: 115%;
+            bottom: 120%;
             left: 50%;
             transform: translateX(-50%);
-            background-color: #1f1f1f;
-            color: #ffffff;
+            background-color: var(--bg-elevated);
+            color: var(--text-primary);
             font-size: 11px;
             font-weight: 500;
-            padding: 4px 8px;
+            padding: 5px 9px;
             border-radius: 6px;
             white-space: nowrap;
-            border: 1px solid #333;
+            border: 1px solid var(--border-subtle);
             pointer-events: none;
             z-index: 1000;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
         }
 
         /* MAIN WORKSPACE */
@@ -116,8 +166,7 @@
             justify-content: space-between;
             align-items: center;
             height: 100vh;
-            padding-top: 4px;
-            padding-bottom: 8px;
+            padding-bottom: 12px;
             position: relative;
         }
 
@@ -127,89 +176,116 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 6px 20px;
+            padding: 10px 20px;
             position: relative;
             z-index: 10;
+        }
+        .nav-left-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .model-badge {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            padding: 4px 10px;
+            border-radius: 20px;
+            letter-spacing: 0.3px;
         }
         .hamburger-btn, .dots-btn {
             background: transparent;
             border: none;
-            color: #aaaaaa;
+            color: var(--text-secondary);
             cursor: pointer;
-            padding: 6px;
-            border-radius: 50%;
+            padding: 7px;
+            border-radius: 8px;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: color 0.2s, background 0.2s;
+            transition: all 0.15s ease;
         }
         .hamburger-btn:hover, .dots-btn:hover {
-            color: #ffffff;
-            background-color: #1a1a1a;
+            color: var(--text-primary);
+            background-color: var(--bg-elevated);
+        }
+        .hamburger-btn:active, .dots-btn:active {
+            transform: scale(0.95);
         }
         .three-dots-wrapper {
             position: relative;
         }
         .dropdown-menu {
             position: absolute;
-            top: 38px;
+            top: 40px;
             right: 0;
             width: 220px;
-            background-color: #0d0d0d;
-            border: 1px solid #222222;
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
             border-radius: 12px;
-            padding: 6px 0;
+            padding: 6px;
             display: none;
             flex-direction: column;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.7);
+            gap: 2px;
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.75);
             z-index: 100;
         }
         .dropdown-menu.show {
             display: flex;
+            animation: fadeIn 0.15s ease;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-5px); }
+            to { opacity: 1; transform: translateY(0); }
         }
         .dropdown-item {
-            padding: 10px 16px;
+            padding: 9px 12px;
             font-size: 13px;
-            color: #cccccc;
+            color: var(--text-secondary);
+            border-radius: 8px;
             cursor: pointer;
             display: flex;
             align-items: center;
             gap: 10px;
-            transition: background 0.2s;
+            transition: all 0.15s ease;
         }
         .dropdown-item:hover {
-            background-color: #1a1a1a;
-            color: #ffffff;
+            background-color: var(--bg-elevated);
+            color: var(--text-primary);
         }
         .dropdown-item.login-item {
-            border-bottom: 1px solid #222;
-            color: #3b82f6;
+            border-bottom: 1px solid var(--border-subtle);
+            border-radius: 8px 8px 0 0;
+            margin-bottom: 4px;
+            color: var(--accent-blue);
             font-weight: 600;
         }
 
         /* SEARCH OVERLAY BAR IN CHAT */
         .search-bar-overlay {
             position: absolute;
-            top: 50px;
+            top: 56px;
             width: 90%;
-            max-width: 500px;
-            background-color: #111;
-            border: 1px solid #333;
-            border-radius: 20px;
-            padding: 6px 14px;
+            max-width: 480px;
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-focus);
+            border-radius: 12px;
+            padding: 8px 14px;
             display: none;
             align-items: center;
             gap: 10px;
             z-index: 50;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.6);
         }
         .search-bar-overlay input {
             flex: 1;
             background: transparent;
             border: none;
             outline: none;
-            color: #fff;
-            font-size: 13px;
+            color: var(--text-primary);
+            font-size: 13.5px;
         }
 
         /* CENTER LANDING HEADER */
@@ -218,116 +294,254 @@
             flex-direction: column;
             align-items: center;
             text-align: center;
-            gap: 6px;
-            margin-top: 15px;
+            gap: 10px;
+            margin-top: auto;
+            margin-bottom: 20px;
+            padding: 0 20px;
         }
         .brand-title-box {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 14px;
         }
         .brand-name-large {
-            font-size: 2.2rem;
+            font-size: 2.3rem;
             font-weight: 800;
-            color: #ffffff;
-            letter-spacing: -0.5px;
+            color: var(--text-primary);
+            letter-spacing: -0.6px;
         }
         .greeting-subtext {
-            font-size: 1.15rem;
-            font-weight: 500;
-            color: #888888;
+            font-size: 1.05rem;
+            font-weight: 400;
+            color: var(--text-secondary);
         }
 
         /* CHAT MESSAGES CONTAINER */
         .chat-container {
             width: 100%;
-            max-width: 800px;
+            max-width: 820px;
             flex: 1;
             overflow-y: auto;
             display: flex;
             flex-direction: column;
-            gap: 14px;
-            padding: 10px 15px;
-            margin-top: 5px;
+            gap: 20px;
+            padding: 16px 20px;
+            scroll-behavior: smooth;
         }
         .message {
             display: flex;
             flex-direction: column;
-            max-width: 82%;
-            line-height: 1.5;
-            font-size: 0.95rem;
-            gap: 8px;
+            max-width: 85%;
+            line-height: 1.65;
+            font-size: 0.96rem;
         }
         .user-message {
             align-self: flex-end;
-            background-color: #1c1c1e;
-            color: #ffffff;
-            padding: 10px 16px;
-            border-radius: 16px 16px 4px 16px;
-            border: 1px solid #2d2d2d;
+            background-color: var(--bg-elevated);
+            color: var(--text-primary);
+            padding: 11px 16px;
+            border-radius: 18px 18px 4px 18px;
+            border: 1px solid var(--border-subtle);
+            white-space: pre-wrap;
+            word-wrap: break-word;
         }
         .ai-message {
             align-self: flex-start;
-            background-color: #080808;
-            color: #f0f0f0;
-            padding: 14px 18px;
-            border-radius: 16px 16px 16px 4px;
-            border: 1px solid #1a1a1a;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
+            background-color: transparent;
+            color: #e4e4e7;
+            padding: 4px 4px;
             width: 100%;
             max-width: 100%;
         }
-        audio {
-            width: 100%;
-            height: 32px;
-            margin-top: 6px;
-            filter: invert(100%) hue-rotate(180deg);
+
+        /* MARKDOWN & FORMATTING STYLES INSIDE AI MESSAGE */
+        .ai-content p {
+            margin-bottom: 12px;
+        }
+        .ai-content p:last-child {
+            margin-bottom: 0;
+        }
+        .ai-content h1, .ai-content h2, .ai-content h3 {
+            color: #ffffff;
+            margin-top: 18px;
+            margin-bottom: 8px;
+            font-weight: 700;
+            line-height: 1.3;
+        }
+        .ai-content h2 { font-size: 1.2rem; border-bottom: 1px solid var(--border-subtle); padding-bottom: 4px; }
+        .ai-content h3 { font-size: 1.05rem; }
+        .ai-content ul, .ai-content ol {
+            margin-left: 22px;
+            margin-bottom: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .ai-content li {
+            padding-left: 4px;
+        }
+        .ai-content strong {
+            color: #ffffff;
+            font-weight: 600;
+        }
+        .ai-content blockquote {
+            border-left: 3px solid var(--accent-blue);
+            padding-left: 12px;
+            color: var(--text-secondary);
+            margin: 12px 0;
+            background: rgba(59, 130, 246, 0.05);
+            padding: 8px 12px;
+            border-radius: 0 8px 8px 0;
+        }
+        .ai-content code {
+            font-family: "Fira Code", "Consolas", monospace;
+            background-color: var(--bg-elevated);
+            color: #93c5fd;
+            padding: 2px 6px;
+            border-radius: 5px;
+            font-size: 0.88em;
+            border: 1px solid var(--border-subtle);
+        }
+
+        /* CODE BLOCK CONTAINER WITH COPY BUTTON */
+        .code-block-wrapper {
+            margin: 14px 0;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid var(--border-subtle);
+            background-color: #0d0d10;
+        }
+        .code-block-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 14px;
+            background-color: #16161a;
+            border-bottom: 1px solid var(--border-subtle);
+            font-size: 11.5px;
+            color: var(--text-secondary);
+            font-family: monospace;
+        }
+        .copy-code-btn {
+            background: transparent;
+            border: 1px solid var(--border-subtle);
+            color: var(--text-secondary);
+            padding: 3px 9px;
+            border-radius: 5px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .copy-code-btn:hover {
+            background-color: var(--bg-elevated);
+            color: #ffffff;
+        }
+        .code-block-wrapper pre {
+            padding: 14px;
+            overflow-x: auto;
+            margin: 0;
+        }
+        .code-block-wrapper pre code {
+            background: transparent;
+            border: none;
+            padding: 0;
+            color: #e4e4e7;
+            font-size: 0.88rem;
+            line-height: 1.5;
+        }
+
+        /* THINKING LOADER */
+        .thinking-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            font-style: italic;
+        }
+        .pulse-dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--accent-blue);
+            border-radius: 50%;
+            animation: pulseAnim 1.2s infinite ease-in-out;
+        }
+        @keyframes pulseAnim {
+            0%, 100% { transform: scale(0.8); opacity: 0.4; }
+            50% { transform: scale(1.2); opacity: 1; }
         }
 
         /* INPUT BAR AREA */
         .input-wrapper {
             width: 100%;
-            max-width: 800px;
+            max-width: 820px;
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 6px;
-            padding: 0 15px;
+            gap: 8px;
+            padding: 0 20px;
         }
         .input-box {
             width: 100%;
-            background-color: #080808;
-            border: 1px solid #222222;
-            border-radius: 26px;
-            padding: 8px 16px;
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 22px;
+            padding: 10px 14px;
             display: flex;
-            align-items: center;
+            align-items: flex-end;
             gap: 10px;
             position: relative;
-            transition: border-color 0.3s, box-shadow 0.3s;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .input-box:focus-within {
+            border-color: var(--border-focus);
+            box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.04);
         }
         .input-box.recording {
-            border-color: #ef4444;
-            box-shadow: 0 0 15px rgba(239, 68, 68, 0.25);
+            border-color: var(--danger-red);
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.15);
+        }
+
+        .icon-action-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 6px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s ease;
+            flex-shrink: 0;
+        }
+        .icon-action-btn:hover {
+            color: var(--text-primary);
+            background-color: var(--bg-elevated);
+        }
+        .icon-action-btn:active {
+            transform: scale(0.92);
+        }
+        .icon-action-btn.active {
+            color: var(--danger-red);
+            background-color: rgba(239, 68, 68, 0.1);
         }
 
         /* GEMINI WAVE BARS */
         .gemini-wave-container {
-            display: flex;
-            align-items: center;
-            gap: 3.5px;
-            height: 20px;
-            width: 100px;
             display: none;
+            align-items: center;
+            gap: 3px;
+            height: 20px;
+            width: 60px;
+            margin-bottom: 6px;
         }
         .gemini-wave-container.active {
             display: flex;
         }
         .wave-bar {
             flex: 1;
-            background: linear-gradient(180deg, #888, #fff);
+            background: linear-gradient(180deg, #71717a, #f4f4f5);
             border-radius: 3px;
             height: 20%;
             animation: waveMotion 0.6s infinite ease-in-out alternate;
@@ -339,7 +553,7 @@
         .wave-bar:nth-child(5) { animation-delay: 0.15s; }
 
         @keyframes waveMotion {
-            0% { height: 15%; }
+            0% { height: 20%; }
             100% { height: 100%; }
         }
 
@@ -348,46 +562,43 @@
             background: transparent;
             border: none;
             outline: none;
-            color: #ffffff;
-            font-size: 0.95rem;
+            color: var(--text-primary);
+            font-size: 0.96rem;
+            line-height: 1.5;
+            max-height: 150px;
+            resize: none;
             padding: 4px 0;
+            overflow-y: auto;
         }
-        .chat-input-field::placeholder { color: #555555; }
-
-        .mic-btn {
-            background: transparent;
-            border: none;
-            color: #aaaaaa;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: color 0.2s, transform 0.2s;
+        .chat-input-field::placeholder {
+            color: var(--text-muted);
         }
-        .mic-btn:hover { color: #ffffff; transform: scale(1.1); }
-        .mic-btn.active { color: #ef4444; }
 
         .arrow-submit-btn {
-            width: 32px;
-            height: 32px;
-            background-color: #ffffff;
-            color: #000000;
+            width: 34px;
+            height: 34px;
+            background-color: var(--text-primary);
+            color: var(--bg-main);
             border: none;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            transition: transform 0.2s, opacity 0.2s;
+            flex-shrink: 0;
+            transition: all 0.15s ease;
         }
         .arrow-submit-btn:hover {
+            background-color: #ffffff;
             transform: scale(1.05);
-            opacity: 0.9;
+        }
+        .arrow-submit-btn:active {
+            transform: scale(0.95);
         }
 
         .footer-disclaimer {
-            font-size: 10.5px;
-            color: #444444;
+            font-size: 11px;
+            color: var(--text-muted);
             text-align: center;
         }
     </style>
@@ -398,42 +609,50 @@
     <div class="sidebar" id="sidebar">
         <div>
             <div class="sidebar-logo-header">
-                <!-- MULTI-LAYERED ILLUSION STAR LOGO (SIDEBAR) -->
+                <!-- MULTI-LAYERED ILLUSION STAR LOGO (SIDEBAR - UNCHANGED) -->
                 <svg width="28" height="28" viewBox="0 0 100 100" fill="none" stroke="#ffffff" stroke-width="4" stroke-linejoin="round">
-                    <!-- Layer 1: Outer Star -->
                     <polygon points="50,5 63,35 95,38 71,60 78,92 50,75 22,92 29,60 5,38 37,35" stroke-width="5" opacity="1.0" />
-                    <!-- Layer 2: Middle Star -->
                     <polygon points="50,22 59,42 80,44 64,59 69,80 50,68 31,80 36,59 20,44 41,42" stroke-width="3" opacity="0.65" />
-                    <!-- Layer 3: Inner Core Star -->
                     <polygon points="50,34 55,47 68,48 58,58 61,71 50,63 39,71 42,58 32,48 45,47" stroke-width="2" opacity="0.35" fill="#ffffff" />
                 </svg>
                 <span class="sidebar-brand-name">Pyrox</span>
             </div>
 
             <div class="menu-list">
-                <div class="menu-btn" onclick="clearChat()" data-tooltip="New Chat">
-                    <svg viewBox="0 0 24 24"><path d="M12 4v16m8-8H4"></path></svg>
-                    <span>New Chat</span>
+                <div class="menu-btn" onclick="clearChat()" data-tooltip="Start Fresh (Ctrl+K)">
+                    <div class="menu-btn-left">
+                        <svg viewBox="0 0 24 24"><path d="M12 4v16m8-8H4"></path></svg>
+                        <span>New Chat</span>
+                    </div>
+                    <span class="shortcut-badge">Ctrl+K</span>
                 </div>
-                <div class="menu-btn" onclick="toggleSearchOverlay()" data-tooltip="Search Chat">
-                    <svg viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                    <span>Search Chat</span>
+                <div class="menu-btn" onclick="toggleSearchOverlay()" data-tooltip="Find in Chat">
+                    <div class="menu-btn-left">
+                        <svg viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                        <span>Search Chat</span>
+                    </div>
                 </div>
-                <div class="menu-btn" onclick="alert('📚 Library: Past notes & saved discussions loaded!')" data-tooltip="Library">
-                    <svg viewBox="0 0 24 24"><path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
-                    <span>Library</span>
+                <div class="menu-btn" onclick="alert('📚 Library: Past notes & saved discussions loaded!')" data-tooltip="Saved Notes">
+                    <div class="menu-btn-left">
+                        <svg viewBox="0 0 24 24"><path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                        <span>Library</span>
+                    </div>
                 </div>
-                <div class="menu-btn" onclick="openStudentSetup()" data-tooltip="For Students">
-                    <svg viewBox="0 0 24 24"><path d="M12 14l9-5-9-5-9 5 9 5z"></path><path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0112 20.055a11.952 11.952 0 01-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"></path></svg>
-                    <span>For Students</span>
+                <div class="menu-btn" onclick="openStudentSetup()" data-tooltip="Study Mode">
+                    <div class="menu-btn-left">
+                        <svg viewBox="0 0 24 24"><path d="M12 14l9-5-9-5-9 5 9 5z"></path><path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0112 20.055a11.952 11.952 0 01-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"></path></svg>
+                        <span>For Students</span>
+                    </div>
                 </div>
             </div>
         </div>
 
         <div class="sidebar-bottom">
-            <div class="menu-btn" onclick="alert('⚙️ Settings: Theme & System preferences')" data-tooltip="Settings">
-                <svg viewBox="0 0 24 24"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                <span>Settings</span>
+            <div class="menu-btn" onclick="alert('⚙️ Settings: Pyrox Pro Dark Theme Active')" data-tooltip="Preferences">
+                <div class="menu-btn-left">
+                    <svg viewBox="0 0 24 24"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                    <span>Settings</span>
+                </div>
             </div>
         </div>
     </div>
@@ -444,23 +663,26 @@
         <!-- SEARCH OVERLAY BAR -->
         <div class="search-bar-overlay" id="searchOverlay">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-            <input type="text" placeholder="Search in conversation..." onkeyup="filterChatMessages(this.value)">
-            <span style="color:#666; font-size:12px; cursor:pointer;" onclick="toggleSearchOverlay()">✕</span>
+            <input type="text" id="searchInput" placeholder="Search in conversation..." onkeyup="filterChatMessages(this.value)">
+            <span style="color:#71717a; font-size:13px; cursor:pointer; padding: 2px 6px;" onclick="toggleSearchOverlay()">✕</span>
         </div>
 
         <!-- TOP NAVBAR -->
         <div class="top-navbar">
-            <button type="button" class="hamburger-btn" onclick="toggleSidebar()" data-tooltip="Toggle Menu">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="3" y1="12" x2="21" y2="12"></line>
-                    <line x1="3" y1="6" x2="21" y2="6"></line>
-                    <line x1="3" y1="18" x2="21" y2="18"></line>
-                </svg>
-            </button>
+            <div class="nav-left-group">
+                <button type="button" class="hamburger-btn" onclick="toggleSidebar()" data-tooltip="Toggle Sidebar">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="3" y1="12" x2="21" y2="12"></line>
+                        <line x1="3" y1="6" x2="21" y2="6"></line>
+                        <line x1="3" y1="18" x2="21" y2="18"></line>
+                    </svg>
+                </button>
+                <span class="model-badge">Pyrox Fast • Groq</span>
+            </div>
 
             <div class="three-dots-wrapper">
-                <button type="button" class="dots-btn" onclick="toggleDropdown()" data-tooltip="More Options">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <button type="button" class="dots-btn" onclick="toggleDropdown()" data-tooltip="Options">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="5" r="1.5"></circle>
                         <circle cx="12" cy="12" r="1.5"></circle>
                         <circle cx="12" cy="19" r="1.5"></circle>
@@ -480,18 +702,15 @@
         <!-- CENTER LANDING HEADER -->
         <div class="center-landing-header" id="landingHeader">
             <div class="brand-title-box">
-                <!-- MULTI-LAYERED ILLUSION STAR LOGO (LARGE MAIN) -->
+                <!-- MULTI-LAYERED ILLUSION STAR LOGO (LARGE MAIN - UNCHANGED) -->
                 <svg width="52" height="52" viewBox="0 0 100 100" fill="none" stroke="#ffffff" stroke-linejoin="round">
-                    <!-- Layer 1: Outer Star -->
                     <polygon points="50,5 63,35 95,38 71,60 78,92 50,75 22,92 29,60 5,38 37,35" stroke-width="4.5" opacity="1.0" />
-                    <!-- Layer 2: Middle Nested Star -->
                     <polygon points="50,22 59,42 80,44 64,59 69,80 50,68 31,80 36,59 20,44 41,42" stroke-width="3" opacity="0.6" />
-                    <!-- Layer 3: Core Star -->
                     <polygon points="50,34 55,47 68,48 58,58 61,71 50,63 39,71 42,58 32,48 45,47" stroke-width="2" opacity="0.3" fill="#ffffff" />
                 </svg>
                 <span class="brand-name-large">Pyrox</span>
             </div>
-            <div class="greeting-subtext">Hi, how can I help you today?</div>
+            <div class="greeting-subtext">Hi Harshit, how can I help you today?</div>
         </div>
 
         <!-- CHAT MESSAGES AREA -->
@@ -501,13 +720,15 @@
         <div class="input-wrapper">
             <div class="input-box" id="inputBox">
                 <!-- ATTACHMENT ICON -->
-                <svg style="cursor:pointer; width:20px; height:20px; flex-shrink:0;" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2" data-tooltip="Attach File & Photo" onclick="triggerFileAttach()">
-                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"></path>
-                </svg>
+                <button type="button" class="icon-action-btn" data-tooltip="Attach File" onclick="triggerFileAttach()">
+                    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"></path>
+                    </svg>
+                </button>
                 <input type="file" id="hiddenFileInput" style="display:none;" onchange="handleFileSelect(event)">
 
-                <button type="button" id="micBtn" class="mic-btn" data-tooltip="Voice Input" onclick="toggleVoice(event)">
-                    <svg id="micIconSvg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <button type="button" id="micBtn" class="icon-action-btn" data-tooltip="Voice-to-Text" onclick="toggleVoice(event)">
+                    <svg id="micIconSvg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
                         <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
                         <line x1="12" y1="19" x2="12" y2="23"></line>
@@ -518,17 +739,18 @@
                     <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
                 </div>
 
-                <input type="text" id="chatInput" class="chat-input-field" placeholder="Ask Pyrox anything..." onkeypress="if(event.key==='Enter'){ event.preventDefault(); triggerSend(); }" />
+                <!-- AUTO-EXPANDING TEXTAREA -->
+                <textarea id="chatInput" class="chat-input-field" rows="1" placeholder="Ask Pyrox anything... (Shift+Enter for new line)" onkeydown="handleInputKeydown(event)" oninput="autoResizeTextarea(this)"></textarea>
 
-                <button type="button" class="arrow-submit-btn" data-tooltip="Submit" onclick="triggerSend(event)">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                <button type="button" class="arrow-submit-btn" data-tooltip="Send (Enter)" onclick="triggerSend(event)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                         <line x1="5" y1="12" x2="19" y2="12"></line>
                         <polyline points="12 5 19 12 12 19"></polyline>
                     </svg>
                 </button>
             </div>
             
-            <div class="footer-disclaimer">Pyrox is AI and can make mistakes</div>
+            <div class="footer-disclaimer">Pyrox is AI and can make mistakes. Verify important information.</div>
         </div>
     </div>
 
@@ -537,6 +759,41 @@
         let recognition = null;
         let accumulatedSpeech = "";
         let isPinned = false;
+
+        // Configure Marked.js for clean line breaks & spacing
+        if (typeof marked !== 'undefined') {
+            marked.setOptions({
+                breaks: true,
+                gfm: true
+            });
+        }
+
+        // GLOBAL KEYBOARD SHORTCUTS (Ctrl+K for New Chat, Esc to close modals)
+        document.addEventListener('keydown', function(e) {
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+                e.preventDefault();
+                clearChat();
+                document.getElementById('chatInput').focus();
+            }
+            if (e.key === 'Escape') {
+                document.getElementById('searchOverlay').style.display = 'none';
+                document.getElementById('dropdownMenu').classList.remove('show');
+            }
+        });
+
+        // AUTO-RESIZE TEXTAREA
+        function autoResizeTextarea(el) {
+            el.style.height = 'auto';
+            el.style.height = Math.min(el.scrollHeight, 150) + 'px';
+        }
+
+        // ENTER TO SEND, SHIFT+ENTER FOR NEW LINE
+        function handleInputKeydown(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                triggerSend();
+            }
+        }
 
         function toggleSidebar() {
             document.getElementById('sidebar').classList.toggle('expanded');
@@ -569,7 +826,13 @@
 
         function toggleSearchOverlay() {
             const overlay = document.getElementById('searchOverlay');
-            overlay.style.display = (overlay.style.display === 'flex') ? 'none' : 'flex';
+            const isVisible = overlay.style.display === 'flex';
+            overlay.style.display = isVisible ? 'none' : 'flex';
+            if (!isVisible) {
+                document.getElementById('searchInput').focus();
+            } else {
+                filterChatMessages('');
+            }
         }
 
         function filterChatMessages(query) {
@@ -597,7 +860,8 @@
             }
             let textContent = "--- Pyrox Studio Conversation ---\n\n";
             msgs.forEach(m => {
-                textContent += m.innerText + "\n\n";
+                let role = m.classList.contains('user-message') ? "Harshit: " : "Pyrox: ";
+                textContent += role + m.innerText + "\n\n---------------------------------\n\n";
             });
             const blob = new Blob([textContent], { type: 'text/plain' });
             const anchor = document.createElement('a');
@@ -618,11 +882,11 @@
         }
 
         function openStudentSetup() {
-            let goal = prompt("आप किस परीक्षा या कक्षा की तैयारी कर रहे हैं? (जैसे: NEET, JEE, School, College)");
+            let goal = prompt("आप किस परीक्षा या कक्षा की तैयारी कर रहे हैं? (जैसे: Class 9, NEET, JEE)");
             if(!goal) return;
-            let standard = prompt("आपकी कक्षा या वर्ष कौन सा है? (जैसे: Class 9, Class 11, B.Tech)");
+            let standard = prompt("आपका मुख्य विषय क्या है? (जैसे: Maths, Science, Python)");
             if(!standard) return;
-            alert("बहुत बढ़िया! " + standard + " (" + goal + ") के लिए आपका स्टडी रूटीन सेट कर दिया गया है।");
+            alert("बहुत बढ़िया! " + goal + " (" + standard + ") के लिए आपका स्टडी मोड सक्रिय कर दिया गया है।");
         }
 
         function toggleVoice(e) {
@@ -657,7 +921,7 @@
                 micBtn.classList.add('active');
                 inputBox.classList.add('recording');
                 waveBox.classList.add('active');
-                inputField.placeholder = "Listening continuously...";
+                inputField.placeholder = "Listening...";
                 micSvg.innerHTML = `<rect x="6" y="4" width="4" height="16" fill="currentColor"/><rect x="14" y="4" width="4" height="16" fill="currentColor"/>`;
             };
 
@@ -671,6 +935,7 @@
                     }
                 }
                 inputField.value = accumulatedSpeech + interim;
+                autoResizeTextarea(inputField);
             };
 
             recognition.onend = function() {
@@ -687,8 +952,60 @@
             micBtn.classList.remove('active');
             document.getElementById('inputBox').classList.remove('recording');
             document.getElementById('waveBox').classList.remove('active');
-            document.getElementById('chatInput').placeholder = "Ask Pyrox anything...";
+            document.getElementById('chatInput').placeholder = "Ask Pyrox anything... (Shift+Enter for new line)";
             micSvg.innerHTML = `<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line>`;
+        }
+
+        // FORMAT MARKDOWN & ADD COPY BUTTONS TO CODE BLOCKS
+        function formatAIResponse(rawText) {
+            let parsedHtml = (typeof marked !== 'undefined') ? marked.parse(rawText) : rawText.replace(/\n/g, '<br>');
+            
+            const tempDiv = document.createElement('div');
+            tempDiv.className = 'ai-content';
+            tempDiv.innerHTML = parsedHtml;
+
+            // Wrap <pre> blocks with header and copy button
+            const preBlocks = tempDiv.querySelectorAll('pre');
+            preBlocks.forEach((pre) => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'code-block-wrapper';
+
+                const header = document.createElement('div');
+                header.className = 'code-block-header';
+                
+                const codeEl = pre.querySelector('code');
+                let lang = 'code';
+                if (codeEl && codeEl.className) {
+                    const match = codeEl.className.match(/language-(\w+)/);
+                    if (match) lang = match[1];
+                }
+
+                header.innerHTML = `<span>${lang.toUpperCase()}</span>`;
+                
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'copy-code-btn';
+                copyBtn.innerText = 'Copy';
+                copyBtn.onclick = function() {
+                    navigator.clipboard.writeText(pre.innerText);
+                    copyBtn.innerText = 'Copied!';
+                    setTimeout(() => copyBtn.innerText = 'Copy', 2000);
+                };
+
+                header.appendChild(copyBtn);
+                pre.parentNode.insertBefore(wrapper, pre);
+                wrapper.appendChild(header);
+                wrapper.appendChild(pre);
+            });
+
+            return tempDiv;
+        }
+
+        function scrollToBottom() {
+            const container = document.getElementById('chatContainer');
+            container.scrollTo({
+                top: container.scrollHeight,
+                behavior: 'smooth'
+            });
         }
 
         async function triggerSend(e) {
@@ -700,10 +1017,11 @@
             if(!text) return;
 
             inputField.value = '';
+            inputField.style.height = 'auto';
             document.getElementById('landingHeader').style.display = 'none';
 
             appendMsg('user', text);
-            const aiDiv = appendMsg('ai', '⚡ Pyrox सोच रहा है...');
+            const aiDiv = appendMsg('ai', '', true);
 
             try {
                 const response = await fetch('/api/chat', {
@@ -714,26 +1032,31 @@
 
                 const data = await response.json();
                 if(response.ok) {
-                    let htmlContent = `<div>${data.reply}</div>`;
-                    if(data.audio_url) {
-                        htmlContent += `<audio controls autoplay><source src="${data.audio_url}?t=${new Date().getTime()}" type="audio/mp3"></audio>`;
-                    }
-                    aiDiv.innerHTML = htmlContent;
+                    aiDiv.innerHTML = '';
+                    const formattedContent = formatAIResponse(data.reply);
+                    aiDiv.appendChild(formattedContent);
                 } else {
-                    aiDiv.innerText = "⚠️ Error: " + (data.detail || "Something went wrong");
+                    aiDiv.innerHTML = `<span style="color:#ef4444;">⚠️ Error: ${data.detail || "Something went wrong"}</span>`;
                 }
             } catch(e) {
-                aiDiv.innerText = "⚠️ Network Exception: " + e.message;
+                aiDiv.innerHTML = `<span style="color:#ef4444;">⚠️ Network Exception: ${e.message}</span>`;
             }
+            scrollToBottom();
         }
 
-        function appendMsg(role, content) {
+        function appendMsg(role, content, isThinking = false) {
             const container = document.getElementById('chatContainer');
             const div = document.createElement('div');
             div.className = 'message ' + (role === 'user' ? 'user-message' : 'ai-message');
-            div.innerText = content;
+            
+            if (isThinking) {
+                div.innerHTML = `<div class="thinking-indicator"><span class="pulse-dot"></span> Pyrox सोच रहा है...</div>`;
+            } else {
+                div.innerText = content;
+            }
+            
             container.appendChild(div);
-            container.scrollTop = container.scrollHeight;
+            scrollToBottom();
             return div;
         }
 
@@ -743,4 +1066,7 @@
         }
     </script>
 </body>
-</html>    
+</html>
+       
+
+     
