@@ -34,24 +34,18 @@ def get_live_groq_model():
         if res.status_code == 200:
             models_data = res.json().get("data", [])
             valid_ids = [m.get("id") for m in models_data if m.get("id")]
-            
-            chat_models = [
-                m_id for m_id in valid_ids 
-                if "guard" not in m_id.lower() and "whisper" not in m_id.lower()
-            ]
-            
+            chat_models = [m_id for m_id in valid_ids if "guard" not in m_id.lower() and "whisper" not in m_id.lower()]
             if chat_models:
                 for priority in ["llama", "gpt-oss", "qwen"]:
                     for m_id in chat_models:
                         if priority in m_id.lower():
                             return m_id, f"Success (Picked {m_id})"
                 return chat_models[0], f"Success (Picked {chat_models[0]})"
-            
             return "llama-3.3-70b-versatile", "Fallback Model"
         else:
-            return "llama-3.3-70b-versatile", "Fallback Model due to API status"
+            return "llama-3.3-70b-versatile", "Fallback Model"
     except Exception as e:
-        return "llama-3.3-70b-versatile", f"Fallback due to error: {str(e)}"
+        return "llama-3.3-70b-versatile", f"Fallback error: {str(e)}"
 
 def search_live_web(query: str) -> str:
     if not SERP_API_KEY:
@@ -68,16 +62,6 @@ def search_live_web(query: str) -> str:
         print("SerpApi Error:", e)
     return ""
 
-@app.get("/api/debug")
-async def debug_key():
-    model, status = get_live_groq_model()
-    return JSONResponse({
-        "status": status,
-        "active_working_model": model,
-        "groq_key_present": bool(API_KEY),
-        "serp_key_present": bool(SERP_API_KEY)
-    })
-
 async def generate_edge_audio(text, voice_name="hi-IN-MadhurNeural", filename="static/response.mp3"):
     try:
         clean_t = re.sub(r'[^\w\s.,!?-]', '', text)
@@ -92,27 +76,21 @@ async def generate_edge_audio(text, voice_name="hi-IN-MadhurNeural", filename="s
 @app.post("/api/chat")
 async def chat_endpoint(req: ChatRequest):
     if not API_KEY:
-        return JSONResponse(status_code=400, content={"detail": "Groq API Key missing in environment variables!"})
+        return JSONResponse(status_code=400, content={"detail": "Groq API Key missing!"})
     
     try:
         web_context = search_live_web(req.message)
         active_model, _ = get_live_groq_model()
         url = "https://api.groq.com/openai/v1/chat/completions"
-        headers = {
-            "Authorization": f"Bearer {API_KEY}",
-            "Content-Type": "application/json"
-        }
+        headers = {"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"}
         
-        # Yahan par humne system prompt ko aur bhi tight aur clear kar diya hai
         system_content = (
             f"You are Pyrox, a brilliant, chill, direct, and professional AI buddy created by your master developer. "
             f"The user mode is set to: {req.student_mode}. "
-            "CRITICAL FORMATTING RULE: NEVER write long, boring, or single giant paragraphs. You MUST ALWAYS structure your answers using "
-            "bold section headings, clear bullet points, and numbered steps with empty lines between them so it is extremely easy to read instantly. "
-            "CRITICAL LANGUAGE RULE: Talk in smooth, natural Hinglish. Keep sentences crisp, direct, and perfectly clear. "
-            "CRITICAL IDENTITY RULE: If anyone asks who created you, proudly state you were built by your master developer. Never mention OpenAI."
+            "CRITICAL FORMATTING RULE: NEVER write long paragraphs. Structure your answers using bold headings, clear bullet points, and numbered steps with empty lines between them. "
+            "CRITICAL LANGUAGE RULE: Talk strictly in smooth, natural Hinglish (Roman script). Never use pure formal Hindi. "
+            "CRITICAL IDENTITY RULE: If asked who created you, state you were built by your master developer. Never mention OpenAI."
         )
-        
         if web_context:
             system_content += f"\n\nLive Web Search Context: {web_context}"
 
@@ -130,16 +108,14 @@ async def chat_endpoint(req: ChatRequest):
         if response.status_code == 200:
             res_json = response.json()
             reply = res_json['choices'][0]['message']['content']
-            
             audio_path = "static/response.mp3"
             success = await generate_edge_audio(reply, req.voice, audio_path)
-            
             return {
                 "reply": reply,
                 "audio_url": f"/{audio_path}?t={asyncio.get_event_loop().time()}" if success else None
             }
         else:
-            return JSONResponse(status_code=response.status_code, content={"detail": f"Groq API Error: {response.text}"})
+            return JSONResponse(status_code=response.status_code, content={"detail": f"Groq Error: {response.text}"})
     except Exception as e:
         return JSONResponse(status_code=500, content={"detail": f"Server Exception: {str(e)}"})
 
@@ -151,7 +127,6 @@ async def read_index():
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pyrox Studio - AI Assistant</title>
-    <!-- Marked.js for Clean Markdown & Formatting -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
@@ -165,13 +140,12 @@ async def read_index():
         .cyber-wave-bg.fade-out { opacity: 0; }
         
         .wave-line {
-            position: absolute; width: 200%; height: 90px; opacity: 0.15;
+            position: absolute; width: 200%; height: 90px; opacity: 0.12;
             background: linear-gradient(90deg, transparent, #3b82f6, #8b5cf6, #3b82f6, transparent);
             animation: waveMove 6s infinite linear;
         }
-        .wave-line:nth-child(1) { top: 20%; animation-duration: 5s; filter: drop-shadow(0 0 10px #3b82f6); }
-        .wave-line:nth-child(2) { top: 55%; animation-duration: 8s; opacity: 0.1; filter: drop-shadow(0 0 12px #8b5cf6); }
-        .wave-line:nth-child(3) { top: 80%; animation-duration: 6s; opacity: 0.08; }
+        .wave-line:nth-child(1) { top: 20%; animation-duration: 5s; }
+        .wave-line:nth-child(2) { top: 55%; animation-duration: 8s; opacity: 0.08; }
 
         @keyframes waveMove {
             0% { transform: translateX(-50%) translateY(0) rotate(0deg); }
@@ -180,16 +154,16 @@ async def read_index():
         }
 
         .sidebar {
-            width: 0px; background-color: #060608; border-right: none;
+            width: 0px; background-color: #050507; border-right: none;
             display: flex; flex-direction: column; justify-content: space-between;
             padding: 0px; z-index: 20; overflow: hidden;
-            transition: width 0.3s ease, padding 0.3s ease, border-right 0.3s ease;
+            transition: width 0.3s ease, padding 0.3s ease;
         }
-        .sidebar.expanded { width: 260px; padding: 14px 12px; border-right: 1px solid #1a1a1e; }
+        .sidebar.expanded { width: 260px; padding: 14px 12px; border-right: 1px solid #141418; }
         .sidebar-logo-header { display: flex; align-items: center; gap: 12px; padding: 6px; margin-bottom: 14px; }
         .sidebar-brand-name { font-size: 1.15rem; font-weight: 700; color: #ffffff; letter-spacing: 0.5px; }
         
-        .menu-section-title { font-size: 0.75rem; text-transform: uppercase; color: #6b7280; padding: 8px 10px 4px 10px; font-weight: 600; letter-spacing: 0.5px; }
+        .menu-section-title { font-size: 0.75rem; text-transform: uppercase; color: #52525b; padding: 8px 10px 4px 10px; font-weight: 600; }
         .menu-list { display: flex; flex-direction: column; gap: 4px; }
         .menu-btn {
             display: flex; align-items: center; gap: 12px; padding: 10px 12px;
@@ -198,48 +172,50 @@ async def read_index():
         }
         .menu-btn:hover { background-color: #18181b; color: #ffffff; }
         .menu-btn svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; flex-shrink: 0; }
-        .sidebar-bottom { border-top: 1px solid #18181b; padding-top: 10px; }
+        .sidebar-bottom { border-top: 1px solid #141418; padding-top: 10px; }
 
         .main-container { flex: 1; display: flex; flex-direction: column; justify-content: space-between; align-items: center; height: 100vh; padding-top: 4px; padding-bottom: 8px; position: relative; z-index: 5; }
         
         .top-navbar { width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 10px 20px; position: relative; z-index: 10; }
-        .hamburger-btn, .dots-btn { background: transparent; border: none; color: #aaaaaa; cursor: pointer; padding: 6px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: color 0.2s, background 0.2s; }
-        .hamburger-btn:hover, .dots-btn:hover { color: #ffffff; background-color: #1a1a1a; }
+        .hamburger-btn, .dots-btn { background: transparent; border: none; color: #a1a1aa; cursor: pointer; padding: 6px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+        .hamburger-btn:hover, .dots-btn:hover { color: #ffffff; background-color: #18181b; }
         
         .three-dots-wrapper { position: relative; }
         .dropdown-menu {
             position: absolute; top: 40px; right: 0; width: 210px;
-            background-color: #111115; border: 1px solid #222228; border-radius: 12px;
+            background-color: #0d0d12; border: 1px solid #22222d; border-radius: 12px;
             padding: 6px 0; display: none; flex-direction: column; box-shadow: 0 10px 25px rgba(0,0,0,0.8); z-index: 100;
         }
         .dropdown-menu.show { display: flex; }
         .dropdown-item {
-            padding: 10px 16px; font-size: 13px; color: #cccccc; cursor: pointer;
-            display: flex; align-items: center; gap: 10px; transition: background 0.2s;
+            padding: 10px 16px; font-size: 13px; color: #d1d5db; cursor: pointer;
+            display: flex; align-items: center; gap: 10px; transition: 0.2s;
         }
-        .dropdown-item:hover { background-color: #1f1f23; color: #ffffff; }
+        .dropdown-item:hover { background-color: #18181f; color: #ffffff; }
 
+        /* Modals */
         .modal-overlay {
             position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
             background: rgba(0,0,0,0.75); display: none; align-items: center; justify-content: center; z-index: 1000;
         }
         .modal-card {
-            background: #121216; border: 1px solid #2a2a32; border-radius: 16px;
+            background: #0e0e12; border: 1px solid #22222d; border-radius: 16px;
             width: 90%; max-width: 420px; padding: 24px; display: flex; flex-direction: column; gap: 16px;
             box-shadow: 0 15px 35px rgba(0,0,0,0.9);
         }
         .modal-title { font-size: 1.1rem; font-weight: 700; color: #fff; display: flex; align-items: center; justify-content: space-between; }
-        .modal-body { font-size: 0.9rem; color: #aaa; display: flex; flex-direction: column; gap: 10px; }
+        .modal-body { font-size: 0.9rem; color: #a1a1aa; display: flex; flex-direction: column; gap: 10px; }
         .modal-btn {
-            background: #1c1c24; border: 1px solid #333340; color: #fff; padding: 10px 14px;
+            background: #18181f; border: 1px solid #2a2a38; color: #fff; padding: 10px 14px;
             border-radius: 10px; cursor: pointer; text-align: left; font-size: 0.9rem; transition: 0.2s;
         }
-        .modal-btn:hover { background: #2c2c38; border-color: #555566; }
+        .modal-btn:hover { background: #262633; border-color: #3b82f6; }
         .modal-close-btn {
             background: #fff; color: #000; border: none; padding: 8px 16px;
             border-radius: 8px; font-weight: 600; cursor: pointer; align-self: flex-end; margin-top: 5px;
         }
 
+        /* Center Landing */
         .center-landing-header { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; margin-top: 15px; padding: 0 15px; }
         .brand-title-box { display: flex; align-items: center; gap: 12px; }
         .brand-name-large { font-size: 2.3rem; font-weight: 800; color: #ffffff; letter-spacing: -0.5px; }
@@ -250,77 +226,118 @@ async def read_index():
 
         .suggestions-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; width: 100%; max-width: 720px; margin-top: 16px; padding: 0 10px; }
         .suggestion-card {
-            background: #09090d; border: 1px solid #1a1a22; border-radius: 14px; padding: 12px 14px;
+            background: #060609; border: 1px solid #16161f; border-radius: 14px; padding: 12px 14px;
             cursor: pointer; text-align: left; transition: all 0.2s; display: flex; flex-direction: column; gap: 4px;
         }
-        .suggestion-card:hover { background: #14141c; border-color: #3b82f6; transform: translateY(-2px); }
+        .suggestion-card:hover { background: #12121a; border-color: #3b82f6; transform: translateY(-2px); }
         .card-title { font-size: 0.88rem; font-weight: 600; color: #ffffff; }
-        .card-desc { font-size: 0.78rem; color: #6b7280; }
+        .card-desc { font-size: 0.78rem; color: #52525b; }
 
-        .chat-container { width: 100%; max-width: 800px; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; padding: 10px 15px; margin-top: 5px; }
-        .message { display: flex; flex-direction: column; max-width: 85%; line-height: 1.6; font-size: 0.95rem; gap: 8px; }
-        .user-message { align-self: flex-end; background-color: #1c1c24; color: #ffffff; padding: 10px 16px; border-radius: 16px 16px 4px 16px; border: 1px solid #2d2d3a; }
-        .ai-message { align-self: flex-start; background-color: #08080c; color: #f3f4f6; padding: 14px 18px; border-radius: 16px 16px 16px 4px; border: 1px solid #16161f; width: 100%; max-width: 100%; }
+        /* Chat Container - Left/Right Alignment & No Boundary */
+        .chat-container { width: 100%; max-width: 800px; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; padding: 10px 15px; margin-top: 5px; }
+        .message { display: flex; flex-direction: column; max-width: 85%; line-height: 1.6; font-size: 0.95rem; gap: 6px; }
+        .user-message { align-self: flex-end; background-color: #18181f; color: #ffffff; padding: 10px 16px; border-radius: 16px 16px 4px 16px; }
+        .ai-message { align-self: flex-start; background-color: transparent; color: #f3f4f6; padding: 6px 0; width: 100%; max-width: 100%; }
         
-        /* Markdown formatting styles */
-        .ai-message ul, .ai-message ol { padding-left: 20px; margin: 8px 0; }
-        .ai-message li { margin-bottom: 6px; }
-        .ai-message p { margin-bottom: 10px; }
+        .ai-message ul, .ai-message ol { padding-left: 20px; margin: 6px 0; }
+        .ai-message li { margin-bottom: 4px; }
+        .ai-message p { margin-bottom: 6px; }
         .ai-message strong { color: #60a5fa; }
-        .ai-message h2, .ai-message h3 { color: #60a5fa; margin-top: 12px; margin-bottom: 6px; }
-
-        /* Code block styles with copy button */
-        .code-block-wrapper { margin: 12px 0; border-radius: 8px; overflow: hidden; border: 1px solid #2a2a35; background: #0d0d12; }
-        .code-block-header { display: flex; justify-content: space-between; align-items: center; padding: 6px 12px; background: #16161f; font-size: 11px; color: #9ca3af; font-family: monospace; }
-        .copy-code-btn { background: transparent; border: 1px solid #333340; color: #ccc; padding: 2px 8px; border-radius: 4px; font-size: 10px; cursor: pointer; }
-        .copy-code-btn:hover { background: #2c2c38; color: #fff; }
-        .code-block-wrapper pre { padding: 12px; overflow-x: auto; margin: 0; }
-        .code-block-wrapper pre code { background: transparent; border: none; padding: 0; color: #e4e4e7; font-size: 0.85rem; }
 
         .audio-player-box { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
         .play-audio-btn {
-            background: #1c1c24; border: 1px solid #333340; color: #fff; padding: 6px 14px;
-            border-radius: 20px; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 6px;
-            transition: 0.2s;
+            background: #18181f; border: 1px solid #2a2a38; color: #fff; padding: 6px 14px;
+            border-radius: 20px; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: 0.2s;
         }
-        .play-audio-btn:hover { background: #2c2c38; border-color: #3b82f6; }
+        .play-audio-btn:hover { background: #262633; border-color: #3b82f6; }
 
-        .input-wrapper { width: 100%; max-width: 800px; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 0 15px; }
+        /* Input Area & Plus Pop-up Menu */
+        .input-wrapper { width: 100%; max-width: 800px; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 0 15px; position: relative; }
+        
         .input-box {
-            width: 100%; background-color: #08080c; border: 1px solid #1f1f28;
+            width: 100%; background-color: #060609; border: 1px solid #16161f;
             border-radius: 26px; padding: 8px 16px; display: flex; align-items: center; gap: 10px; position: relative;
             transition: border-color 0.3s, box-shadow 0.3s;
         }
         .input-box.recording { border-color: #3b82f6; box-shadow: 0 0 20px rgba(59, 130, 246, 0.3); }
 
+        /* Plus Pop-up Menu (Custom sizing as requested) */
+        .plus-popup-menu {
+            position: absolute; bottom: 65px; left: 15px; background: #0c0c10;
+            border: 1px solid #22222e; border-radius: 16px; padding: 12px;
+            display: none; flex-direction: column; gap: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); z-index: 100;
+            width: 260px; animation: popUpAnim 0.2s ease;
+        }
+        .plus-popup-menu.show { display: flex; }
+        @keyframes popUpAnim { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .popup-section-large { display: flex; flex-direction: column; gap: 6px; }
+        .popup-section-small { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; border-top: 1px solid #1a1a24; padding-top: 8px; }
+
+        .popup-item-large {
+            background: #14141c; border: 1px solid #1f1f2b; border-radius: 10px; padding: 10px 12px;
+            color: #fff; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: 0.2s;
+        }
+        .popup-item-large:hover { background: #1f1f2b; border-color: #3b82f6; }
+
+        .popup-item-small {
+            background: #101017; border: 1px solid #191924; border-radius: 8px; padding: 8px;
+            color: #a1a1aa; font-size: 0.78rem; cursor: pointer; text-align: center; transition: 0.2s;
+        }
+        .popup-item-small:hover { background: #191924; color: #fff; border-color: #555; }
+
+        /* Plus Button Animation (Rotates to Minus) */
+        .file-btn { background: transparent; border: none; color: #a1a1aa; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 0.3s ease; }
+        .file-btn.rotated { transform: rotate(45deg); color: #3b82f6; }
+
+        /* Camera 75% Modal Overlay with Flash & Flip */
+        .camera-modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.5); display: none; align-items: flex-end; justify-content: center; z-index: 1500;
+        }
+        .camera-modal-card {
+            background: #09090d; border: 1px solid #22222d; border-radius: 24px 24px 0 0;
+            width: 100%; max-width: 600px; height: 75vh; padding: 20px; display: flex; flex-direction: column; justify-content: space-between;
+            box-shadow: 0 -10px 40px rgba(0,0,0,0.9); animation: slideUp 0.3s ease; position: relative;
+        }
+        @keyframes slideUp { from { transform: translateY(100vh); } to { transform: translateY(0); } }
+
+        .camera-header { display: flex; align-items: center; justify-content: space-between; }
+        .camera-viewfinder { flex: 1; background: #000; border-radius: 16px; margin: 15px 0; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; border: 1px solid #1a1a24; }
+        .camera-controls { display: flex; align-items: center; justify-content: space-around; padding-bottom: 10px; }
+        .cam-action-btn { background: #18181f; border: 1px solid #2a2a38; color: #fff; padding: 10px 16px; border-radius: 12px; cursor: pointer; font-size: 0.85rem; display: flex; align-items: center; gap: 6px; }
+        .cam-action-btn:hover { background: #262633; }
+        .shutter-btn { width: 60px; height: 60px; background: #fff; border: 4px solid #3b82f6; border-radius: 50%; cursor: pointer; }
+
+        /* Strict Mic Animation: Silent when not speaking, active only on voice */
         .equalizer-wave-container { display: flex; align-items: center; gap: 3px; height: 26px; width: 140px; display: none; }
         .equalizer-wave-container.active { display: flex; }
-        .freq-bar { flex: 1; background: linear-gradient(180deg, #3b82f6, #8b5cf6, #ffffff); border-radius: 1px; height: 15%; animation: spikeMotion 0.4s infinite ease-in-out alternate; }
-        .freq-bar:nth-child(odd) { animation-delay: 0.1s; }
-        .freq-bar:nth-child(even) { animation-delay: 0.25s; }
+        .freq-bar { flex: 1; background: linear-gradient(180deg, #3b82f6, #8b5cf6, #ffffff); border-radius: 1px; height: 10%; transition: height 0.1s ease; }
+        .equalizer-wave-container.active .freq-bar { animation: spikeMotion 0.3s infinite ease-in-out alternate; }
+        .freq-bar:nth-child(odd) { animation-delay: 0.05s; }
+        .freq-bar:nth-child(even) { animation-delay: 0.15s; }
 
-        @keyframes spikeMotion { 0% { height: 10%; } 100% { height: 100%; } }
+        @keyframes spikeMotion { 0% { height: 15%; } 100% { height: 100%; } }
 
         .chat-input-field { flex: 1; background: transparent; border: none; outline: none; color: #ffffff; font-size: 0.95rem; padding: 4px 0; }
-        .chat-input-field::placeholder { color: #555560; }
+        .chat-input-field::placeholder { color: #52525b; }
 
-        .mic-btn, .file-btn { background: transparent; border: none; color: #9ca3af; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: color 0.2s, transform 0.2s; }
-        .mic-btn:hover, .file-btn:hover { color: #ffffff; transform: scale(1.1); }
+        .mic-btn { background: transparent; border: none; color: #a1a1aa; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+        .mic-btn:hover { color: #fff; }
         .mic-btn.active { color: #3b82f6; }
 
         .arrow-submit-btn {
             width: 32px; height: 32px; background-color: #ffffff; color: #000000;
             border: none; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-            cursor: pointer; transition: transform 0.2s, opacity 0.2s;
+            cursor: pointer; transition: 0.2s;
         }
-        .arrow-submit-btn:hover { transform: scale(1.05); opacity: 0.9; }
-        .footer-disclaimer { font-size: 10.5px; color: #4b5563; text-align: center; }
+        .arrow-submit-btn:hover { transform: scale(1.05); }
+        .footer-disclaimer { font-size: 10.5px; color: #3f3f46; text-align: center; }
     </style>
 </head>
 <body>
 
     <div class="cyber-wave-bg" id="cyberWaveBg">
-        <div class="wave-line"></div>
         <div class="wave-line"></div>
         <div class="wave-line"></div>
     </div>
@@ -347,38 +364,31 @@ async def read_index():
         <div class="modal-card">
             <div class="modal-title">Pyrox Library & History <span style="cursor:pointer;" onclick="closeModal('libraryModal')">✕</span></div>
             <div class="modal-body" id="libraryContent">
-                <p style="color: #666; font-size: 0.85rem; text-align: center; padding: 15px 0;">No saved items in library yet. Export or bookmark your answers!</p>
+                <p style="color: #666; font-size: 0.85rem; text-align: center; padding: 15px 0;">No saved items in library yet.</p>
             </div>
             <button class="modal-close-btn" onclick="closeModal('libraryModal')">Close</button>
         </div>
     </div>
 
-    <!-- Schedule & Routine Modal -->
-    <div class="modal-overlay" id="scheduleModal">
-        <div class="modal-card">
-            <div class="modal-title">Productivity & Schedule <span style="cursor:pointer;" onclick="closeModal('scheduleModal')">✕</span></div>
-            <div class="modal-body">
-                <button class="modal-btn" onclick="selectSuggestion('Create a structured 7-day study and coding time-table for me.')">📅 Generate Weekly Study Plan</button>
-                <button class="modal-btn" onclick="selectSuggestion('Make a healthy daily meal & hydration schedule.')">🥗 Daily Diet & Health Schedule</button>
-                <button class="modal-btn" onclick="selectSuggestion('Set up a YouTube video content creation schedule.')">🎬 Content Creation Routine</button>
+    <!-- 75% Camera Modal with Flash & Flip -->
+    <div class="camera-modal-overlay" id="cameraModal">
+        <div class="camera-modal-card">
+            <div class="camera-header">
+                <span style="font-weight:600; font-size:1rem;">Pyrox Lens & Camera</span>
+                <span style="cursor:pointer; font-size:1.1rem; color:#a1a1aa;" onclick="closeCameraModal()">✕</span>
             </div>
-            <button class="modal-close-btn" onclick="closeModal('scheduleModal')">Close</button>
+            <div class="camera-viewfinder">
+                <span style="color:#52525b; font-size:0.9rem;">📷 Camera Viewfinder Active (75% Screen)</span>
+            </div>
+            <div class="camera-controls">
+                <button class="cam-action-btn" onclick="toggleFlash()">⚡ Flash: <span id="flashStatus">Off</span></button>
+                <button class="shutter-btn" onclick="capturePhoto()"></button>
+                <button class="cam-action-btn" onclick="flipCamera()">🔄 Flip</button>
+            </div>
         </div>
     </div>
 
-    <!-- Pro Upgrade Modal -->
-    <div class="modal-overlay" id="upgradeModal">
-        <div class="modal-card">
-            <div class="modal-title">✨ Pyrox Pro Membership <span style="cursor:pointer;" onclick="closeModal('upgradeModal')">✕</span></div>
-            <div class="modal-body">
-                <p style="font-size:0.9rem; color:#ccc;">Unlock unlimited high-speed inference, advanced voice synthesis, and dedicated coding assistants.</p>
-                <button class="modal-btn" style="background:linear-gradient(135deg, #3b82f6, #8b5cf6); font-weight:600; text-align:center;" onclick="alert('⚡ Pro Plan Activated successfully!')">Activate Pro Access</button>
-            </div>
-            <button class="modal-close-btn" onclick="closeModal('upgradeModal')">Close</button>
-        </div>
-    </div>
-
-    <!-- Sidebar / Expand Menu -->
+    <!-- Sidebar -->
     <div class="sidebar" id="sidebar">
         <div>
             <div class="sidebar-logo-header">
@@ -398,17 +408,6 @@ async def read_index():
                 <div class="menu-btn" onclick="openModal('libraryModal')">
                     <svg viewBox="0 0 24 24"><path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
                     <span>Library & History</span>
-                </div>
-                <div class="menu-btn" onclick="openModal('scheduleModal')">
-                    <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-                    <span>Schedule & Routine</span>
-                </div>
-            </div>
-            <div class="menu-section-title" style="margin-top: 10px;">Account</div>
-            <div class="menu-list">
-                <div class="menu-btn" onclick="openModal('upgradeModal')">
-                    <svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
-                    <span>Upgrade to Pro</span>
                 </div>
             </div>
         </div>
@@ -442,7 +441,6 @@ async def read_index():
                 <div class="dropdown-menu" id="dropdownMenu">
                     <div class="dropdown-item" onclick="openModal('settingsModal')">⚙️ Settings</div>
                     <div class="dropdown-item" onclick="openModal('libraryModal')">📚 Library</div>
-                    <div class="dropdown-item" onclick="openModal('scheduleModal')">📅 Schedule</div>
                     <div class="dropdown-item" onclick="exportChat()">📄 Export Chat</div>
                     <div class="dropdown-item" style="color:#ef4444;" onclick="clearChat()">🗑️ Clear Chat</div>
                 </div>
@@ -473,24 +471,30 @@ async def read_index():
                     <span class="card-title">🥗 Meal & Health Planner</span>
                     <span class="card-desc">Personalized daily food & diet strategy</span>
                 </div>
-                <div class="suggestion-card" onclick="selectSuggestion('Mujhe coding aur studies ke liye fast revision plan chahiye.')">
-                    <span class="card-title">📝 Student Study Hub</span>
-                    <span class="card-desc">Smart exam & project preparation guide</span>
-                </div>
-                <div class="suggestion-card" onclick="selectSuggestion('Viral YouTube & Social Media Content Ideas batao.')">
-                    <span class="card-title">💡 Creative Content Ideas</span>
-                    <span class="card-desc">Trending script & video concepts</span>
-                </div>
             </div>
         </div>
 
         <div class="chat-container" id="chatContainer"></div>
 
         <div class="input-wrapper">
+            <!-- Plus Pop-up Menu (Large File/Image/Drive & Smaller Image Creation/Canvas) -->
+            <div class="plus-popup-menu" id="plusPopupMenu">
+                <div class="popup-section-large">
+                    <div class="popup-item-large" onclick="selectAttachment('📁 File Upload')">📁 Upload File</div>
+                    <div class="popup-item-large" onclick="openCameraModal()">📷 Take Photo / Camera</div>
+                    <div class="popup-item-large" onclick="selectAttachment('☁️ Google Drive')">☁️ Google Drive</div>
+                </div>
+                <div class="popup-section-small">
+                    <div class="popup-item-small" onclick="selectAttachment('🎨 Image Creation')">🎨 Image Creation</div>
+                    <div class="popup-item-small" onclick="selectAttachment('⚡ Pyrox Canvas')">⚡ Pyrox Canvas</div>
+                </div>
+            </div>
+
             <div class="input-box" id="inputBox">
-                <button type="button" class="file-btn" onclick="triggerFileSelect()" title="Attach Photo or File">
+                <button type="button" id="plusBtn" class="file-btn" onclick="togglePlusMenu(event)" title="Add Options">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"></path>
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
                     </svg>
                 </button>
                 <input type="file" id="hiddenFileInput" style="display:none;" onchange="handleFileAttach(event)">
@@ -503,6 +507,7 @@ async def read_index():
                     </svg>
                 </button>
 
+                <!-- Strict Equalizer: Completely silent when not speaking -->
                 <div class="equalizer-wave-container" id="waveBox">
                     <div class="freq-bar"></div><div class="freq-bar"></div><div class="freq-bar"></div><div class="freq-bar"></div>
                     <div class="freq-bar"></div><div class="freq-bar"></div><div class="freq-bar"></div><div class="freq-bar"></div>
@@ -531,41 +536,33 @@ async def read_index():
         let currentUserName = localStorage.getItem('pyrox_user') || 'Master Creator';
         let currentStudentMode = localStorage.getItem('pyrox_mode') || 'General Student';
         let isFirstMessage = true;
-
-        const greetingsList = [
-            { title: "Namaste, Master Creator!", sub: "Aaj padhai, coding ya content creation me kahan help chahiye?" },
-            { title: "Hello Bhai! Pyrox is ready.", sub: "Batao aaj konsa project ya goal tackle karna hai?" },
-            { title: "Welcome back, Creator!", sub: "Apna sawal pucho ya niche diye gaye options me se select karo." },
-            { title: "Ready for high productivity?", sub: "Pyrox yahan hai, seedha point par baat karte hain." }
-        ];
-
-        window.onload = function() {
-            const rand = greetingsList[Math.floor(Math.random() * greetingsList.length)];
-            document.getElementById('greetingTitle').innerText = rand.title;
-            document.getElementById('greetingSubtitle').innerText = rand.sub;
-        };
+        let flashState = false;
 
         function toggleSidebar(e) {
             if(e) e.stopPropagation();
-            const sb = document.getElementById('sidebar');
-            sb.classList.toggle('expanded');
+            document.getElementById('sidebar').classList.toggle('expanded');
         }
 
         function toggleDropdown(e) {
             if(e) e.stopPropagation();
-            const menu = document.getElementById('dropdownMenu');
+            document.getElementById('dropdownMenu').classList.toggle('show');
+        }
+
+        function togglePlusMenu(e) {
+            if(e) e.stopPropagation();
+            const menu = document.getElementById('plusPopupMenu');
+            const btn = document.getElementById('plusBtn');
             menu.classList.toggle('show');
+            btn.classList.toggle('rotated');
         }
 
         window.onclick = function(event) {
-            if (!event.target.matches('.dots-btn') && !event.target.closest('.three-dots-wrapper')) {
-                const dropdowns = document.getElementsByClassName("dropdown-menu");
-                for (let i = 0; i < dropdowns.length; i++) {
-                    let openDropdown = dropdowns[i];
-                    if (openDropdown.classList.contains('show')) {
-                        openDropdown.classList.remove('show');
-                    }
-                }
+            if (!event.target.closest('.three-dots-wrapper')) {
+                document.getElementById('dropdownMenu').classList.remove('show');
+            }
+            if (!event.target.closest('.input-wrapper')) {
+                document.getElementById('plusPopupMenu').classList.remove('show');
+                document.getElementById('plusBtn').classList.remove('rotated');
             }
             if (!event.target.closest('.sidebar') && !event.target.closest('.hamburger-btn')) {
                 document.getElementById('sidebar').classList.remove('expanded');
@@ -581,18 +578,34 @@ async def read_index():
             document.getElementById(modalId).style.display = 'none';
         }
 
-        function setVoice(voiceId, voiceName) {
-            currentVoice = voiceId;
-            localStorage.setItem('pyrox_voice', voiceId);
-            alert('Voice updated to: ' + voiceName);
-            closeModal('settingsModal');
+        function openCameraModal() {
+            document.getElementById('cameraModal').style.display = 'flex';
+            document.getElementById('plusPopupMenu').classList.remove('show');
+            document.getElementById('plusBtn').classList.remove('rotated');
         }
 
-        function setStudentMode(modeName) {
-            currentStudentMode = modeName;
-            localStorage.setItem('pyrox_mode', modeName);
-            alert('Academic Mode set to: ' + modeName);
-            closeModal('settingsModal');
+        function closeCameraModal() {
+            document.getElementById('cameraModal').style.display = 'none';
+        }
+
+        function toggleFlash() {
+            flashState = !flashState;
+            document.getElementById('flashStatus').innerText = flashState ? 'On' : 'Off';
+        }
+
+        function flipCamera() {
+            alert('🔄 Camera switched (Front/Back)');
+        }
+
+        function capturePhoto() {
+            alert('📸 Photo captured successfully!');
+            closeCameraModal();
+        }
+
+        function selectAttachment(type) {
+            document.getElementById('chatInput').value = `[Selected: ${type}] `;
+            document.getElementById('plusPopupMenu').classList.remove('show');
+            document.getElementById('plusBtn').classList.remove('rotated');
         }
 
         function selectSuggestion(text) {
@@ -610,33 +623,17 @@ async def read_index():
 
         function exportChat() {
             const chatContent = document.getElementById('chatContainer').innerText;
-            if(!chatContent) {
-                alert('No chat conversation to export yet!');
-                return;
-            }
+            if(!chatContent) { alert('No chat conversation to export!'); return; }
             const blob = new Blob([chatContent], { type: 'text/plain;charset=utf-8' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
-            a.href = url;
-            a.download = 'Pyrox_Chat_Export.txt';
-            a.click();
+            a.href = url; a.download = 'Pyrox_Chat_Export.txt'; a.click();
             document.getElementById('dropdownMenu').classList.remove('show');
-        }
-
-        function triggerFileSelect() {
-            document.getElementById('hiddenFileInput').click();
-        }
-
-        function handleFileAttach(event) {
-            const file = event.target.files[0];
-            if(file) {
-                document.getElementById('chatInput').value = `[Attached File: ${file.name}] `;
-            }
         }
 
         function toggleVoice(event) {
             if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-                alert('Speech Recognition is not supported in your browser. Please use Chrome or Edge.');
+                alert('Speech Recognition not supported in this browser.');
                 return;
             }
 
@@ -671,14 +668,8 @@ async def read_index():
                     document.getElementById('chatInput').value = accumulatedSpeech + interim;
                 };
 
-                recognition.onerror = function(event) {
-                    console.error('Speech recognition error', event.error);
-                    stopVoice();
-                };
-
-                recognition.onend = function() {
-                    stopVoice();
-                };
+                recognition.onerror = function() { stopVoice(); };
+                recognition.onend = function() { stopVoice(); };
 
                 recognition.start();
             } else {
@@ -694,54 +685,15 @@ async def read_index():
             if(micBtn) micBtn.classList.remove('active');
             if(inputBox) inputBox.classList.remove('recording');
             if(waveBox) waveBox.classList.remove('active');
-            if(recognition) {
-                try { recognition.stop(); } catch(e){}
-            }
+            if(recognition) { try { recognition.stop(); } catch(e){} }
             const finalVal = document.getElementById('chatInput').value.trim();
-            if(finalVal) {
-                triggerSend();
-            }
+            if(finalVal) { triggerSend(); }
         }
 
-        // Marked.js & Code Block Formatter Function
         function formatAIResponse(rawText) {
             let parsedHtml = (typeof marked !== 'undefined') ? marked.parse(rawText) : rawText.replace(/\\n/g, '<br>');
-            
             const tempDiv = document.createElement('div');
             tempDiv.innerHTML = parsedHtml;
-
-            const preBlocks = tempDiv.querySelectorAll('pre');
-            preBlocks.forEach((pre) => {
-                const wrapper = document.createElement('div');
-                wrapper.className = 'code-block-wrapper';
-
-                const header = document.createElement('div');
-                header.className = 'code-block-header';
-                
-                const codeEl = pre.querySelector('code');
-                let lang = 'code';
-                if (codeEl && codeEl.className) {
-                    const match = codeEl.className.match(/language-(\\w+)/);
-                    if (match) lang = match[1];
-                }
-
-                header.innerHTML = `<span>${lang.toUpperCase()}</span>`;
-                
-                const copyBtn = document.createElement('button');
-                copyBtn.className = 'copy-code-btn';
-                copyBtn.innerText = 'Copy';
-                copyBtn.onclick = function() {
-                    navigator.clipboard.writeText(pre.innerText);
-                    copyBtn.innerText = 'Copied!';
-                    setTimeout(() => copyBtn.innerText = 'Copy', 2000);
-                };
-
-                header.appendChild(copyBtn);
-                pre.parentNode.insertBefore(wrapper, pre);
-                wrapper.appendChild(header);
-                wrapper.appendChild(pre);
-            });
-
             return tempDiv.innerHTML;
         }
 
@@ -758,7 +710,6 @@ async def read_index():
             }
 
             inputField.value = '';
-
             const chatContainer = document.getElementById('chatContainer');
             
             const userMsgDiv = document.createElement('div');
@@ -788,7 +739,6 @@ async def read_index():
                 if(res.ok) {
                     const data = await res.json();
                     let formattedReply = formatAIResponse(data.reply);
-                    
                     let audioHtml = '';
                     if(data.audio_url) {
                         audioHtml = `
@@ -800,11 +750,10 @@ async def read_index():
                             </div>
                         `;
                     }
-
                     aiMsgDiv.innerHTML = `<strong>Pyrox:</strong><br><br>${formattedReply}${audioHtml}`;
                 } else {
                     const errJson = await res.json();
-                    aiMsgDiv.innerHTML = `<strong>Pyrox Error:</strong> ${errJson.detail || 'Server processing error'}`;
+                    aiMsgDiv.innerHTML = `<strong>Pyrox Error:</strong> ${errJson.detail || 'Server error'}`;
                 }
             } catch(err) {
                 aiMsgDiv.innerHTML = `<strong>Network Error:</strong> ${err.message}`;
@@ -818,9 +767,7 @@ async def read_index():
             if(audio.paused) {
                 audio.play();
                 btnEl.innerText = '⏸ Pause Voice';
-                audio.onended = function() {
-                    btnEl.innerText = '▶ Play Voice Response';
-                };
+                audio.onended = function() { btnEl.innerText = '▶ Play Voice Response'; };
             } else {
                 audio.pause();
                 btnEl.innerText = '▶ Play Voice Response';
@@ -831,10 +778,3 @@ async def read_index():
 </html>
 """
     return html_content
-    
-          
-
-      
-              
-
- 
