@@ -42,6 +42,12 @@ class ImageRequest(BaseModel):
     model_id: str = "black-forest-labs/FLUX.1-schnell"
 
 
+class FeedbackRequest(BaseModel):
+    reason: str
+    details: Optional[str] = ""
+    response_snippet: Optional[str] = ""
+
+
 def resolve_groq_model() -> str:
     global CACHED_GROQ_MODEL
     if CACHED_GROQ_MODEL:
@@ -211,11 +217,11 @@ async def chat_endpoint(req: ChatRequest):
             )
 
         effective_prompt = user_msg or "User shared an image."
-        if req.image_data_url and not "vision" in model_id.lower():
+        if req.image_data_url and "vision" not in model_id.lower():
             effective_prompt = (
                 f"{effective_prompt}\n[Note: User attached an image from camera/file. "
-                "If image pixels are not passed directly to text-only model, politely let the user know "
-                "you received the attachment note and ask what specific detail they want help with.]"
+                "If image pixels cannot be inspected directly by this text model, politely mention that "
+                "and ask what specific detail they want help with.]"
             )
 
         payload = {
@@ -268,7 +274,7 @@ async def generate_image_endpoint(req: ImageRequest):
         return JSONResponse(
             status_code=400,
             content={
-                "detail": "HF_API_KEY missing in environment variables. Set HF_API_KEY first."
+                "detail": "HF_API_KEY missing in environment variables. Set HF_API_KEY on Render first."
             },
         )
 
@@ -290,9 +296,9 @@ async def generate_image_endpoint(req: ImageRequest):
     body = {"inputs": prompt}
 
     try:
-        resp = requests.post(router_url, headers=headers, json=body, timeout=60)
+        resp = requests.post(router_url, headers=headers, json=body, timeout=65)
         if resp.status_code == 404:
-            resp = requests.post(legacy_url, headers=headers, json=body, timeout=60)
+            resp = requests.post(legacy_url, headers=headers, json=body, timeout=65)
 
         if resp.status_code != 200:
             err_msg = resp.text[:250] if resp.text else "Image generation failed"
@@ -311,6 +317,11 @@ async def generate_image_endpoint(req: ImageRequest):
         return JSONResponse(status_code=500, content={"detail": str(exc)})
 
 
+@app.post("/api/feedback")
+async def feedback_endpoint(req: FeedbackRequest):
+    return {"status": "recorded", "reason": req.reason}
+
+
 @app.get("/", response_class=HTMLResponse)
 async def index():
     html = """<!DOCTYPE html>
@@ -323,13 +334,13 @@ async def index():
     <style>
         :root {
             --bg-main: #09090b;
-            --bg-surface: #111114;
-            --bg-elevated: #18181d;
-            --border-subtle: #27272a;
+            --bg-surface: #121216;
+            --bg-elevated: #1a1a20;
+            --border-subtle: #2a2a32;
             --border-user: #52525b;
             --text-primary: #f4f4f5;
-            --text-secondary: #b4b4bc;
-            --text-muted: #71717a;
+            --text-secondary: #c4c4cc;
+            --text-muted: #8e8e98;
             --accent-upgrade: #2563eb;
             --accent-upgrade-border: #3b82f6;
         }
@@ -341,7 +352,7 @@ async def index():
             --border-subtle: #cbd5e1;
             --border-user: #64748b;
             --text-primary: #09090b;
-            --text-secondary: #334155;
+            --text-secondary: #1e293b;
             --text-muted: #64748b;
             --accent-upgrade: #2563eb;
             --accent-upgrade-border: #1d4ed8;
@@ -361,6 +372,7 @@ async def index():
             background-color: var(--bg-main);
             color: var(--text-primary);
             overflow: hidden;
+            font-weight: 500;
             transition: background-color 0.2s ease, color 0.2s ease;
         }
 
@@ -388,7 +400,7 @@ async def index():
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 12px;
+            gap: 14px;
         }
 
         .splash-star-wrap {
@@ -397,12 +409,12 @@ async def index():
         }
 
         .splash-word-flash {
-            font-size: 2.35rem;
+            font-size: 2.5rem;
             font-weight: 800;
             letter-spacing: 0.6px;
             color: var(--text-primary);
             opacity: 0;
-            transform: translateX(-28px) skewX(-12deg);
+            transform: translateX(-30px) skewX(-12deg);
             animation: flashRevealPyrox 0.78s cubic-bezier(0.16, 1, 0.3, 1) 0.14s forwards;
         }
 
@@ -427,7 +439,7 @@ async def index():
         @keyframes flashRevealPyrox {
             0% {
                 opacity: 0;
-                transform: translateX(-30px) skewX(-16deg);
+                transform: translateX(-32px) skewX(-16deg);
                 text-shadow: 0 0 24px rgba(255, 255, 255, 0.9);
             }
             45% {
@@ -450,7 +462,7 @@ async def index():
             overflow: hidden;
         }
 
-        /* Expandable Sidebar (~40% width on mobile) */
+        /* Expandable Sidebar (~42% width on mobile) */
         .sidebar {
             position: fixed;
             top: 0;
@@ -469,8 +481,8 @@ async def index():
         }
 
         .sidebar.open {
-            width: 40vw;
-            min-width: 175px;
+            width: 44vw;
+            min-width: 185px;
             max-width: 340px;
             border-right-color: var(--border-subtle);
             padding: 16px 12px;
@@ -483,26 +495,34 @@ async def index():
         }
 
         .sidebar-title {
-            font-size: 1.05rem;
-            font-weight: 700;
+            font-size: 1.12rem;
+            font-weight: 800;
             color: var(--text-primary);
-            padding: 4px 8px 10px 8px;
+            padding: 4px 8px 12px 8px;
             border-bottom: 1px solid var(--border-subtle);
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 6px;
+            gap: 8px;
+        }
+
+        .sidebar-brand-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 0;
         }
 
         .nav-item {
-            padding: 12px 11px;
+            padding: 12px 12px;
             border-radius: 10px;
-            font-size: 0.98rem;
-            font-weight: 600;
+            font-size: 1.02rem;
+            font-weight: 650;
             color: var(--text-primary);
             cursor: pointer;
             display: flex;
             align-items: center;
+            justify-content: space-between;
             gap: 8px;
             white-space: nowrap;
             overflow: hidden;
@@ -516,6 +536,16 @@ async def index():
 
         .nav-item:active {
             transform: scale(0.97);
+        }
+
+        .quota-pill {
+            font-size: 0.74rem;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 999px;
+            background-color: var(--bg-elevated);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-secondary);
         }
 
         .model-sublist {
@@ -532,9 +562,10 @@ async def index():
         }
 
         .model-option {
-            padding: 9px 10px;
+            padding: 10px 10px;
             border-radius: 8px;
-            font-size: 0.88rem;
+            font-size: 0.92rem;
+            font-weight: 600;
             color: var(--text-secondary);
             cursor: pointer;
             display: flex;
@@ -545,14 +576,13 @@ async def index():
         .model-option.active {
             background-color: var(--bg-elevated);
             color: var(--text-primary);
-            font-weight: 600;
         }
 
         .library-folders {
             display: none;
             flex-direction: column;
             gap: 6px;
-            margin-top: 4px;
+            margin-top: 2px;
             padding-left: 6px;
         }
 
@@ -561,8 +591,9 @@ async def index():
         }
 
         .folder-chip {
-            padding: 8px 10px;
-            font-size: 0.84rem;
+            padding: 9px 10px;
+            font-size: 0.9rem;
+            font-weight: 600;
             color: var(--text-secondary);
             background-color: var(--bg-elevated);
             border: 1px solid var(--border-subtle);
@@ -586,12 +617,12 @@ async def index():
         }
 
         .google-pill {
-            padding: 10px 10px;
+            padding: 11px 10px;
             border-radius: 10px;
             border: 1px solid var(--border-subtle);
             background-color: var(--bg-elevated);
-            font-size: 0.88rem;
-            font-weight: 600;
+            font-size: 0.92rem;
+            font-weight: 700;
             color: var(--text-primary);
             cursor: pointer;
             text-align: center;
@@ -610,7 +641,7 @@ async def index():
         }
 
         .top-bar {
-            height: 56px;
+            height: 58px;
             padding: 0 12px;
             display: flex;
             align-items: center;
@@ -623,7 +654,7 @@ async def index():
         .top-left {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 10px;
             min-height: 36px;
             min-width: 0;
         }
@@ -632,8 +663,8 @@ async def index():
             background: transparent;
             border: 1px solid var(--border-subtle);
             color: var(--text-primary);
-            width: 36px;
-            height: 36px;
+            width: 38px;
+            height: 38px;
             border-radius: 10px;
             display: flex;
             align-items: center;
@@ -655,16 +686,11 @@ async def index():
             transform: scale(0.95);
         }
 
-        .brand-title-wrap {
-            display: flex;
-            align-items: center;
-            gap: 7px;
-            min-width: 0;
-        }
-
+        /* Top bar displays plain Pyrox text without extra logo */
         .brand-heading {
-            font-size: 1.05rem;
-            font-weight: 700;
+            font-size: 1.15rem;
+            font-weight: 800;
+            letter-spacing: 0.2px;
             color: var(--text-primary);
             white-space: nowrap;
             overflow: hidden;
@@ -687,8 +713,8 @@ async def index():
             color: #ffffff;
             border: 1px solid var(--accent-upgrade-border);
             border-radius: 14px 4px 14px 4px;
-            padding: 7px 12px;
-            font-size: 0.82rem;
+            padding: 7px 13px;
+            font-size: 0.86rem;
             font-weight: 700;
             cursor: pointer;
             display: inline-flex;
@@ -735,8 +761,8 @@ async def index():
             background: transparent;
             border: 1px solid var(--border-subtle);
             color: var(--text-primary);
-            width: 34px;
-            height: 34px;
+            width: 36px;
+            height: 36px;
             border-radius: 10px;
             display: flex;
             align-items: center;
@@ -746,9 +772,9 @@ async def index():
 
         .dots-menu {
             position: absolute;
-            top: 42px;
+            top: 44px;
             right: 0;
-            width: 190px;
+            width: 195px;
             background-color: var(--bg-surface);
             border: 1px solid var(--border-subtle);
             border-radius: 12px;
@@ -767,7 +793,8 @@ async def index():
         .dots-item {
             padding: 10px 12px;
             border-radius: 8px;
-            font-size: 0.9rem;
+            font-size: 0.94rem;
+            font-weight: 600;
             color: var(--text-primary);
             cursor: pointer;
         }
@@ -779,9 +806,9 @@ async def index():
         /* Status banner for Web Search or Limit Warning */
         .status-strip {
             display: none;
-            padding: 6px 14px;
-            font-size: 0.84rem;
-            font-weight: 600;
+            padding: 7px 14px;
+            font-size: 0.88rem;
+            font-weight: 650;
             background-color: var(--bg-surface);
             border-bottom: 1px solid var(--border-subtle);
             color: var(--text-secondary);
@@ -796,30 +823,49 @@ async def index():
             flex: 1;
             min-height: 0;
             overflow-y: auto;
-            padding: 16px 14px;
+            padding: 18px 15px;
             display: flex;
             flex-direction: column;
-            gap: 14px;
+            gap: 16px;
         }
 
         .greeting-center {
             margin: auto;
             text-align: center;
-            max-width: 540px;
+            max-width: 560px;
             padding: 20px 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .greeting-logo-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+
+        .greeting-logo-title {
+            font-size: 2rem;
+            font-weight: 800;
+            letter-spacing: 0.3px;
+            color: var(--text-primary);
         }
 
         .greeting-center h1 {
             font-size: 1.55rem;
             font-weight: 700;
             color: var(--text-primary);
-            line-height: 1.38;
+            line-height: 1.42;
+            letter-spacing: 0.1px;
         }
 
         .msg-row {
             display: flex;
             flex-direction: column;
-            max-width: 88%;
+            max-width: 90%;
             gap: 8px;
         }
 
@@ -828,10 +874,12 @@ async def index():
             background-color: var(--bg-elevated);
             color: var(--text-primary);
             border: 1px solid var(--border-user);
-            border-radius: 14px 14px 4px 14px;
-            padding: 11px 15px;
-            font-size: 1rem;
-            line-height: 1.55;
+            border-radius: 16px 16px 4px 16px;
+            padding: 12px 16px;
+            font-size: 1.06rem;
+            font-weight: 550;
+            line-height: 1.6;
+            letter-spacing: 0.15px;
             word-break: break-word;
         }
 
@@ -840,37 +888,41 @@ async def index():
             width: 100%;
             max-width: 100%;
             color: var(--text-primary);
-            font-size: 1.02rem;
-            line-height: 1.65;
+            font-size: 1.08rem;
+            font-weight: 500;
+            line-height: 1.72;
+            letter-spacing: 0.15px;
+            word-spacing: 1px;
             padding: 4px 2px;
         }
 
         .msg-ai p {
-            margin-bottom: 8px;
+            margin-bottom: 10px;
         }
 
         .msg-ai ul, .msg-ai ol {
-            padding-left: 20px;
-            margin: 6px 0 10px 0;
+            padding-left: 22px;
+            margin: 8px 0 12px 0;
         }
 
         .msg-ai li {
-            margin-bottom: 5px;
+            margin-bottom: 6px;
         }
 
         .msg-ai img {
             max-width: 100%;
-            max-height: 360px;
-            border-radius: 12px;
+            max-height: 380px;
+            border-radius: 14px;
             border: 1px solid var(--border-subtle);
             margin-top: 6px;
         }
 
         .msg-actions {
             display: flex;
+            flex-wrap: wrap;
             align-items: center;
-            gap: 8px;
-            margin-top: 2px;
+            gap: 6px;
+            margin-top: 4px;
         }
 
         .mini-action-btn {
@@ -878,27 +930,29 @@ async def index():
             border: 1px solid var(--border-subtle);
             color: var(--text-secondary);
             border-radius: 8px;
-            padding: 4px 10px;
-            font-size: 0.78rem;
-            font-weight: 600;
+            padding: 5px 10px;
+            font-size: 0.8rem;
+            font-weight: 650;
             cursor: pointer;
         }
 
-        .mini-action-btn:hover {
+        .mini-action-btn:hover,
+        .mini-action-btn.selected-act {
             color: var(--text-primary);
+            border-color: var(--border-user);
         }
 
         /* Two-dot thinking indicator */
         .thinking-dots {
             display: inline-flex;
             align-items: center;
-            gap: 7px;
-            padding: 6px 2px;
+            gap: 8px;
+            padding: 8px 2px;
         }
 
         .thinking-dots span {
-            width: 9px;
-            height: 9px;
+            width: 10px;
+            height: 10px;
             border-radius: 50%;
             background-color: var(--text-secondary);
             animation: twoDotPulse 1s infinite ease-in-out;
@@ -923,7 +977,7 @@ async def index():
         .bottom-dock {
             flex-shrink: 0;
             width: 100%;
-            padding: 8px 10px 10px 10px;
+            padding: 8px 10px 8px 10px;
             background-color: var(--bg-main);
             border-top: 1px solid var(--border-subtle);
             position: relative;
@@ -932,9 +986,9 @@ async def index():
 
         .plus-menu {
             position: absolute;
-            bottom: 82px;
+            bottom: 96px;
             left: 12px;
-            width: 268px;
+            width: 276px;
             background-color: var(--bg-surface);
             border: 1px solid var(--border-subtle);
             border-radius: 14px;
@@ -956,9 +1010,12 @@ async def index():
             background-color: var(--bg-elevated);
             border: 1px solid var(--border-subtle);
             color: var(--text-primary);
-            font-size: 0.96rem;
-            font-weight: 600;
+            font-size: 0.98rem;
+            font-weight: 650;
             cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
             text-align: left;
         }
 
@@ -975,15 +1032,18 @@ async def index():
         }
 
         .plus-small-btn {
-            padding: 8px 6px;
+            padding: 9px 7px;
             border-radius: 8px;
             background-color: var(--bg-main);
             border: 1px solid var(--border-subtle);
             color: var(--text-secondary);
-            font-size: 0.78rem;
-            font-weight: 600;
+            font-size: 0.8rem;
+            font-weight: 650;
             cursor: pointer;
-            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
         }
 
         .plus-small-btn:hover {
@@ -994,7 +1054,7 @@ async def index():
             display: flex;
             align-items: center;
             gap: 8px;
-            min-height: 62px;
+            min-height: 64px;
             background-color: var(--bg-surface);
             border: 1px solid var(--border-subtle);
             border-radius: 24px;
@@ -1002,8 +1062,8 @@ async def index():
         }
 
         .icon-action-btn {
-            width: 42px;
-            height: 42px;
+            width: 44px;
+            height: 44px;
             border-radius: 13px;
             border: 1px solid var(--border-subtle);
             background-color: var(--bg-elevated);
@@ -1013,12 +1073,26 @@ async def index():
             justify-content: center;
             cursor: pointer;
             flex-shrink: 0;
-            font-size: 1.15rem;
-            transition: transform 0.18s ease;
+            font-size: 1.2rem;
+            font-weight: 700;
+            transition: transform 0.18s ease, border-color 0.18s ease;
         }
 
         .icon-action-btn.open-minus {
             transform: rotate(90deg);
+        }
+
+        .icon-action-btn.mic-recording {
+            border-color: var(--border-user);
+            background-color: var(--bg-main);
+        }
+
+        .curved-stop-square {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+            background-color: var(--text-primary);
+            display: inline-block;
         }
 
         .prompt-input {
@@ -1030,19 +1104,30 @@ async def index():
             border: none;
             outline: none;
             color: var(--text-primary);
-            font-size: 1.02rem;
+            font-size: 1.04rem;
+            font-weight: 550;
             resize: none;
             padding: 9px 4px;
-            line-height: 1.38;
+            line-height: 1.4;
         }
 
-        /* Silent-until-voice frequency bars */
+        .prompt-input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .prompt-input.hidden-while-speaking {
+            display: none;
+        }
+
+        /* Full-width frequency meter inside input shell while speaking */
         .freq-meter {
             display: none;
+            flex: 1;
             align-items: center;
+            justify-content: space-evenly;
             gap: 3px;
-            height: 30px;
-            padding: 0 4px;
+            height: 36px;
+            padding: 0 8px;
         }
 
         .freq-meter.visible {
@@ -1057,27 +1142,9 @@ async def index():
             transition: height 0.07s linear;
         }
 
-        .stop-dict-btn {
-            display: none;
-            align-items: center;
-            justify-content: center;
-            padding: 7px 10px;
-            border-radius: 10px;
-            border: 1px solid var(--border-user);
-            background-color: var(--bg-elevated);
-            color: var(--text-primary);
-            font-size: 0.78rem;
-            font-weight: 700;
-            cursor: pointer;
-        }
-
-        .stop-dict-btn.visible {
-            display: inline-flex;
-        }
-
         .send-btn, .stop-btn {
-            width: 44px;
-            height: 44px;
+            width: 46px;
+            height: 46px;
             border-radius: 15px;
             border: none;
             background-color: var(--text-primary);
@@ -1087,7 +1154,7 @@ async def index():
             justify-content: center;
             cursor: pointer;
             flex-shrink: 0;
-            font-size: 1.25rem;
+            font-size: 1.35rem;
             font-weight: 800;
         }
 
@@ -1104,6 +1171,14 @@ async def index():
 
         .send-btn.hidden-send {
             display: none;
+        }
+
+        .ai-disclaimer {
+            text-align: center;
+            font-size: 0.74rem;
+            color: var(--text-muted);
+            margin-top: 5px;
+            font-weight: 500;
         }
 
         /* Modals */
@@ -1130,7 +1205,7 @@ async def index():
 
         .modal-box {
             width: 100%;
-            max-width: 450px;
+            max-width: 460px;
             max-height: 90dvh;
             overflow-y: auto;
             background-color: var(--bg-surface);
@@ -1143,6 +1218,47 @@ async def index():
             color: var(--text-primary);
         }
 
+        /* 70% height grey Bad Response feedback box */
+        .feedback-box {
+            width: 100%;
+            max-width: 480px;
+            min-height: 70dvh;
+            max-height: 85dvh;
+            overflow-y: auto;
+            background-color: #27272a;
+            color: #f4f4f5;
+            border: 1px solid #3f3f46;
+            border-radius: 18px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            gap: 14px;
+        }
+
+        .feedback-reasons-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .reason-chip {
+            padding: 9px 12px;
+            border-radius: 10px;
+            border: 1px solid #52525b;
+            background-color: #18181b;
+            color: #f4f4f5;
+            font-size: 0.88rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .reason-chip.active {
+            background-color: #f4f4f5;
+            color: #09090b;
+            border-color: #f4f4f5;
+        }
+
         .camera-sheet .modal-box {
             max-width: 640px;
             height: 75dvh;
@@ -1153,8 +1269,8 @@ async def index():
             display: flex;
             align-items: center;
             justify-content: space-between;
-            font-weight: 700;
-            font-size: 1.05rem;
+            font-weight: 750;
+            font-size: 1.08rem;
         }
 
         .close-x {
@@ -1164,25 +1280,25 @@ async def index():
             border-radius: 8px;
             padding: 5px 10px;
             cursor: pointer;
-            font-size: 0.85rem;
-            font-weight: 600;
+            font-size: 0.88rem;
+            font-weight: 700;
         }
 
-        /* GitHub-inspired Sign-Up modal with larger Continue with Google button */
+        /* GitHub-inspired Sign-Up modal with Logo & large Continue with Google */
         .google-big-btn {
             width: 100%;
-            padding: 14px 16px;
+            padding: 15px 16px;
             border-radius: 12px;
             border: 1px solid var(--border-user);
             background-color: var(--bg-elevated);
             color: var(--text-primary);
-            font-size: 1.04rem;
-            font-weight: 700;
+            font-size: 1.08rem;
+            font-weight: 750;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 8px;
+            gap: 10px;
         }
 
         .google-big-btn:hover {
@@ -1191,14 +1307,14 @@ async def index():
 
         .divider-or {
             text-align: center;
-            font-size: 0.82rem;
+            font-size: 0.84rem;
             color: var(--text-muted);
             margin: 2px 0;
         }
 
         .field-label {
-            font-size: 0.84rem;
-            font-weight: 600;
+            font-size: 0.88rem;
+            font-weight: 650;
             color: var(--text-secondary);
         }
 
@@ -1208,8 +1324,9 @@ async def index():
             border: 1px solid var(--border-subtle);
             color: var(--text-primary);
             border-radius: 10px;
-            padding: 10px 12px;
-            font-size: 0.94rem;
+            padding: 11px 12px;
+            font-size: 0.96rem;
+            font-weight: 550;
             outline: none;
         }
 
@@ -1219,23 +1336,24 @@ async def index():
             color: var(--text-primary);
             border-radius: 10px;
             padding: 11px 13px;
-            font-size: 0.92rem;
-            font-weight: 600;
+            font-size: 0.94rem;
+            font-weight: 650;
             cursor: pointer;
         }
 
-        /* ChatGPT-style Upgrade Feature Comparison Modal */
+        /* ChatGPT-style Single Pyrox Pro Upgrade Modal */
         .compare-table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 0.88rem;
+            font-size: 0.92rem;
         }
 
         .compare-table th,
         .compare-table td {
-            padding: 9px 6px;
+            padding: 10px 6px;
             border-bottom: 1px solid var(--border-subtle);
             text-align: left;
+            font-weight: 600;
         }
 
         .compare-table th:nth-child(2),
@@ -1243,28 +1361,32 @@ async def index():
         .compare-table th:nth-child(3),
         .compare-table td:nth-child(3) {
             text-align: center;
-            width: 64px;
+            width: 68px;
         }
 
-        .plan-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 8px;
-        }
-
-        .plan-card {
-            border: 1px solid var(--border-subtle);
+        .single-price-banner {
+            border: 1px solid var(--accent-upgrade-border);
             background-color: var(--bg-elevated);
-            border-radius: 12px;
-            padding: 11px;
-            cursor: pointer;
+            border-radius: 14px;
+            padding: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
 
-        .plan-card.selected {
-            border-color: var(--accent-upgrade-border);
+        .old-price {
+            text-decoration: line-through;
+            color: var(--text-muted);
+            font-size: 0.96rem;
+            margin-right: 6px;
         }
 
-        /* Camera sheet with round shutter button */
+        .new-price {
+            font-size: 1.32rem;
+            font-weight: 800;
+            color: var(--text-primary);
+        }
+
         .video-frame {
             flex: 1;
             min-height: 0;
@@ -1292,8 +1414,8 @@ async def index():
         }
 
         .shutter-circle {
-            width: 58px;
-            height: 58px;
+            width: 60px;
+            height: 60px;
             border-radius: 50%;
             border: 4px solid var(--text-primary);
             background-color: transparent;
@@ -1306,22 +1428,42 @@ async def index():
 
         .shutter-circle::after {
             content: "";
-            width: 42px;
-            height: 42px;
+            width: 44px;
+            height: 44px;
             border-radius: 50%;
             background-color: var(--text-primary);
         }
     </style>
 </head>
 <body>
+<!-- Shared SVG Gradient Defs for Crystal-Clear Multi-Shade Star Logo -->
+<svg width="0" height="0" style="position:absolute;visibility:hidden;">
+    <defs>
+        <linearGradient id="pyroxOuterGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#38bdf8" />
+            <stop offset="50%" stop-color="#6366f1" />
+            <stop offset="100%" stop-color="#a855f7" />
+        </linearGradient>
+        <linearGradient id="pyroxMidGrad" x1="100%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#60a5fa" />
+            <stop offset="55%" stop-color="#818cf8" />
+            <stop offset="100%" stop-color="#ec4899" />
+        </linearGradient>
+        <linearGradient id="pyroxCoreGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#ffffff" />
+            <stop offset="100%" stop-color="#bae6fd" />
+        </linearGradient>
+    </defs>
+</svg>
+
 <!-- Pogo-style Flashy Star + Pyrox Splash Entry -->
 <div class="splash-overlay" id="splashOverlay">
     <div class="splash-stage">
         <div class="splash-star-wrap">
-            <svg width="46" height="46" viewBox="0 0 100 100" fill="none">
-                <polygon points="50,6 63,36 95,39 71,60 78,92 50,75 22,92 29,60 5,39 37,36" stroke="#ef4444" stroke-width="5" fill="rgba(239,68,68,0.12)"/>
-                <polygon points="50,20 59,41 81,43 64,58 69,80 50,68 31,80 36,58 19,43 41,41" stroke="#3b82f6" stroke-width="4" fill="rgba(59,130,246,0.14)"/>
-                <polygon points="50,33 56,47 70,48 59,58 62,72 50,64 38,72 41,58 30,48 44,47" stroke="#1d4ed8" stroke-width="3" fill="#60a5fa"/>
+            <svg width="52" height="52" viewBox="0 0 100 100" fill="none">
+                <path d="M50 4 C55 34, 66 45, 96 50 C66 55, 55 66, 50 96 C45 66, 34 55, 4 50 C34 45, 45 34, 50 4 Z" fill="url(#pyroxOuterGrad)" />
+                <path d="M50 20 C53 40, 60 47, 80 50 C60 53, 53 60, 50 80 C47 60, 40 53, 20 50 C40 47, 47 40, 50 20 Z" fill="url(#pyroxMidGrad)" />
+                <path d="M50 34 C51.5 44, 56 48.5, 66 50 C56 51.5, 51.5 56, 50 66 C48.5 56, 44 51.5, 34 50 C44 48.5, 48.5 44, 50 34 Z" fill="url(#pyroxCoreGrad)" />
             </svg>
         </div>
         <div class="splash-word-flash" id="splashWord">Pyrox</div>
@@ -1332,13 +1474,30 @@ async def index():
     <aside class="sidebar" id="sidebar" onclick="event.stopPropagation()">
         <div class="sidebar-top">
             <div class="sidebar-title">
-                <span id="sidebarThemeTitle">Pyrox</span>
-                <span style="font-size:0.82rem;color:var(--text-secondary);cursor:pointer;" onclick="closeSidebar()">✕</span>
+                <div class="sidebar-brand-group">
+                    <svg width="24" height="24" viewBox="0 0 100 100" fill="none">
+                        <path d="M50 4 C55 34, 66 45, 96 50 C66 55, 55 66, 50 96 C45 66, 34 55, 4 50 C34 45, 45 34, 50 4 Z" fill="url(#pyroxOuterGrad)" />
+                        <path d="M50 20 C53 40, 60 47, 80 50 C60 53, 53 60, 50 80 C47 60, 40 53, 20 50 C40 47, 47 40, 50 20 Z" fill="url(#pyroxMidGrad)" />
+                        <path d="M50 34 C51.5 44, 56 48.5, 66 50 C56 51.5, 51.5 56, 50 66 C48.5 56, 44 51.5, 34 50 C44 48.5, 48.5 44, 50 34 Z" fill="url(#pyroxCoreGrad)" />
+                    </svg>
+                    <span id="sidebarThemeTitle">Pyrox</span>
+                </div>
+                <span style="font-size:0.88rem;color:var(--text-secondary);cursor:pointer;" onclick="closeSidebar()">✕</span>
             </div>
 
             <div class="nav-item" onclick="newChat(); closeSidebar();">+ New Chat</div>
             <div class="nav-item" onclick="toggleLibraryFolders()">Library</div>
             <div class="library-folders" id="libraryFolders"></div>
+
+            <div class="nav-item" onclick="openImageStudioModal(); closeSidebar();">
+                <span>Images</span>
+                <span class="quota-pill" id="sidebarImgQuota">2/2</span>
+            </div>
+
+            <div class="nav-item" onclick="openModal('videoModal'); closeSidebar();">
+                <span>Video</span>
+                <span class="quota-pill">Soon</span>
+            </div>
 
             <div class="nav-item" onclick="toggleModelSublist()">Pyrox Only ▾</div>
             <div class="model-sublist" id="modelSublist">
@@ -1346,9 +1505,9 @@ async def index():
                     <span>Pyrox Only</span>
                     <span>Active</span>
                 </div>
-                <div class="model-option" id="optProModel" onclick="selectModelMode('Pro Model')">
+                <div class="model-option" id="optProModel" onclick="openModal('upgradeModal'); closeSidebar();">
                     <span>Pro Model</span>
-                    <span>Soon</span>
+                    <span>Upgrade</span>
                 </div>
             </div>
         </div>
@@ -1365,21 +1524,13 @@ async def index():
         <header class="top-bar">
             <div class="top-left">
                 <button type="button" class="menu-toggle-btn" id="burgerBtn" onclick="openSidebar(event)" aria-label="Open menu">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3">
                         <line x1="3" y1="6" x2="21" y2="6"></line>
                         <line x1="3" y1="12" x2="21" y2="12"></line>
                         <line x1="3" y1="18" x2="21" y2="18"></line>
                     </svg>
                 </button>
-
-                <div class="brand-title-wrap">
-                    <svg width="24" height="24" viewBox="0 0 100 100" fill="none">
-                        <polygon points="50,6 63,36 95,39 71,60 78,92 50,75 22,92 29,60 5,39 37,36" stroke="#ef4444" stroke-width="6"/>
-                        <polygon points="50,21 59,41 81,43 64,58 69,80 50,68 31,80 36,58 19,43 41,41" stroke="#3b82f6" stroke-width="5"/>
-                        <polygon points="50,34 56,47 70,48 59,58 62,72 50,64 38,72 41,58 30,48 44,47" stroke="#60a5fa" stroke-width="4" fill="#60a5fa"/>
-                    </svg>
-                    <span class="brand-heading" id="headerBrandTitle">Pyrox</span>
-                </div>
+                <span class="brand-heading" id="headerBrandTitle">Pyrox</span>
             </div>
 
             <div class="top-right" onclick="event.stopPropagation()">
@@ -1407,18 +1558,58 @@ async def index():
 
         <section class="scroll-stage" id="scrollStage">
             <div class="greeting-center" id="greetingBox">
+                <div class="greeting-logo-row">
+                    <svg width="46" height="46" viewBox="0 0 100 100" fill="none">
+                        <path d="M50 4 C55 34, 66 45, 96 50 C66 55, 55 66, 50 96 C45 66, 34 55, 4 50 C34 45, 45 34, 50 4 Z" fill="url(#pyroxOuterGrad)" />
+                        <path d="M50 20 C53 40, 60 47, 80 50 C60 53, 53 60, 50 80 C47 60, 40 53, 20 50 C40 47, 47 40, 50 20 Z" fill="url(#pyroxMidGrad)" />
+                        <path d="M50 34 C51.5 44, 56 48.5, 66 50 C56 51.5, 51.5 56, 50 66 C48.5 56, 44 51.5, 34 50 C44 48.5, 48.5 44, 50 34 Z" fill="url(#pyroxCoreGrad)" />
+                    </svg>
+                    <span class="greeting-logo-title" id="greetingBrandName">Pyrox</span>
+                </div>
                 <h1 id="greetingText">Namaste, main aapki aaj kaise madad kar sakta hoon?</h1>
             </div>
         </section>
 
         <footer class="bottom-dock" id="bottomDock" onclick="event.stopPropagation()">
             <div class="plus-menu" id="plusMenu">
-                <button type="button" class="plus-big-btn" onclick="triggerFilePicker()">File</button>
-                <button type="button" class="plus-big-btn" onclick="openCamera()">Camera</button>
-                <button type="button" class="plus-big-btn" onclick="openModal('libraryModal')">Drive</button>
+                <button type="button" class="plus-big-btn" onclick="triggerFilePicker()">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                    </svg>
+                    <span>File</span>
+                </button>
+                <button type="button" class="plus-big-btn" onclick="openCamera()">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                        <circle cx="12" cy="13" r="4"></circle>
+                    </svg>
+                    <span>Camera</span>
+                </button>
+                <button type="button" class="plus-big-btn" onclick="openModal('libraryModal')">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                        <polyline points="2 17 12 22 22 17"></polyline>
+                        <polyline points="2 12 12 17 22 12"></polyline>
+                    </svg>
+                    <span>Drive</span>
+                </button>
                 <div class="plus-small-grid">
-                    <button type="button" class="plus-small-btn" onclick="promptImageCreation()">Image Creation</button>
-                    <button type="button" class="plus-small-btn" onclick="promptCanvasMode()">Canvas</button>
+                    <button type="button" class="plus-small-btn" onclick="openImageStudioModal()">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                            <polyline points="21 15 16 10 5 21"></polyline>
+                        </svg>
+                        <span>Image Creation</span>
+                    </button>
+                    <button type="button" class="plus-small-btn" onclick="promptCanvasMode()">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 20h9"></path>
+                            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                        </svg>
+                        <span>Canvas</span>
+                    </button>
                 </div>
             </div>
 
@@ -1428,7 +1619,7 @@ async def index():
                 <button type="button" class="icon-action-btn" id="plusBtn" onclick="togglePlusMenu(event)" title="More actions">+</button>
 
                 <button type="button" class="icon-action-btn" id="micBtn" onclick="toggleDictation(event)" title="Voice input">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1">
                         <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
                         <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
                         <line x1="12" y1="19" x2="12" y2="23"></line>
@@ -1444,9 +1635,11 @@ async def index():
                     <div class="freq-bar"></div>
                     <div class="freq-bar"></div>
                     <div class="freq-bar"></div>
+                    <div class="freq-bar"></div>
+                    <div class="freq-bar"></div>
+                    <div class="freq-bar"></div>
+                    <div class="freq-bar"></div>
                 </div>
-
-                <button type="button" class="stop-dict-btn" id="stopDictBtn" onclick="stopDictationManual()">Stop</button>
 
                 <textarea
                     id="promptInput"
@@ -1464,20 +1657,28 @@ async def index():
                 <button type="button" class="stop-btn" id="stopGenBtn" onclick="stopGeneration()">■</button>
                 <button type="button" class="send-btn" id="sendBtn" onclick="sendMessage()">↑</button>
             </div>
+            <div class="ai-disclaimer">Pyrox is AI and can make mistakes.</div>
         </footer>
     </main>
 </div>
 
-<!-- GitHub-inspired Sign-Up Modal with Large Continue with Google -->
+<!-- GitHub-inspired Sign-Up Modal with Star Logo & Large Continue with Google -->
 <div class="overlay-modal" id="googleModal" onclick="closeModal('googleModal')">
     <div class="modal-box" onclick="event.stopPropagation()">
         <div class="modal-head">
-            <span>Sign up for Pyrox</span>
+            <div style="display:flex;align-items:center;gap:8px;">
+                <svg width="26" height="26" viewBox="0 0 100 100" fill="none">
+                    <path d="M50 4 C55 34, 66 45, 96 50 C66 55, 55 66, 50 96 C45 66, 34 55, 4 50 C34 45, 45 34, 50 4 Z" fill="url(#pyroxOuterGrad)" />
+                    <path d="M50 20 C53 40, 60 47, 80 50 C60 53, 53 60, 50 80 C47 60, 40 53, 20 50 C40 47, 47 40, 50 20 Z" fill="url(#pyroxMidGrad)" />
+                    <path d="M50 34 C51.5 44, 56 48.5, 66 50 C56 51.5, 51.5 56, 50 66 C48.5 56, 44 51.5, 34 50 C44 48.5, 48.5 44, 50 34 Z" fill="url(#pyroxCoreGrad)" />
+                </svg>
+                <span>Sign up for Pyrox</span>
+            </div>
             <button type="button" class="close-x" onclick="closeModal('googleModal')">✕</button>
         </div>
 
         <button type="button" class="google-big-btn" onclick="quickGoogleSignIn()">
-            <span>G</span>
+            <span style="font-weight:900;">G</span>
             <span>Continue with Google</span>
         </button>
 
@@ -1496,6 +1697,32 @@ async def index():
     </div>
 </div>
 
+<!-- Images Modal (2 Free Images / Month + Lock until Next Month) -->
+<div class="overlay-modal" id="imageStudioModal" onclick="closeModal('imageStudioModal')">
+    <div class="modal-box" onclick="event.stopPropagation()">
+        <div class="modal-head">
+            <span>Pyrox Images</span>
+            <button type="button" class="close-x" onclick="closeModal('imageStudioModal')">Close</button>
+        </div>
+        <div id="imageQuotaStatus" style="font-size:0.92rem;font-weight:650;color:var(--text-secondary);"></div>
+        <input type="text" class="field-input" id="modalImagePrompt" placeholder="Describe the image you want to create..." />
+        <button type="button" class="action-btn" id="modalGenerateImgBtn" onclick="triggerModalImageGeneration()">Generate Image</button>
+    </div>
+</div>
+
+<!-- Video Modal -->
+<div class="overlay-modal" id="videoModal" onclick="closeModal('videoModal')">
+    <div class="modal-box" onclick="event.stopPropagation()">
+        <div class="modal-head">
+            <span>Pyrox Video</span>
+            <button type="button" class="close-x" onclick="closeModal('videoModal')">Close</button>
+        </div>
+        <p style="font-size:0.94rem;color:var(--text-secondary);line-height:1.55;">
+            AI Video generation module ready hai—dedicated video API key connect hote hi yahan se direct video banegi.
+        </p>
+    </div>
+</div>
+
 <!-- Settings Modal -->
 <div class="overlay-modal" id="settingsModal" onclick="closeModal('settingsModal')">
     <div class="modal-box" onclick="event.stopPropagation()">
@@ -1504,7 +1731,7 @@ async def index():
             <button type="button" class="close-x" onclick="closeModal('settingsModal')">Close</button>
         </div>
         <label class="field-label" for="customThemeInput">Custom Theme Name</label>
-        <input type="text" class="field-input" id="customThemeInput" placeholder="e.g. Pyrox Dark, Studio White" />
+        <input type="text" class="field-input" id="customThemeInput" placeholder="e.g. Pyrox, Studio Dark" />
         <button type="button" class="action-btn" onclick="saveThemeName()">Save Theme Name</button>
         <button type="button" class="action-btn" id="ttsToggleBtn" onclick="toggleTtsPreference()">Voice Reply (TTS): On</button>
         <button type="button" class="action-btn" onclick="clearSavedFolders()">Clear Library Folders</button>
@@ -1518,21 +1745,29 @@ async def index():
             <span>Library Folders</span>
             <button type="button" class="close-x" onclick="closeModal('libraryModal')">Close</button>
         </div>
-        <div id="libraryModalBody" style="display:flex;flex-direction:column;gap:8px;font-size:0.9rem;color:var(--text-secondary);">
+        <div id="libraryModalBody" style="display:flex;flex-direction:column;gap:8px;font-size:0.94rem;color:var(--text-secondary);">
             No chat folders created yet.
         </div>
     </div>
 </div>
 
-<!-- ChatGPT-style Upgrade Modal -->
+<!-- ChatGPT-style Single Pyrox Pro Upgrade Modal (₹800 crossed -> ₹139) -->
 <div class="overlay-modal" id="upgradeModal" onclick="closeModal('upgradeModal')">
     <div class="modal-box" onclick="event.stopPropagation()">
         <div class="modal-head">
-            <span>Upgrade Pyrox</span>
+            <div style="display:flex;align-items:center;gap:8px;">
+                <svg width="26" height="26" viewBox="0 0 100 100" fill="none">
+                    <path d="M50 4 C55 34, 66 45, 96 50 C66 55, 55 66, 50 96 C45 66, 34 55, 4 50 C34 45, 45 34, 50 4 Z" fill="url(#pyroxOuterGrad)" />
+                    <path d="M50 20 C53 40, 60 47, 80 50 C60 53, 53 60, 50 80 C47 60, 40 53, 20 50 C40 47, 47 40, 50 20 Z" fill="url(#pyroxMidGrad)" />
+                    <path d="M50 34 C51.5 44, 56 48.5, 66 50 C56 51.5, 51.5 56, 50 66 C48.5 56, 44 51.5, 34 50 C44 48.5, 48.5 44, 50 34 Z" fill="url(#pyroxCoreGrad)" />
+                </svg>
+                <span>Upgrade to Pyrox Pro</span>
+            </div>
             <button type="button" class="close-x" onclick="closeModal('upgradeModal')">✕</button>
         </div>
-        <p style="font-size:0.86rem;color:var(--text-secondary);">
-            Student-friendly plans (₹79–₹149) for extended access and perks.
+
+        <p style="font-size:0.9rem;color:var(--text-secondary);">
+            Personalized AI for study, creation, and daily work
         </p>
 
         <table class="compare-table">
@@ -1545,17 +1780,22 @@ async def index():
             </thead>
             <tbody>
                 <tr>
-                    <td>Fast core model & daily limit</td>
+                    <td>Core model (Pyrox Only)</td>
                     <td>✓</td>
                     <td>✓</td>
                 </tr>
                 <tr>
-                    <td>Higher image creation quota</td>
+                    <td>Pyrox Pro Model access</td>
                     <td>—</td>
                     <td>✓</td>
                 </tr>
                 <tr>
-                    <td>Pro Model & priority tools</td>
+                    <td>Extended image & video creation</td>
+                    <td>—</td>
+                    <td>✓</td>
+                </tr>
+                <tr>
+                    <td>Higher daily question limit</td>
                     <td>—</td>
                     <td>✓</td>
                 </tr>
@@ -1567,21 +1807,51 @@ async def index():
             </tbody>
         </table>
 
-        <div class="plan-row">
-            <div class="plan-card selected" id="planStarter" onclick="selectPlan('₹79 / month')">
-                <div style="font-weight:700;">Starter</div>
-                <div style="font-size:1rem;margin-top:3px;">₹79 / mo</div>
+        <div class="single-price-banner">
+            <div>
+                <div style="font-weight:800;font-size:1.02rem;">Pyrox Pro</div>
+                <div style="font-size:0.8rem;color:var(--text-secondary);">Monthly access</div>
             </div>
-            <div class="plan-card" id="planPlus" onclick="selectPlan('₹149 / month')">
-                <div style="font-weight:700;">Pro</div>
-                <div style="font-size:1rem;margin-top:3px;">₹149 / mo</div>
+            <div>
+                <span class="old-price">₹800</span>
+                <span class="new-price">₹139/mo</span>
             </div>
         </div>
 
-        <button type="button" class="action-btn" style="background-color:var(--accent-upgrade);border-color:var(--accent-upgrade-border);color:#ffffff;" onclick="confirmUpgrade()">
-            Upgrade Plan
+        <button type="button" class="action-btn" style="background-color:var(--accent-upgrade);border-color:var(--accent-upgrade-border);color:#ffffff;font-size:1rem;" onclick="confirmUpgrade()">
+            Upgrade to Pyrox Pro
         </button>
-        <div id="upgradeStatusMsg" style="font-size:0.84rem;color:var(--text-secondary);"></div>
+        <div id="upgradeStatusMsg" style="font-size:0.86rem;color:var(--text-secondary);"></div>
+    </div>
+</div>
+
+<!-- 70% Screen Grey Bad Response Feedback Modal -->
+<div class="overlay-modal" id="feedbackModal" onclick="closeModal('feedbackModal')">
+    <div class="feedback-box" onclick="event.stopPropagation()">
+        <div style="display:flex;flex-direction:column;gap:14px;">
+            <div class="modal-head">
+                <span>Feedback</span>
+                <button type="button" class="close-x" onclick="closeModal('feedbackModal')">✕</button>
+            </div>
+            <p style="font-size:0.92rem;color:#d4d4d8;">
+                Is response mein kya dikkat aayi? Select karo:
+            </p>
+            <div class="feedback-reasons-grid" id="feedbackReasonsGrid">
+                <button type="button" class="reason-chip" onclick="toggleFeedbackReason(this)">Unsafe</button>
+                <button type="button" class="reason-chip" onclick="toggleFeedbackReason(this)">Not factually correct</button>
+                <button type="button" class="reason-chip" onclick="toggleFeedbackReason(this)">Don't follow instruction</button>
+                <button type="button" class="reason-chip" onclick="toggleFeedbackReason(this)">Personalization issue</button>
+                <button type="button" class="reason-chip" onclick="toggleFeedbackReason(this)">Wrong language</button>
+                <button type="button" class="reason-chip" onclick="toggleFeedbackReason(this)">Poorly formatted</button>
+                <button type="button" class="reason-chip" onclick="toggleFeedbackReason(this)">Generally bland</button>
+                <button type="button" class="reason-chip" onclick="toggleFeedbackReason(this)">Too harmful action</button>
+            </div>
+            <textarea id="feedbackCustomNote" class="field-input" rows="3" placeholder="Additional note (optional)..." style="background-color:#18181b;color:#f4f4f5;border-color:#52525b;"></textarea>
+        </div>
+
+        <button type="button" class="action-btn" style="background-color:#f4f4f5;color:#09090b;font-weight:800;font-size:0.98rem;" onclick="submitBadFeedback()">
+            Submit
+        </button>
     </div>
 </div>
 
@@ -1607,10 +1877,10 @@ async def index():
 <script>
     const DAILY_QUESTION_LIMIT = 40;
     const WARNING_REMAINING_THRESHOLD = 5;
+    const MONTHLY_FREE_IMAGE_LIMIT = 2;
 
     let chatStarted = false;
     let activeAbortController = null;
-    let selectedPlan = "₹79 / month";
     let selectedModelMode = "Pyrox Only";
     let currentFacingMode = "environment";
     let cameraStream = null;
@@ -1620,6 +1890,7 @@ async def index():
     let pendingAttachmentName = "";
     let activeFolderId = null;
     let latestAudioPlayer = null;
+    let feedbackTargetSnippet = "";
 
     let recognition = null;
     let isDictating = false;
@@ -1628,7 +1899,14 @@ async def index():
     let micStream = null;
     let freqAnimId = null;
 
-    // Sync theme strictly with system dark/light preference
+    const MIC_SVG = `
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+            <line x1="12" y1="19" x2="12" y2="23"></line>
+        </svg>
+    `;
+
     function syncSystemTheme() {
         const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
         document.body.classList.toggle("light-mode", !prefersDark);
@@ -1648,6 +1926,75 @@ async def index():
         }, 980);
     }
 
+    // Monthly 2 free image quota + lock until next month
+    function getMonthKey() {
+        const now = new Date();
+        return `${now.getFullYear()}-${now.getMonth() + 1}`;
+    }
+
+    function getMonthlyImageCount() {
+        const data = JSON.parse(localStorage.getItem("pyrox_monthly_images") || "{}");
+        if (data.month !== getMonthKey()) {
+            return 0;
+        }
+        return Number(data.count || 0);
+    }
+
+    function incrementMonthlyImageCount() {
+        const next = getMonthlyImageCount() + 1;
+        localStorage.setItem(
+            "pyrox_monthly_images",
+            JSON.stringify({ month: getMonthKey(), count: next })
+        );
+        refreshImageQuotaUI();
+        return next;
+    }
+
+    function isImageLockedThisMonth() {
+        return getMonthlyImageCount() >= MONTHLY_FREE_IMAGE_LIMIT;
+    }
+
+    function refreshImageQuotaUI() {
+        const used = getMonthlyImageCount();
+        const remaining = Math.max(0, MONTHLY_FREE_IMAGE_LIMIT - used);
+        const pill = document.getElementById("sidebarImgQuota");
+        if (pill) {
+            pill.textContent = isImageLockedThisMonth() ? "🔒 Locked" : `${remaining}/2`;
+        }
+        const statusEl = document.getElementById("imageQuotaStatus");
+        const genBtn = document.getElementById("modalGenerateImgBtn");
+        if (statusEl && genBtn) {
+            if (isImageLockedThisMonth()) {
+                statusEl.textContent = "🔒 Is mahine ki 2 free images poori ho chuki hain. Agle mahine phir khulega.";
+                genBtn.disabled = true;
+                genBtn.textContent = "🔒 Locked until next month";
+            } else {
+                statusEl.textContent = `Is mahine ${remaining} free image bachi hai (Total 2/month).`;
+                genBtn.disabled = false;
+                genBtn.textContent = "Generate Image";
+            }
+        }
+    }
+
+    function openImageStudioModal() {
+        refreshImageQuotaUI();
+        openModal("imageStudioModal");
+    }
+
+    function triggerModalImageGeneration() {
+        if (isImageLockedThisMonth()) {
+            refreshImageQuotaUI();
+            return;
+        }
+        const promptVal = document.getElementById("modalImagePrompt").value.trim();
+        if (!promptVal) return;
+        document.getElementById("modalImagePrompt").value = "";
+        closeModal("imageStudioModal");
+        document.getElementById("promptInput").value = `/image ${promptVal}`;
+        sendMessage();
+    }
+
+    // Daily 40 questions limit + warning on last 5
     function getTodayKey() {
         const now = new Date();
         return `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
@@ -1679,7 +2026,7 @@ async def index():
             banner.textContent = "Aaj ki 40 questions ki limit khatam ho chuki hai. Kal reset hogi ya Upgrade karein.";
             banner.classList.add("show");
         } else if (remaining <= WARNING_REMAINING_THRESHOLD) {
-            banner.textContent = `Aaj ke sirf ${remaining} questions bache hain. Limit khatam hone par kal reset hogi.`;
+            banner.textContent = `Warning: Aaj ke sirf ${remaining} questions bache hain. Limit kal reset hogi.`;
             banner.classList.add("show");
         } else if (!banner.dataset.searching) {
             banner.textContent = "";
@@ -1724,6 +2071,8 @@ async def index():
         document.getElementById("headerBrandTitle").textContent = label;
         document.getElementById("sidebarThemeTitle").textContent = label;
         document.getElementById("splashWord").textContent = label;
+        const greetBrand = document.getElementById("greetingBrandName");
+        if (greetBrand) greetBrand.textContent = label;
         document.getElementById("customThemeInput").value = label;
     }
 
@@ -1776,7 +2125,6 @@ async def index():
     function selectModelMode(mode) {
         selectedModelMode = mode;
         document.getElementById("optPyroxOnly").classList.toggle("active", mode === "Pyrox Only");
-        document.getElementById("optProModel").classList.toggle("active", mode === "Pro Model");
     }
 
     function openModal(id) {
@@ -1819,17 +2167,11 @@ async def index():
         document.getElementById("ttsToggleBtn").textContent = `Voice Reply (TTS): ${ttsEnabled ? "On" : "Off"}`;
     }
 
-    function selectPlan(plan) {
-        selectedPlan = plan;
-        document.getElementById("planStarter").classList.toggle("selected", plan.includes("79"));
-        document.getElementById("planPlus").classList.toggle("selected", plan.includes("149"));
-    }
-
     function confirmUpgrade() {
-        document.getElementById("upgradeStatusMsg").textContent = `Selected ${selectedPlan}. Ready for payment flow.`;
+        document.getElementById("upgradeStatusMsg").textContent = "Pyrox Pro (₹139/mo) selected. Payment gateway integration ready.";
     }
 
-    // Folder-based Library (named after first prompt in that chat)
+    // Folder-based Library without file icons next to Library label
     function loadFolders() {
         return JSON.parse(localStorage.getItem("pyrox_folders") || "[]");
     }
@@ -1872,7 +2214,7 @@ async def index():
         folders.slice(0, 8).forEach((f) => {
             const chip = document.createElement("div");
             chip.className = "folder-chip";
-            chip.textContent = `📁 ${f.title}`;
+            chip.textContent = f.title;
             chip.onclick = () => {
                 openFolderInStage(f.id);
                 closeSidebar();
@@ -1882,8 +2224,7 @@ async def index():
     }
 
     function toggleLibraryFolders() {
-        const box = document.getElementById("libraryFolders");
-        box.classList.toggle("show");
+        document.getElementById("libraryFolders").classList.toggle("show");
     }
 
     function openFolderInStage(folderId) {
@@ -1902,10 +2243,7 @@ async def index():
                 row.textContent = m.content;
                 stage.appendChild(row);
             } else {
-                const row = document.createElement("div");
-                row.className = "msg-row msg-ai";
-                row.innerHTML = marked.parse(m.content);
-                stage.appendChild(row);
+                appendAIMessage(marked.parse(m.content), m.content, "");
             }
         });
         stage.scrollTop = stage.scrollHeight;
@@ -1924,7 +2262,7 @@ async def index():
             btn.type = "button";
             btn.className = "action-btn";
             btn.style.textAlign = "left";
-            btn.textContent = `📁 ${f.title} (${f.items.length} entries)`;
+            btn.textContent = `${f.title} (${f.items.length} messages)`;
             btn.onclick = () => {
                 openFolderInStage(f.id);
                 closeModal("libraryModal");
@@ -1946,16 +2284,20 @@ async def index():
         pendingAttachmentDataUrl = null;
         pendingAttachmentName = "";
         const stage = document.getElementById("scrollStage");
-        stage.innerHTML = "";
-        const greetingDiv = document.createElement("div");
-        greetingDiv.className = "greeting-center";
-        greetingDiv.id = "greetingBox";
-        const h1 = document.createElement("h1");
-        h1.id = "greetingText";
-        greetingDiv.appendChild(h1);
-        stage.appendChild(greetingDiv);
+        stage.innerHTML = `
+            <div class="greeting-center" id="greetingBox">
+                <div class="greeting-logo-row">
+                    <svg width="46" height="46" viewBox="0 0 100 100" fill="none">
+                        <path d="M50 4 C55 34, 66 45, 96 50 C66 55, 55 66, 50 96 C45 66, 34 55, 4 50 C34 45, 45 34, 50 4 Z" fill="url(#pyroxOuterGrad)" />
+                        <path d="M50 20 C53 40, 60 47, 80 50 C60 53, 53 60, 50 80 C47 60, 40 53, 20 50 C40 47, 47 40, 50 20 Z" fill="url(#pyroxMidGrad)" />
+                        <path d="M50 34 C51.5 44, 56 48.5, 66 50 C56 51.5, 51.5 56, 50 66 C48.5 56, 44 51.5, 34 50 C44 48.5, 48.5 44, 50 34 Z" fill="url(#pyroxCoreGrad)" />
+                    </svg>
+                    <span class="greeting-logo-title" id="greetingBrandName">${getThemeLabel()}</span>
+                </div>
+                <h1 id="greetingText"></h1>
+            </div>
+        `;
         refreshGreeting();
-
         chatStarted = false;
         document.getElementById("upgradeBtn").classList.add("shine-active");
     }
@@ -2005,13 +2347,6 @@ async def index():
             input.focus();
         };
         reader.readAsDataURL(file);
-    }
-
-    function promptImageCreation() {
-        closePlusMenu();
-        const input = document.getElementById("promptInput");
-        input.value = "/image ";
-        input.focus();
     }
 
     function promptCanvasMode() {
@@ -2086,9 +2421,12 @@ async def index():
         input.focus();
     }
 
+    // Mic -> Curved Square Stop Icon + Full-Width Frequency Bar
     async function startVoiceMeter() {
         const meter = document.getElementById("freqMeter");
+        const inputEl = document.getElementById("promptInput");
         const bars = meter.querySelectorAll(".freq-bar");
+        inputEl.classList.add("hidden-while-speaking");
         meter.classList.add("visible");
 
         try {
@@ -2106,7 +2444,7 @@ async def index():
                 analyser.getByteFrequencyData(arr);
                 for (let i = 0; i < bars.length; i++) {
                     const v = arr[i] || 0;
-                    const h = v > 30 ? Math.max(4, Math.min(28, Math.round((v / 255) * 28))) : 3;
+                    const h = v > 30 ? Math.max(4, Math.min(32, Math.round((v / 255) * 32))) : 3;
                     bars[i].style.height = `${h}px`;
                 }
                 freqAnimId = requestAnimationFrame(step);
@@ -2129,8 +2467,17 @@ async def index():
             audioCtx = null;
         }
         const meter = document.getElementById("freqMeter");
+        const inputEl = document.getElementById("promptInput");
         meter.classList.remove("visible");
+        inputEl.classList.remove("hidden-while-speaking");
         meter.querySelectorAll(".freq-bar").forEach((b) => (b.style.height = "3px"));
+    }
+
+    function setMicButtonAsStopSquare(recording) {
+        const micBtn = document.getElementById("micBtn");
+        micBtn.classList.toggle("mic-recording", recording);
+        micBtn.innerHTML = recording ? `<span class="curved-stop-square"></span>` : MIC_SVG;
+        micBtn.title = recording ? "Stop dictation" : "Voice input";
     }
 
     function toggleDictation(e) {
@@ -2156,7 +2503,7 @@ async def index():
 
         recognition.onstart = async () => {
             isDictating = true;
-            document.getElementById("stopDictBtn").classList.add("visible");
+            setMicButtonAsStopSquare(true);
             await startVoiceMeter();
         };
 
@@ -2179,9 +2526,8 @@ async def index():
         };
 
         recognition.onend = () => {
-            // Do not auto-submit when dictation ends
             isDictating = false;
-            document.getElementById("stopDictBtn").classList.remove("visible");
+            setMicButtonAsStopSquare(false);
             stopVoiceMeter();
         };
 
@@ -2190,7 +2536,7 @@ async def index():
 
     function stopDictationManual() {
         isDictating = false;
-        document.getElementById("stopDictBtn").classList.remove("visible");
+        setMicButtonAsStopSquare(false);
         if (recognition) {
             try {
                 recognition.stop();
@@ -2229,7 +2575,81 @@ async def index():
         stage.scrollTop = stage.scrollHeight;
     }
 
-    function appendAIMessage(htmlContent, plainTextForCopy) {
+    function buildResponseActionsBar(plainText, originalPrompt) {
+        const bar = document.createElement("div");
+        bar.className = "msg-actions";
+
+        const goodBtn = document.createElement("button");
+        goodBtn.type = "button";
+        goodBtn.className = "mini-action-btn";
+        goodBtn.textContent = "Good response";
+        goodBtn.onclick = () => {
+            goodBtn.classList.add("selected-act");
+            badBtn.classList.remove("selected-act");
+        };
+
+        const badBtn = document.createElement("button");
+        badBtn.type = "button";
+        badBtn.className = "mini-action-btn";
+        badBtn.textContent = "Bad response";
+        badBtn.onclick = () => {
+            badBtn.classList.add("selected-act");
+            goodBtn.classList.remove("selected-act");
+            feedbackTargetSnippet = plainText.slice(0, 200);
+            openModal("feedbackModal");
+        };
+
+        const redoBtn = document.createElement("button");
+        redoBtn.type = "button";
+        redoBtn.className = "mini-action-btn";
+        redoBtn.textContent = "Redo";
+        redoBtn.onclick = () => {
+            if (originalPrompt) {
+                document.getElementById("promptInput").value = originalPrompt;
+                sendMessage();
+            }
+        };
+
+        const shareBtn = document.createElement("button");
+        shareBtn.type = "button";
+        shareBtn.className = "mini-action-btn";
+        shareBtn.textContent = "Share / Export";
+        shareBtn.onclick = () => {
+            if (navigator.share) {
+                navigator.share({ title: "Pyrox AI", text: plainText }).catch(() => {});
+            } else {
+                exportChat();
+            }
+        };
+
+        const copyBtn = document.createElement("button");
+        copyBtn.type = "button";
+        copyBtn.className = "mini-action-btn";
+        copyBtn.textContent = "Copy response";
+        copyBtn.onclick = () => {
+            navigator.clipboard.writeText(plainText).catch(() => {});
+            copyBtn.textContent = "Copied";
+            setTimeout(() => (copyBtn.textContent = "Copy response"), 1200);
+        };
+
+        const moreBtn = document.createElement("button");
+        moreBtn.type = "button";
+        moreBtn.className = "mini-action-btn";
+        moreBtn.textContent = "More";
+        moreBtn.onclick = () => {
+            openModal("libraryModal");
+        };
+
+        bar.appendChild(goodBtn);
+        bar.appendChild(badBtn);
+        bar.appendChild(redoBtn);
+        bar.appendChild(shareBtn);
+        bar.appendChild(copyBtn);
+        bar.appendChild(moreBtn);
+        return bar;
+    }
+
+    function appendAIMessage(htmlContent, plainText, originalPrompt) {
         markChatStarted();
         const stage = document.getElementById("scrollStage");
         const row = document.createElement("div");
@@ -2239,25 +2659,41 @@ async def index():
         bodyDiv.innerHTML = htmlContent;
         row.appendChild(bodyDiv);
 
-        if (plainTextForCopy) {
-            const bar = document.createElement("div");
-            bar.className = "msg-actions";
-            const copyBtn = document.createElement("button");
-            copyBtn.type = "button";
-            copyBtn.className = "mini-action-btn";
-            copyBtn.textContent = "Copy";
-            copyBtn.onclick = () => {
-                navigator.clipboard.writeText(plainTextForCopy).catch(() => {});
-                copyBtn.textContent = "Copied";
-                setTimeout(() => (copyBtn.textContent = "Copy"), 1200);
-            };
-            bar.appendChild(copyBtn);
-            row.appendChild(bar);
+        if (plainText) {
+            row.appendChild(buildResponseActionsBar(plainText, originalPrompt));
         }
 
         stage.appendChild(row);
         stage.scrollTop = stage.scrollHeight;
         return { row, bodyDiv };
+    }
+
+    function toggleFeedbackReason(chip) {
+        chip.classList.toggle("active");
+    }
+
+    async function submitBadFeedback() {
+        const activeChips = Array.from(
+            document.querySelectorAll("#feedbackReasonsGrid .reason-chip.active")
+        ).map((c) => c.textContent);
+        const note = document.getElementById("feedbackCustomNote").value.trim();
+        const reasonStr = activeChips.join(", ") || "General feedback";
+
+        try {
+            await fetch("/api/feedback", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    reason: reasonStr,
+                    details: note,
+                    response_snippet: feedbackTargetSnippet,
+                }),
+            });
+        } catch (_) {}
+
+        document.querySelectorAll("#feedbackReasonsGrid .reason-chip").forEach((c) => c.classList.remove("active"));
+        document.getElementById("feedbackCustomNote").value = "";
+        closeModal("feedbackModal");
     }
 
     function playAudioFromUrl(url) {
@@ -2283,8 +2719,25 @@ async def index():
         setGeneratingState(false);
     }
 
+    function detectImageGenerationIntent(text) {
+        const lower = text.toLowerCase().trim();
+        if (lower.startsWith("/image ")) {
+            return { isImage: true, prompt: text.slice(7).trim() };
+        }
+        const imagePatterns = [
+            /\b(generate|create|make|draw)\s+(an?\s+)?(image|photo|picture|pic|art|wallpaper)\b/i,
+            /\b(image|photo|picture|tasveer)\s+(bana|banao|banade|bana\s*do|bana\s*de|generate|create)\b/i,
+        ];
+        if (imagePatterns.some((rx) => rx.test(text))) {
+            return { isImage: true, prompt: text };
+        }
+        return { isImage: false, prompt: text };
+    }
+
     async function sendMessage() {
-        stopDictationManual();
+        if (isDictating) {
+            stopDictationManual();
+        }
 
         if (getUsedQuestionsToday() >= DAILY_QUESTION_LIMIT) {
             updateLimitWarningBanner();
@@ -2295,47 +2748,64 @@ async def index():
         const raw = input.value.trim();
         if (!raw && !pendingAttachmentDataUrl) return;
 
+        // Completely clear input field immediately upon submit
+        input.value = "";
+        input.blur();
+        input.focus();
+
         const messageToSend = raw || `Please check ${pendingAttachmentName || "this image"}`;
         const attachmentToSend = pendingAttachmentDataUrl;
         pendingAttachmentDataUrl = null;
         pendingAttachmentName = "";
-        input.value = "";
 
         ensureFolderForPrompt(messageToSend);
         appendUserMessage(messageToSend, attachmentToSend);
         appendItemToActiveFolder("user", messageToSend);
         incrementUsedQuestionsToday();
 
-        const { bodyDiv } = appendAIMessage(
+        const { row, bodyDiv } = appendAIMessage(
             `<div class="thinking-dots"><span></span><span></span></div>`,
-            ""
+            "",
+            messageToSend
         );
 
         activeAbortController = new AbortController();
         setGeneratingState(true);
 
-        const searchLikely = /\b(aaj|kal|today|tomorrow|news|latest|festival|tyohar|weather|2026|2027|kab hai|kya chal raha)\b/i.test(
-            messageToSend
-        );
+        const imgIntent = detectImageGenerationIntent(messageToSend);
+        const searchLikely =
+            !imgIntent.isImage &&
+            /\b(aaj|kal|today|tomorrow|news|latest|festival|tyohar|weather|2026|2027|kab hai|kya chal raha)\b/i.test(
+                messageToSend
+            );
+
         if (searchLikely) {
             setSearchingBanner(true);
         }
 
         try {
-            if (messageToSend.toLowerCase().startsWith("/image ")) {
-                const imgPrompt = messageToSend.slice(7).trim();
-                const res = await fetch("/api/generate-image", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ prompt: imgPrompt }),
-                    signal: activeAbortController.signal,
-                });
-                const data = await res.json();
-                if (!res.ok) {
-                    bodyDiv.textContent = data.detail || "Image generation failed.";
+            if (imgIntent.isImage) {
+                if (isImageLockedThisMonth()) {
+                    bodyDiv.textContent =
+                        "🔒 Is mahine ki 2 free images poori ho chuki hain. Agle mahine phir se khul jaayega.";
                 } else {
-                    bodyDiv.innerHTML = `<img src="${data.image_data}" alt="${imgPrompt}" />`;
-                    appendItemToActiveFolder("ai", `[Generated Image: ${imgPrompt}]`);
+                    const res = await fetch("/api/generate-image", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ prompt: imgIntent.prompt }),
+                        signal: activeAbortController.signal,
+                    });
+                    const data = await res.json();
+                    if (!res.ok) {
+                        bodyDiv.textContent = data.detail || "Image generation failed.";
+                    } else {
+                        incrementMonthlyImageCount();
+                        bodyDiv.innerHTML = `<img src="${data.image_data}" alt="${imgIntent.prompt}" />`;
+                        row.appendChild(
+                            buildResponseActionsBar(`Generated image: ${imgIntent.prompt}`, messageToSend)
+                        );
+                        appendItemToActiveFolder("ai", `[Generated Image: ${imgIntent.prompt}]`);
+                    }
                 }
             } else {
                 const res = await fetch("/api/chat", {
@@ -2357,6 +2827,7 @@ async def index():
                 } else {
                     const reply = data.reply || "";
                     bodyDiv.innerHTML = marked.parse(reply);
+                    row.appendChild(buildResponseActionsBar(reply, messageToSend));
                     appendItemToActiveFolder("ai", reply);
                     if (data.audio_url) {
                         playAudioFromUrl(data.audio_url);
@@ -2383,9 +2854,11 @@ async def index():
     refreshGreeting();
     refreshThemeLabel();
     renderLibraryFolders();
+    refreshImageQuotaUI();
     updateLimitWarningBanner();
 </script>
 </body>
 </html>
 """
     return html
+     
