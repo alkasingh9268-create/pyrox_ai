@@ -48,6 +48,11 @@ class FeedbackRequest(BaseModel):
     response_snippet: Optional[str] = ""
 
 
+class ListenRequest(BaseModel):
+    text: str
+    voice: str = "hi-IN-MadhurNeural"
+
+
 def resolve_groq_model() -> str:
     global CACHED_GROQ_MODEL
     if CACHED_GROQ_MODEL:
@@ -87,6 +92,31 @@ def resolve_groq_model() -> str:
 
     CACHED_GROQ_MODEL = default_model
     return default_model
+
+
+def is_heavy_coding_query(message: str) -> bool:
+    q = message.lower()
+    coding_terms = [
+        "python",
+        "code",
+        "coding",
+        "script",
+        "function",
+        "bug",
+        "error",
+        "html",
+        "css",
+        "javascript",
+        "js",
+        "fastapi",
+        "sql",
+        "algorithm",
+        "debug",
+        "class ",
+        "def ",
+        "import ",
+    ]
+    return any(term in q for term in coding_terms)
 
 
 def should_search_web(message: str) -> bool:
@@ -147,7 +177,7 @@ async def generate_edge_audio(
         cleaned = re.sub(r"\s+", " ", cleaned).strip()
         if not cleaned:
             return False
-        communicate = edge_tts.Communicate(cleaned[:550], voice_name, rate="+20%")
+        communicate = edge_tts.Communicate(cleaned[:650], voice_name, rate="+20%")
         await communicate.save(filename)
         return True
     except Exception:
@@ -231,7 +261,7 @@ async def chat_endpoint(req: ChatRequest):
                 {"role": "user", "content": effective_prompt},
             ],
             "temperature": 0.65,
-            "max_tokens": 200 if short_mode else 650,
+            "max_tokens": 200 if short_mode else 750,
         }
 
         res = requests.post(
@@ -266,6 +296,22 @@ async def chat_endpoint(req: ChatRequest):
 
     except Exception as exc:
         return JSONResponse(status_code=500, content={"detail": str(exc)})
+
+
+@app.post("/api/listen")
+async def listen_endpoint(req: ListenRequest):
+    if not req.text.strip():
+        return JSONResponse(
+            status_code=400, content={"detail": "Nothing to read aloud."}
+        )
+    stamp = int(asyncio.get_event_loop().time() * 1000)
+    filename = "static/listen_out.mp3"
+    ok = await generate_edge_audio(req.text, req.voice, filename)
+    if not ok:
+        return JSONResponse(
+            status_code=500, content={"detail": "Unable to generate voice audio."}
+        )
+    return {"audio_url": f"/static/listen_out.mp3?v={stamp}"}
 
 
 @app.post("/api/generate-image")
@@ -384,14 +430,14 @@ async def index():
             display: flex;
             align-items: center;
             justify-content: center;
-            z-index: 500;
+            z-index: 600;
             overflow: hidden;
-            transition: opacity 0.35s ease, transform 0.35s ease;
+            transition: opacity 0.32s ease, transform 0.32s ease;
         }
 
         .splash-overlay.done {
             opacity: 0;
-            transform: scale(1.06);
+            transform: scale(1.05);
             pointer-events: none;
         }
 
@@ -405,7 +451,7 @@ async def index():
 
         .splash-star-wrap {
             z-index: 3;
-            animation: pogoStarPop 0.78s cubic-bezier(0.22, 1.45, 0.36, 1) forwards;
+            animation: pogoStarPop 0.75s cubic-bezier(0.22, 1.45, 0.36, 1) forwards;
         }
 
         .splash-word-flash {
@@ -415,7 +461,7 @@ async def index():
             color: var(--text-primary);
             opacity: 0;
             transform: translateX(-30px) skewX(-12deg);
-            animation: flashRevealPyrox 0.78s cubic-bezier(0.16, 1, 0.3, 1) 0.14s forwards;
+            animation: flashRevealPyrox 0.75s cubic-bezier(0.16, 1, 0.3, 1) 0.14s forwards;
         }
 
         @keyframes pogoStarPop {
@@ -454,6 +500,119 @@ async def index():
             }
         }
 
+        /* Full-Screen White Onboarding Sign-Up Tab after Splash (if not logged in) */
+        .onboarding-signup-screen {
+            position: fixed;
+            inset: 0;
+            background-color: #ffffff;
+            color: #09090b;
+            z-index: 520;
+            display: none;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 20px 22px 26px 22px;
+            overflow-y: auto;
+        }
+
+        .onboarding-signup-screen.show {
+            display: flex;
+        }
+
+        .onboarding-top-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .onboarding-cross-btn {
+            width: 38px;
+            height: 38px;
+            border-radius: 999px;
+            border: 1px solid #cbd5e1;
+            background-color: #f8fafc;
+            color: #09090b;
+            font-size: 1.05rem;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .onboarding-body {
+            max-width: 440px;
+            width: 100%;
+            margin: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .onboarding-title {
+            font-size: 1.65rem;
+            font-weight: 800;
+            color: #09090b;
+            margin-bottom: 2px;
+        }
+
+        .white-label {
+            font-size: 0.88rem;
+            font-weight: 700;
+            color: #1e293b;
+        }
+
+        .white-input {
+            width: 100%;
+            background-color: #f8fafc;
+            border: 1px solid #cbd5e1;
+            color: #09090b;
+            border-radius: 10px;
+            padding: 11px 13px;
+            font-size: 0.98rem;
+            font-weight: 550;
+            outline: none;
+        }
+
+        .white-input:focus {
+            border-color: #2563eb;
+        }
+
+        .white-primary-btn {
+            width: 100%;
+            padding: 12px 14px;
+            border-radius: 10px;
+            border: none;
+            background-color: #09090b;
+            color: #ffffff;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            margin-top: 4px;
+        }
+
+        .white-google-btn {
+            width: 100%;
+            padding: 14px 16px;
+            border-radius: 12px;
+            border: 1px solid #94a3b8;
+            background-color: #ffffff;
+            color: #09090b;
+            font-size: 1.05rem;
+            font-weight: 800;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .white-or {
+            text-align: center;
+            font-size: 0.85rem;
+            color: #64748b;
+            font-weight: 600;
+        }
+
         .app-shell {
             display: flex;
             height: 100dvh;
@@ -462,7 +621,7 @@ async def index():
             overflow: hidden;
         }
 
-        /* Expandable Sidebar (~42% width on mobile) */
+        /* Expandable Sidebar */
         .sidebar {
             position: fixed;
             top: 0;
@@ -686,7 +845,6 @@ async def index():
             transform: scale(0.95);
         }
 
-        /* Top bar displays plain Pyrox text without extra logo */
         .brand-heading {
             font-size: 1.15rem;
             font-weight: 800;
@@ -700,12 +858,26 @@ async def index():
         .top-right {
             display: flex;
             align-items: center;
-            gap: 7px;
+            gap: 6px;
             position: relative;
             flex-shrink: 0;
         }
 
-        /* Upgrade button: entry shine before chat starts, stops once chat starts */
+        .header-signup-btn {
+            background-color: var(--bg-elevated);
+            color: var(--text-primary);
+            border: 1px solid var(--border-user);
+            border-radius: 10px;
+            padding: 6px 10px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .header-signup-btn.logged-in-hide {
+            display: none;
+        }
+
         .upgrade-btn {
             position: relative;
             overflow: hidden;
@@ -713,8 +885,8 @@ async def index():
             color: #ffffff;
             border: 1px solid var(--accent-upgrade-border);
             border-radius: 14px 4px 14px 4px;
-            padding: 7px 13px;
-            font-size: 0.86rem;
+            padding: 7px 12px;
+            font-size: 0.84rem;
             font-weight: 700;
             cursor: pointer;
             display: inline-flex;
@@ -803,7 +975,6 @@ async def index():
             background-color: var(--bg-elevated);
         }
 
-        /* Status banner for Web Search or Limit Warning */
         .status-strip {
             display: none;
             padding: 7px 14px;
@@ -900,6 +1071,20 @@ async def index():
             margin-bottom: 10px;
         }
 
+        .msg-ai pre {
+            background-color: var(--bg-elevated);
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            padding: 12px;
+            overflow-x: auto;
+            margin: 8px 0 12px 0;
+            font-size: 0.9rem;
+        }
+
+        .msg-ai code {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        }
+
         .msg-ai ul, .msg-ai ol {
             padding-left: 22px;
             margin: 8px 0 12px 0;
@@ -917,32 +1102,33 @@ async def index():
             margin-top: 6px;
         }
 
+        /* Clean icon-only response action bar */
         .msg-actions {
             display: flex;
-            flex-wrap: wrap;
             align-items: center;
-            gap: 6px;
+            gap: 8px;
             margin-top: 4px;
         }
 
-        .mini-action-btn {
+        .icon-symbol-btn {
+            width: 34px;
+            height: 34px;
+            border-radius: 9px;
             background-color: var(--bg-elevated);
             border: 1px solid var(--border-subtle);
             color: var(--text-secondary);
-            border-radius: 8px;
-            padding: 5px 10px;
-            font-size: 0.8rem;
-            font-weight: 650;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
             cursor: pointer;
         }
 
-        .mini-action-btn:hover,
-        .mini-action-btn.selected-act {
+        .icon-symbol-btn:hover,
+        .icon-symbol-btn.selected-act {
             color: var(--text-primary);
             border-color: var(--border-user);
         }
 
-        /* Two-dot thinking indicator */
         .thinking-dots {
             display: inline-flex;
             align-items: center;
@@ -973,7 +1159,7 @@ async def index():
             }
         }
 
-        /* Bottom Dock - Large & clean for mobile */
+        /* Bottom Dock */
         .bottom-dock {
             flex-shrink: 0;
             width: 100%;
@@ -984,9 +1170,25 @@ async def index():
             z-index: 30;
         }
 
+        .image-generating-strip {
+            display: none;
+            margin-bottom: 6px;
+            padding: 6px 12px;
+            border-radius: 10px;
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            font-size: 0.84rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .image-generating-strip.show {
+            display: block;
+        }
+
         .plus-menu {
             position: absolute;
-            bottom: 96px;
+            bottom: 98px;
             left: 12px;
             width: 276px;
             background-color: var(--bg-surface);
@@ -1119,15 +1321,15 @@ async def index():
             display: none;
         }
 
-        /* Full-width frequency meter inside input shell while speaking */
+        /* Tightly spaced frequency meter inside input shell while speaking */
         .freq-meter {
             display: none;
             flex: 1;
             align-items: center;
-            justify-content: space-evenly;
-            gap: 3px;
+            justify-content: center;
+            gap: 2px;
             height: 36px;
-            padding: 0 8px;
+            padding: 0 6px;
         }
 
         .freq-meter.visible {
@@ -1135,11 +1337,11 @@ async def index():
         }
 
         .freq-bar {
-            width: 3px;
+            width: 2.5px;
             height: 3px;
             border-radius: 2px;
             background-color: var(--text-primary);
-            transition: height 0.07s linear;
+            transition: height 0.06s linear;
         }
 
         .send-btn, .stop-btn {
@@ -1218,7 +1420,6 @@ async def index():
             color: var(--text-primary);
         }
 
-        /* 70% height grey Bad Response feedback box */
         .feedback-box {
             width: 100%;
             max-width: 480px;
@@ -1284,34 +1485,6 @@ async def index():
             font-weight: 700;
         }
 
-        /* GitHub-inspired Sign-Up modal with Logo & large Continue with Google */
-        .google-big-btn {
-            width: 100%;
-            padding: 15px 16px;
-            border-radius: 12px;
-            border: 1px solid var(--border-user);
-            background-color: var(--bg-elevated);
-            color: var(--text-primary);
-            font-size: 1.08rem;
-            font-weight: 750;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-        }
-
-        .google-big-btn:hover {
-            border-color: var(--accent-upgrade-border);
-        }
-
-        .divider-or {
-            text-align: center;
-            font-size: 0.84rem;
-            color: var(--text-muted);
-            margin: 2px 0;
-        }
-
         .field-label {
             font-size: 0.88rem;
             font-weight: 650;
@@ -1341,7 +1514,6 @@ async def index():
             cursor: pointer;
         }
 
-        /* ChatGPT-style Single Pyrox Pro Upgrade Modal */
         .compare-table {
             width: 100%;
             border-collapse: collapse;
@@ -1436,7 +1608,6 @@ async def index():
     </style>
 </head>
 <body>
-<!-- Shared SVG Gradient Defs for Crystal-Clear Multi-Shade Star Logo -->
 <svg width="0" height="0" style="position:absolute;visibility:hidden;">
     <defs>
         <linearGradient id="pyroxOuterGrad" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -1456,7 +1627,7 @@ async def index():
     </defs>
 </svg>
 
-<!-- Pogo-style Flashy Star + Pyrox Splash Entry -->
+<!-- 1. Pogo-style Flashy Star + Pyrox Splash Entry -->
 <div class="splash-overlay" id="splashOverlay">
     <div class="splash-stage">
         <div class="splash-star-wrap">
@@ -1467,6 +1638,47 @@ async def index():
             </svg>
         </div>
         <div class="splash-word-flash" id="splashWord">Pyrox</div>
+    </div>
+</div>
+
+<!-- 2. Full White Sign-Up Tab right after Splash (Email, Name, Password + Single Google button + Cross skip) -->
+<div class="onboarding-signup-screen" id="onboardingSignupScreen">
+    <div class="onboarding-top-row">
+        <div style="display:flex;align-items:center;gap:8px;">
+            <svg width="28" height="28" viewBox="0 0 100 100" fill="none">
+                <path d="M50 4 C55 34, 66 45, 96 50 C66 55, 55 66, 50 96 C45 66, 34 55, 4 50 C34 45, 45 34, 50 4 Z" fill="url(#pyroxOuterGrad)" />
+                <path d="M50 20 C53 40, 60 47, 80 50 C60 53, 53 60, 50 80 C47 60, 40 53, 20 50 C40 47, 47 40, 50 20 Z" fill="url(#pyroxMidGrad)" />
+                <path d="M50 34 C51.5 44, 56 48.5, 66 50 C56 51.5, 51.5 56, 50 66 C48.5 56, 44 51.5, 34 50 C44 48.5, 48.5 44, 50 34 Z" fill="url(#pyroxCoreGrad)" />
+            </svg>
+            <span style="font-weight:800;font-size:1.1rem;color:#09090b;">Pyrox</span>
+        </div>
+        <button type="button" class="onboarding-cross-btn" onclick="skipOnboardingToWelcome()" aria-label="Skip sign up">✕</button>
+    </div>
+
+    <div class="onboarding-body">
+        <div class="onboarding-title">Sign up to Pyrox</div>
+
+        <label class="white-label" for="obEmail">Email</label>
+        <input type="email" class="white-input" id="obEmail" placeholder="name@gmail.com" />
+
+        <label class="white-label" for="obName">Name</label>
+        <input type="text" class="white-input" id="obName" placeholder="Your name" />
+
+        <label class="white-label" for="obPassword">Password</label>
+        <input type="password" class="white-input" id="obPassword" placeholder="Create a password" />
+
+        <button type="button" class="white-primary-btn" onclick="completeOnboardingForm()">Create account</button>
+
+        <div class="white-or">or</div>
+
+        <button type="button" class="white-google-btn" onclick="completeOnboardingGoogle()">
+            <span>G</span>
+            <span>Sign up with Google</span>
+        </button>
+    </div>
+
+    <div style="text-align:center;font-size:0.78rem;color:#64748b;">
+        Tap ✕ to continue with Swagatam welcome screen
     </div>
 </div>
 
@@ -1489,7 +1701,7 @@ async def index():
             <div class="nav-item" onclick="toggleLibraryFolders()">Library</div>
             <div class="library-folders" id="libraryFolders"></div>
 
-            <div class="nav-item" onclick="openImageStudioModal(); closeSidebar();">
+            <div class="nav-item" onclick="activateImageModeBar(); closeSidebar();">
                 <span>Images</span>
                 <span class="quota-pill" id="sidebarImgQuota">2/2</span>
             </div>
@@ -1534,6 +1746,9 @@ async def index():
             </div>
 
             <div class="top-right" onclick="event.stopPropagation()">
+                <button type="button" class="header-signup-btn" id="headerSignUpBtn" onclick="openModal('googleModal')">
+                    Sign Up
+                </button>
                 <button type="button" class="upgrade-btn shine-active" id="upgradeBtn" onclick="openModal('upgradeModal')">
                     Upgrade
                 </button>
@@ -1566,11 +1781,15 @@ async def index():
                     </svg>
                     <span class="greeting-logo-title" id="greetingBrandName">Pyrox</span>
                 </div>
-                <h1 id="greetingText">Namaste, main aapki aaj kaise madad kar sakta hoon?</h1>
+                <h1 id="greetingText">Swagatam! Namaste, main aapki aaj kaise madad kar sakta hoon?</h1>
             </div>
         </section>
 
         <footer class="bottom-dock" id="bottomDock" onclick="event.stopPropagation()">
+            <div class="image-generating-strip" id="imageModeBanner">
+                Image generation mode active — enter prompt to generate image
+            </div>
+
             <div class="plus-menu" id="plusMenu">
                 <button type="button" class="plus-big-btn" onclick="triggerFilePicker()">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1595,7 +1814,7 @@ async def index():
                     <span>Drive</span>
                 </button>
                 <div class="plus-small-grid">
-                    <button type="button" class="plus-small-btn" onclick="openImageStudioModal()">
+                    <button type="button" class="plus-small-btn" onclick="activateImageModeBar(); closePlusMenu();">
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
                             <circle cx="8.5" cy="8.5" r="1.5"></circle>
@@ -1639,6 +1858,12 @@ async def index():
                     <div class="freq-bar"></div>
                     <div class="freq-bar"></div>
                     <div class="freq-bar"></div>
+                    <div class="freq-bar"></div>
+                    <div class="freq-bar"></div>
+                    <div class="freq-bar"></div>
+                    <div class="freq-bar"></div>
+                    <div class="freq-bar"></div>
+                    <div class="freq-bar"></div>
                 </div>
 
                 <textarea
@@ -1662,24 +1887,17 @@ async def index():
     </main>
 </div>
 
-<!-- GitHub-inspired Sign-Up Modal with Star Logo & Large Continue with Google -->
+<!-- Account / Sign-In Modal -->
 <div class="overlay-modal" id="googleModal" onclick="closeModal('googleModal')">
     <div class="modal-box" onclick="event.stopPropagation()">
         <div class="modal-head">
-            <div style="display:flex;align-items:center;gap:8px;">
-                <svg width="26" height="26" viewBox="0 0 100 100" fill="none">
-                    <path d="M50 4 C55 34, 66 45, 96 50 C66 55, 55 66, 50 96 C45 66, 34 55, 4 50 C34 45, 45 34, 50 4 Z" fill="url(#pyroxOuterGrad)" />
-                    <path d="M50 20 C53 40, 60 47, 80 50 C60 53, 53 60, 50 80 C47 60, 40 53, 20 50 C40 47, 47 40, 50 20 Z" fill="url(#pyroxMidGrad)" />
-                    <path d="M50 34 C51.5 44, 56 48.5, 66 50 C56 51.5, 51.5 56, 50 66 C48.5 56, 44 51.5, 34 50 C44 48.5, 48.5 44, 50 34 Z" fill="url(#pyroxCoreGrad)" />
-                </svg>
-                <span>Sign up for Pyrox</span>
-            </div>
+            <span>Sign up for Pyrox</span>
             <button type="button" class="close-x" onclick="closeModal('googleModal')">✕</button>
         </div>
 
-        <button type="button" class="google-big-btn" onclick="quickGoogleSignIn()">
+        <button type="button" class="google-big-btn" style="background-color:var(--bg-elevated);color:var(--text-primary);border-color:var(--border-user);" onclick="quickGoogleSignIn()">
             <span style="font-weight:900;">G</span>
-            <span>Continue with Google</span>
+            <span>Sign up with Google</span>
         </button>
 
         <div class="divider-or">or</div>
@@ -1687,26 +1905,13 @@ async def index():
         <label class="field-label" for="googleEmailInput">Email</label>
         <input type="email" class="field-input" id="googleEmailInput" placeholder="you@gmail.com" />
 
-        <label class="field-label" for="googleNameInput">Username / Name</label>
+        <label class="field-label" for="googleNameInput">Name</label>
         <input type="text" class="field-input" id="googleNameInput" placeholder="Your name" />
 
         <label class="field-label" for="googlePassInput">Password</label>
         <input type="password" class="field-input" id="googlePassInput" placeholder="Password" />
 
         <button type="button" class="action-btn" onclick="saveAccountForm()">Create account</button>
-    </div>
-</div>
-
-<!-- Images Modal (2 Free Images / Month + Lock until Next Month) -->
-<div class="overlay-modal" id="imageStudioModal" onclick="closeModal('imageStudioModal')">
-    <div class="modal-box" onclick="event.stopPropagation()">
-        <div class="modal-head">
-            <span>Pyrox Images</span>
-            <button type="button" class="close-x" onclick="closeModal('imageStudioModal')">Close</button>
-        </div>
-        <div id="imageQuotaStatus" style="font-size:0.92rem;font-weight:650;color:var(--text-secondary);"></div>
-        <input type="text" class="field-input" id="modalImagePrompt" placeholder="Describe the image you want to create..." />
-        <button type="button" class="action-btn" id="modalGenerateImgBtn" onclick="triggerModalImageGeneration()">Generate Image</button>
     </div>
 </div>
 
@@ -1718,7 +1923,7 @@ async def index():
             <button type="button" class="close-x" onclick="closeModal('videoModal')">Close</button>
         </div>
         <p style="font-size:0.94rem;color:var(--text-secondary);line-height:1.55;">
-            AI Video generation module ready hai—dedicated video API key connect hote hi yahan se direct video banegi.
+            AI Video generation module ready hai—dedicated video API connect hote hi yahan se video banegi.
         </p>
     </div>
 </div>
@@ -1751,7 +1956,7 @@ async def index():
     </div>
 </div>
 
-<!-- ChatGPT-style Single Pyrox Pro Upgrade Modal (₹800 crossed -> ₹139) -->
+<!-- Single Pyrox Pro Upgrade Modal (₹800 crossed -> ₹139) -->
 <div class="overlay-modal" id="upgradeModal" onclick="closeModal('upgradeModal')">
     <div class="modal-box" onclick="event.stopPropagation()">
         <div class="modal-head">
@@ -1875,7 +2080,8 @@ async def index():
 </div>
 
 <script>
-    const DAILY_QUESTION_LIMIT = 40;
+    const NORMAL_DAILY_LIMIT = 40;
+    const CODING_DAILY_LIMIT = 30;
     const WARNING_REMAINING_THRESHOLD = 5;
     const MONTHLY_FREE_IMAGE_LIMIT = 2;
 
@@ -1891,6 +2097,7 @@ async def index():
     let activeFolderId = null;
     let latestAudioPlayer = null;
     let feedbackTargetSnippet = "";
+    let imageModeActive = false;
 
     let recognition = null;
     let isDictating = false;
@@ -1916,17 +2123,58 @@ async def index():
         window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", syncSystemTheme);
     }
 
-    function runSplashEntry() {
+    function isUserSignedUp() {
+        return Boolean(localStorage.getItem("pyrox_signed_up"));
+    }
+
+    function syncHeaderSignUpVisibility() {
+        const btn = document.getElementById("headerSignUpBtn");
+        if (btn) {
+            btn.classList.toggle("logged-in-hide", isUserSignedUp());
+        }
+    }
+
+    function runSplashAndSignUpFlow() {
         const splash = document.getElementById("splashOverlay");
+        const signupScreen = document.getElementById("onboardingSignupScreen");
+
         setTimeout(() => {
             splash.classList.add("done");
             setTimeout(() => {
                 splash.style.display = "none";
-            }, 380);
-        }, 980);
+                if (!isUserSignedUp() && !sessionStorage.getItem("pyrox_skipped_signup")) {
+                    signupScreen.classList.add("show");
+                }
+            }, 340);
+        }, 950);
     }
 
-    // Monthly 2 free image quota + lock until next month
+    function skipOnboardingToWelcome() {
+        sessionStorage.setItem("pyrox_skipped_signup", "1");
+        document.getElementById("onboardingSignupScreen").classList.remove("show");
+        refreshGreeting();
+    }
+
+    function completeOnboardingGoogle() {
+        const typed = document.getElementById("obName").value.trim();
+        localStorage.setItem("pyrox_user_name", typed || "Harshit");
+        localStorage.setItem("pyrox_signed_up", "1");
+        document.getElementById("onboardingSignupScreen").classList.remove("show");
+        syncHeaderSignUpVisibility();
+        refreshGreeting();
+    }
+
+    function completeOnboardingForm() {
+        const nameVal = document.getElementById("obName").value.trim();
+        const emailVal = document.getElementById("obEmail").value.trim();
+        if (nameVal) localStorage.setItem("pyrox_user_name", nameVal);
+        if (emailVal) localStorage.setItem("pyrox_user_email", emailVal);
+        localStorage.setItem("pyrox_signed_up", "1");
+        document.getElementById("onboardingSignupScreen").classList.remove("show");
+        syncHeaderSignUpVisibility();
+        refreshGreeting();
+    }
+
     function getMonthKey() {
         const now = new Date();
         return `${now.getFullYear()}-${now.getMonth() + 1}`;
@@ -1955,78 +2203,85 @@ async def index():
     }
 
     function refreshImageQuotaUI() {
-        const used = getMonthlyImageCount();
-        const remaining = Math.max(0, MONTHLY_FREE_IMAGE_LIMIT - used);
+        const remaining = Math.max(0, MONTHLY_FREE_IMAGE_LIMIT - getMonthlyImageCount());
         const pill = document.getElementById("sidebarImgQuota");
         if (pill) {
             pill.textContent = isImageLockedThisMonth() ? "🔒 Locked" : `${remaining}/2`;
         }
-        const statusEl = document.getElementById("imageQuotaStatus");
-        const genBtn = document.getElementById("modalGenerateImgBtn");
-        if (statusEl && genBtn) {
-            if (isImageLockedThisMonth()) {
-                statusEl.textContent = "🔒 Is mahine ki 2 free images poori ho chuki hain. Agle mahine phir khulega.";
-                genBtn.disabled = true;
-                genBtn.textContent = "🔒 Locked until next month";
-            } else {
-                statusEl.textContent = `Is mahine ${remaining} free image bachi hai (Total 2/month).`;
-                genBtn.disabled = false;
-                genBtn.textContent = "Generate Image";
-            }
-        }
     }
 
-    function openImageStudioModal() {
-        refreshImageQuotaUI();
-        openModal("imageStudioModal");
-    }
-
-    function triggerModalImageGeneration() {
+    function activateImageModeBar() {
         if (isImageLockedThisMonth()) {
-            refreshImageQuotaUI();
+            const banner = document.getElementById("imageModeBanner");
+            banner.textContent = "🔒 Is mahine ki 2 free images poori ho chuki hain. Agle mahine khulega.";
+            banner.classList.add("show");
             return;
         }
-        const promptVal = document.getElementById("modalImagePrompt").value.trim();
-        if (!promptVal) return;
-        document.getElementById("modalImagePrompt").value = "";
-        closeModal("imageStudioModal");
-        document.getElementById("promptInput").value = `/image ${promptVal}`;
-        sendMessage();
+        imageModeActive = true;
+        const banner = document.getElementById("imageModeBanner");
+        banner.textContent = "Image creation active — apna prompt likh kar send karein";
+        banner.classList.add("show");
+        document.getElementById("promptInput").focus();
     }
 
-    // Daily 40 questions limit + warning on last 5
+    function clearImageModeBar() {
+        imageModeActive = false;
+        const banner = document.getElementById("imageModeBanner");
+        banner.classList.remove("show");
+    }
+
     function getTodayKey() {
         const now = new Date();
         return `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
     }
 
-    function getUsedQuestionsToday() {
+    function getUsageToday() {
         const saved = JSON.parse(localStorage.getItem("pyrox_daily_usage") || "{}");
         if (saved.date !== getTodayKey()) {
-            return 0;
+            return { total: 0, heavy: 0 };
         }
-        return Number(saved.count || 0);
+        return {
+            total: Number(saved.total || 0),
+            heavy: Number(saved.heavy || 0),
+        };
     }
 
-    function incrementUsedQuestionsToday() {
-        const nextCount = getUsedQuestionsToday() + 1;
+    function recordQuestionUsage(isHeavy) {
+        const curr = getUsageToday();
+        const next = {
+            total: curr.total + 1,
+            heavy: curr.heavy + (isHeavy ? 1 : 0),
+        };
         localStorage.setItem(
             "pyrox_daily_usage",
-            JSON.stringify({ date: getTodayKey(), count: nextCount })
+            JSON.stringify({ date: getTodayKey(), ...next })
         );
-        updateLimitWarningBanner();
-        return nextCount;
+        updateLimitWarningBanner(isHeavy);
+        return next;
     }
 
-    function updateLimitWarningBanner() {
-        const used = getUsedQuestionsToday();
-        const remaining = Math.max(0, DAILY_QUESTION_LIMIT - used);
+    function isDailyLimitReached(isHeavy) {
+        const curr = getUsageToday();
+        if (curr.total >= NORMAL_DAILY_LIMIT) return true;
+        if (isHeavy && curr.heavy >= CODING_DAILY_LIMIT) return true;
+        return false;
+    }
+
+    function updateLimitWarningBanner(isHeavyContext = false) {
+        const curr = getUsageToday();
+        const remNormal = Math.max(0, NORMAL_DAILY_LIMIT - curr.total);
+        const remHeavy = Math.max(0, CODING_DAILY_LIMIT - curr.heavy);
         const banner = document.getElementById("statusStrip");
-        if (used >= DAILY_QUESTION_LIMIT) {
-            banner.textContent = "Aaj ki 40 questions ki limit khatam ho chuki hai. Kal reset hogi ya Upgrade karein.";
+
+        if (curr.total >= NORMAL_DAILY_LIMIT) {
+            banner.textContent = "Aaj ki 40 questions ki limit khatam ho chuki hai. Kal reset hogi.";
             banner.classList.add("show");
-        } else if (remaining <= WARNING_REMAINING_THRESHOLD) {
-            banner.textContent = `Warning: Aaj ke sirf ${remaining} questions bache hain. Limit kal reset hogi.`;
+        } else if (isHeavyContext && curr.heavy >= CODING_DAILY_LIMIT) {
+            banner.textContent = "Coding/heavy questions ki aaj ki 30 limit poori ho chuki hai. Kal reset hogi.";
+            banner.classList.add("show");
+        } else if (remNormal <= WARNING_REMAINING_THRESHOLD || (isHeavyContext && remHeavy <= WARNING_REMAINING_THRESHOLD)) {
+            const rem = isHeavyContext ? Math.min(remNormal, remHeavy) : remNormal;
+            banner.textContent = `Aaj ke sirf ${rem} questions bache hain. Limit kal reset hogi.`;
             banner.classList.add("show");
         } else if (!banner.dataset.searching) {
             banner.textContent = "";
@@ -2059,8 +2314,8 @@ async def index():
         const el = document.getElementById("greetingText");
         if (el) {
             el.textContent = name
-                ? `Namaste ${name}, main aapki aaj kaise madad kar sakta hoon?`
-                : "Namaste, main aapki aaj kaise madad kar sakta hoon?";
+                ? `Swagatam ${name}! Namaste, main aapki aaj kaise madad kar sakta hoon?`
+                : "Swagatam! Namaste, main aapki aaj kaise madad kar sakta hoon?";
         }
         const gBtn = document.getElementById("googleAccountBtn");
         gBtn.textContent = name ? `Google: ${name}` : "Continue with Google";
@@ -2138,8 +2393,9 @@ async def index():
 
     function quickGoogleSignIn() {
         const typedName = document.getElementById("googleNameInput").value.trim();
-        const chosen = typedName || "Harshit";
-        localStorage.setItem("pyrox_user_name", chosen);
+        localStorage.setItem("pyrox_user_name", typedName || "Harshit");
+        localStorage.setItem("pyrox_signed_up", "1");
+        syncHeaderSignUpVisibility();
         refreshGreeting();
         closeModal("googleModal");
     }
@@ -2149,6 +2405,8 @@ async def index():
         const email = document.getElementById("googleEmailInput").value.trim();
         if (name) localStorage.setItem("pyrox_user_name", name);
         if (email) localStorage.setItem("pyrox_user_email", email);
+        localStorage.setItem("pyrox_signed_up", "1");
+        syncHeaderSignUpVisibility();
         refreshGreeting();
         closeModal("googleModal");
     }
@@ -2168,10 +2426,9 @@ async def index():
     }
 
     function confirmUpgrade() {
-        document.getElementById("upgradeStatusMsg").textContent = "Pyrox Pro (₹139/mo) selected. Payment gateway integration ready.";
+        document.getElementById("upgradeStatusMsg").textContent = "Pyrox Pro (₹139/mo) selected. Ready for payment integration.";
     }
 
-    // Folder-based Library without file icons next to Library label
     function loadFolders() {
         return JSON.parse(localStorage.getItem("pyrox_folders") || "[]");
     }
@@ -2202,7 +2459,7 @@ async def index():
         const folders = loadFolders();
         const target = folders.find((f) => f.id === activeFolderId);
         if (target) {
-            target.items.push({ role, content: content.slice(0, 500) });
+            target.items.push({ role, content: content.slice(0, 600) });
             saveFolders(folders);
         }
     }
@@ -2280,6 +2537,7 @@ async def index():
 
     function newChat() {
         stopGeneration();
+        clearImageModeBar();
         activeFolderId = null;
         pendingAttachmentDataUrl = null;
         pendingAttachmentName = "";
@@ -2421,7 +2679,6 @@ async def index():
         input.focus();
     }
 
-    // Mic -> Curved Square Stop Icon + Full-Width Frequency Bar
     async function startVoiceMeter() {
         const meter = document.getElementById("freqMeter");
         const inputEl = document.getElementById("promptInput");
@@ -2575,45 +2832,128 @@ async def index():
         stage.scrollTop = stage.scrollHeight;
     }
 
+    async function speakTextOnDemand(text, btnEl) {
+        if (!text) return;
+        btnEl.classList.add("selected-act");
+        try {
+            const res = await fetch("/api/listen", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ text }),
+            });
+            const data = await res.json();
+            if (res.ok && data.audio_url) {
+                if (latestAudioPlayer) latestAudioPlayer.pause();
+                latestAudioPlayer = new Audio(data.audio_url);
+                latestAudioPlayer.onended = () => btnEl.classList.remove("selected-act");
+                latestAudioPlayer.play().catch(() => btnEl.classList.remove("selected-act"));
+            } else {
+                btnEl.classList.remove("selected-act");
+            }
+        } catch (_) {
+            btnEl.classList.remove("selected-act");
+        }
+    }
+
+    // Symbol-only response controls: Like, Dislike, Cycle/Redo, Listen/Audio, Copy, Share
     function buildResponseActionsBar(plainText, originalPrompt) {
         const bar = document.createElement("div");
         bar.className = "msg-actions";
 
-        const goodBtn = document.createElement("button");
-        goodBtn.type = "button";
-        goodBtn.className = "mini-action-btn";
-        goodBtn.textContent = "Good response";
-        goodBtn.onclick = () => {
-            goodBtn.classList.add("selected-act");
-            badBtn.classList.remove("selected-act");
+        const likeBtn = document.createElement("button");
+        likeBtn.type = "button";
+        likeBtn.className = "icon-symbol-btn";
+        likeBtn.title = "Good";
+        likeBtn.innerHTML = `
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3z"></path>
+                <path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path>
+            </svg>
+        `;
+
+        const dislikeBtn = document.createElement("button");
+        dislikeBtn.type = "button";
+        dislikeBtn.className = "icon-symbol-btn";
+        dislikeBtn.title = "Bad";
+        dislikeBtn.innerHTML = `
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3z"></path>
+                <path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"></path>
+            </svg>
+        `;
+
+        likeBtn.onclick = () => {
+            likeBtn.classList.add("selected-act");
+            dislikeBtn.classList.remove("selected-act");
         };
 
-        const badBtn = document.createElement("button");
-        badBtn.type = "button";
-        badBtn.className = "mini-action-btn";
-        badBtn.textContent = "Bad response";
-        badBtn.onclick = () => {
-            badBtn.classList.add("selected-act");
-            goodBtn.classList.remove("selected-act");
+        dislikeBtn.onclick = () => {
+            dislikeBtn.classList.add("selected-act");
+            likeBtn.classList.remove("selected-act");
             feedbackTargetSnippet = plainText.slice(0, 200);
             openModal("feedbackModal");
         };
 
-        const redoBtn = document.createElement("button");
-        redoBtn.type = "button";
-        redoBtn.className = "mini-action-btn";
-        redoBtn.textContent = "Redo";
-        redoBtn.onclick = () => {
+        const cycleBtn = document.createElement("button");
+        cycleBtn.type = "button";
+        cycleBtn.className = "icon-symbol-btn";
+        cycleBtn.title = "Regenerate";
+        cycleBtn.innerHTML = `
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <polyline points="1 20 1 14 7 14"></polyline>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+            </svg>
+        `;
+        cycleBtn.onclick = () => {
             if (originalPrompt) {
                 document.getElementById("promptInput").value = originalPrompt;
                 sendMessage();
             }
         };
 
+        const listenBtn = document.createElement("button");
+        listenBtn.type = "button";
+        listenBtn.className = "icon-symbol-btn";
+        listenBtn.title = "Listen";
+        listenBtn.innerHTML = `
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+            </svg>
+        `;
+        listenBtn.onclick = () => speakTextOnDemand(plainText, listenBtn);
+
+        const copyBtn = document.createElement("button");
+        copyBtn.type = "button";
+        copyBtn.className = "icon-symbol-btn";
+        copyBtn.title = "Copy";
+        copyBtn.innerHTML = `
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+        `;
+        copyBtn.onclick = () => {
+            navigator.clipboard.writeText(plainText).catch(() => {});
+            copyBtn.classList.add("selected-act");
+            setTimeout(() => copyBtn.classList.remove("selected-act"), 1000);
+        };
+
         const shareBtn = document.createElement("button");
         shareBtn.type = "button";
-        shareBtn.className = "mini-action-btn";
-        shareBtn.textContent = "Share / Export";
+        shareBtn.className = "icon-symbol-btn";
+        shareBtn.title = "Share / Export";
+        shareBtn.innerHTML = `
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="18" cy="5" r="3"></circle>
+                <circle cx="6" cy="12" r="3"></circle>
+                <circle cx="18" cy="19" r="3"></circle>
+                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+            </svg>
+        `;
         shareBtn.onclick = () => {
             if (navigator.share) {
                 navigator.share({ title: "Pyrox AI", text: plainText }).catch(() => {});
@@ -2622,30 +2962,12 @@ async def index():
             }
         };
 
-        const copyBtn = document.createElement("button");
-        copyBtn.type = "button";
-        copyBtn.className = "mini-action-btn";
-        copyBtn.textContent = "Copy response";
-        copyBtn.onclick = () => {
-            navigator.clipboard.writeText(plainText).catch(() => {});
-            copyBtn.textContent = "Copied";
-            setTimeout(() => (copyBtn.textContent = "Copy response"), 1200);
-        };
-
-        const moreBtn = document.createElement("button");
-        moreBtn.type = "button";
-        moreBtn.className = "mini-action-btn";
-        moreBtn.textContent = "More";
-        moreBtn.onclick = () => {
-            openModal("libraryModal");
-        };
-
-        bar.appendChild(goodBtn);
-        bar.appendChild(badBtn);
-        bar.appendChild(redoBtn);
-        bar.appendChild(shareBtn);
+        bar.appendChild(likeBtn);
+        bar.appendChild(dislikeBtn);
+        bar.appendChild(cycleBtn);
+        bar.appendChild(listenBtn);
         bar.appendChild(copyBtn);
-        bar.appendChild(moreBtn);
+        bar.appendChild(shareBtn);
         return bar;
     }
 
@@ -2719,8 +3041,17 @@ async def index():
         setGeneratingState(false);
     }
 
+    function detectHeavyCodingIntent(text) {
+        return /\b(python|code|coding|script|function|bug|error|html|css|javascript|js|fastapi|sql|algorithm|debug)\b/i.test(
+            text
+        );
+    }
+
     function detectImageGenerationIntent(text) {
         const lower = text.toLowerCase().trim();
+        if (imageModeActive) {
+            return { isImage: true, prompt: text };
+        }
         if (lower.startsWith("/image ")) {
             return { isImage: true, prompt: text.slice(7).trim() };
         }
@@ -2739,29 +3070,33 @@ async def index():
             stopDictationManual();
         }
 
-        if (getUsedQuestionsToday() >= DAILY_QUESTION_LIMIT) {
-            updateLimitWarningBanner();
-            return;
-        }
-
         const input = document.getElementById("promptInput");
         const raw = input.value.trim();
         if (!raw && !pendingAttachmentDataUrl) return;
 
-        // Completely clear input field immediately upon submit
-        input.value = "";
-        input.blur();
-        input.focus();
-
         const messageToSend = raw || `Please check ${pendingAttachmentName || "this image"}`;
+        const isHeavy = detectHeavyCodingIntent(messageToSend);
+
+        if (isDailyLimitReached(isHeavy)) {
+            updateLimitWarningBanner(isHeavy);
+            return;
+        }
+
+        const wasImageMode = imageModeActive;
+        clearImageModeBar();
+
         const attachmentToSend = pendingAttachmentDataUrl;
         pendingAttachmentDataUrl = null;
         pendingAttachmentName = "";
 
+        input.value = "";
+        input.blur();
+        input.focus();
+
         ensureFolderForPrompt(messageToSend);
         appendUserMessage(messageToSend, attachmentToSend);
         appendItemToActiveFolder("user", messageToSend);
-        incrementUsedQuestionsToday();
+        recordQuestionUsage(isHeavy);
 
         const { row, bodyDiv } = appendAIMessage(
             `<div class="thinking-dots"><span></span><span></span></div>`,
@@ -2784,7 +3119,7 @@ async def index():
         }
 
         try {
-            if (imgIntent.isImage) {
+            if (imgIntent.isImage || wasImageMode) {
                 if (isImageLockedThisMonth()) {
                     bodyDiv.textContent =
                         "🔒 Is mahine ki 2 free images poori ho chuki hain. Agle mahine phir se khul jaayega.";
@@ -2792,7 +3127,7 @@ async def index():
                     const res = await fetch("/api/generate-image", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ prompt: imgIntent.prompt }),
+                        body: JSON.stringify({ prompt: imgIntent.prompt || messageToSend }),
                         signal: activeAbortController.signal,
                     });
                     const data = await res.json();
@@ -2800,11 +3135,14 @@ async def index():
                         bodyDiv.textContent = data.detail || "Image generation failed.";
                     } else {
                         incrementMonthlyImageCount();
-                        bodyDiv.innerHTML = `<img src="${data.image_data}" alt="${imgIntent.prompt}" />`;
+                        bodyDiv.innerHTML = `<img src="${data.image_data}" alt="${imgIntent.prompt || messageToSend}" />`;
                         row.appendChild(
-                            buildResponseActionsBar(`Generated image: ${imgIntent.prompt}`, messageToSend)
+                            buildResponseActionsBar(
+                                `Generated image: ${imgIntent.prompt || messageToSend}`,
+                                messageToSend
+                            )
                         );
-                        appendItemToActiveFolder("ai", `[Generated Image: ${imgIntent.prompt}]`);
+                        appendItemToActiveFolder("ai", `[Generated Image: ${imgIntent.prompt || messageToSend}]`);
                     }
                 }
             } else {
@@ -2850,7 +3188,8 @@ async def index():
     }
 
     syncSystemTheme();
-    runSplashEntry();
+    syncHeaderSignUpVisibility();
+    runSplashAndSignUpFlow();
     refreshGreeting();
     refreshThemeLabel();
     renderLibraryFolders();
@@ -2861,4 +3200,3 @@ async def index():
 </html>
 """
     return html
-     
