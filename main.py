@@ -29,12 +29,13 @@ CACHED_GROQ_MODEL: Optional[str] = None
 
 class ChatRequest(BaseModel):
     message: str
-    voice: str = "hi-IN-MadhurNeural"
+    voice: str = "en-US-AriaNeural"
     user_name: Optional[str] = None
     theme_label: str = "Pyrox"
     model_mode: str = "Pyrox Only"
-    enable_tts: bool = True
+    enable_tts: bool = False
     image_data_url: Optional[str] = None
+    regenerate: bool = False
 
 
 class ImageRequest(BaseModel):
@@ -50,7 +51,7 @@ class FeedbackRequest(BaseModel):
 
 class ListenRequest(BaseModel):
     text: str
-    voice: str = "hi-IN-MadhurNeural"
+    voice: str = "en-US-AriaNeural"
 
 
 def resolve_groq_model() -> str:
@@ -92,31 +93,6 @@ def resolve_groq_model() -> str:
 
     CACHED_GROQ_MODEL = default_model
     return default_model
-
-
-def is_heavy_coding_query(message: str) -> bool:
-    q = message.lower()
-    coding_terms = [
-        "python",
-        "code",
-        "coding",
-        "script",
-        "function",
-        "bug",
-        "error",
-        "html",
-        "css",
-        "javascript",
-        "js",
-        "fastapi",
-        "sql",
-        "algorithm",
-        "debug",
-        "class ",
-        "def ",
-        "import ",
-    ]
-    return any(term in q for term in coding_terms)
 
 
 def should_search_web(message: str) -> bool:
@@ -177,7 +153,7 @@ async def generate_edge_audio(
         cleaned = re.sub(r"\s+", " ", cleaned).strip()
         if not cleaned:
             return False
-        communicate = edge_tts.Communicate(cleaned[:650], voice_name, rate="+20%")
+        communicate = edge_tts.Communicate(cleaned[:650], voice_name, rate="+18%")
         await communicate.save(filename)
         return True
     except Exception:
@@ -196,6 +172,38 @@ def is_short_greeting(message: str) -> bool:
         "yo",
         "sup",
     }
+
+
+def detect_language_style(message: str) -> str:
+    if re.search(r"[\u0900-\u097F]", message):
+        return "Hindi (Devanagari)"
+    hinglish_markers = {
+        "kya",
+        "hai",
+        "hain",
+        "kaise",
+        "kaisa",
+        "batao",
+        "bata",
+        "karo",
+        "karna",
+        "mera",
+        "meri",
+        "aaj",
+        "kal",
+        "nahi",
+        "haan",
+        "bhai",
+        "yaar",
+        "kuch",
+        "kyun",
+        "kab",
+        "kahan",
+    }
+    words = set(re.findall(r"[a-zA-Z']+", message.lower()))
+    if len(words.intersection(hinglish_markers)) >= 1:
+        return "Casual Hinglish (mirror user's casual tone politely)"
+    return "Clear, polished English"
 
 
 @app.post("/api/chat")
@@ -230,28 +238,35 @@ async def chat_endpoint(req: ChatRequest):
         identity_line = (
             f"The user's name is {user_label}." if user_label else ""
         )
+        lang_mode = detect_language_style(user_msg)
+        regen_rule = (
+            " This is a regeneration request: provide a fresh, varied phrasing and angle instead of repeating the exact previous wording."
+            if req.regenerate
+            else ""
+        )
 
         if short_mode:
             system_prompt = (
                 f"You are Pyrox ({req.model_mode} mode). {context_block} {identity_line} "
-                "Reply in 1 short, natural, friendly sentence using Roman Hinglish. "
-                "Do NOT use bullet points or numbered lists for a simple greeting."
+                f"Preferred style: {lang_mode}. Default to clear, respectful English unless the user uses Hindi or casual Hinglish. "
+                "Keep a helpful, composed assistant tone without overly informal slang unless the user is casual. "
+                f"Reply in 1 concise, natural sentence.{regen_rule}"
             )
         else:
             system_prompt = (
                 f"You are Pyrox ({req.model_mode} mode). {context_block} {identity_line} "
-                "Reply fast, clearly, and naturally in smooth Roman Hinglish. "
-                "Use bullet points or numbered steps ONLY when genuinely helpful for multi-step or structured info; "
-                "for casual or direct questions, write normal clean paragraphs without forced bullets. "
-                "Keep dates, festivals, and current events accurate according to the current date."
+                f"Preferred style: {lang_mode}. Default to clear, well-structured English unless the user writes in Hindi or casual Hinglish. "
+                "Maintain a helpful, respectful assistant demeanor without being overly familiar unless matched by the user. "
+                "Use bullet points or numbered steps ONLY when genuinely helpful for structured or multi-step explanations; "
+                f"otherwise write clean, readable paragraphs.{regen_rule}"
             )
 
         effective_prompt = user_msg or "User shared an image."
         if req.image_data_url and "vision" not in model_id.lower():
             effective_prompt = (
                 f"{effective_prompt}\n[Note: User attached an image from camera/file. "
-                "If image pixels cannot be inspected directly by this text model, politely mention that "
-                "and ask what specific detail they want help with.]"
+                "If image pixels cannot be inspected directly by this text model, politely state that "
+                "and ask what specific detail they want assistance with.]"
             )
 
         payload = {
@@ -260,8 +275,8 @@ async def chat_endpoint(req: ChatRequest):
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": effective_prompt},
             ],
-            "temperature": 0.65,
-            "max_tokens": 200 if short_mode else 750,
+            "temperature": 0.78 if req.regenerate else 0.62,
+            "max_tokens": 180 if short_mode else 780,
         }
 
         res = requests.post(
@@ -283,7 +298,12 @@ async def chat_endpoint(req: ChatRequest):
         reply_text = res.json()["choices"][0]["message"]["content"].strip()
         audio_url = None
         if req.enable_tts:
-            ok = await generate_edge_audio(reply_text, req.voice, "static/response.mp3")
+            voice_to_use = (
+                "hi-IN-MadhurNeural"
+                if re.search(r"[\u0900-\u097F]", reply_text)
+                else req.voice
+            )
+            ok = await generate_edge_audio(reply_text, voice_to_use, "static/response.mp3")
             if ok:
                 audio_url = f"/static/response.mp3?v={int(asyncio.get_event_loop().time() * 1000)}"
 
@@ -304,9 +324,14 @@ async def listen_endpoint(req: ListenRequest):
         return JSONResponse(
             status_code=400, content={"detail": "Nothing to read aloud."}
         )
+    voice_to_use = (
+        "hi-IN-MadhurNeural"
+        if re.search(r"[\u0900-\u097F]", req.text)
+        else req.voice
+    )
     stamp = int(asyncio.get_event_loop().time() * 1000)
     filename = "static/listen_out.mp3"
-    ok = await generate_edge_audio(req.text, req.voice, filename)
+    ok = await generate_edge_audio(req.text, voice_to_use, filename)
     if not ok:
         return JSONResponse(
             status_code=500, content={"detail": "Unable to generate voice audio."}
@@ -500,7 +525,7 @@ async def index():
             }
         }
 
-        /* Full-Screen White Onboarding Sign-Up Tab after Splash (if not logged in) */
+        /* Full-Screen White Onboarding Sign-Up Tab (Email, Name + Gmail with Pyrox, no password) */
         .onboarding-signup-screen {
             position: fixed;
             inset: 0;
@@ -597,7 +622,7 @@ async def index():
             border: 1px solid #94a3b8;
             background-color: #ffffff;
             color: #09090b;
-            font-size: 1.05rem;
+            font-size: 1.04rem;
             font-weight: 800;
             cursor: pointer;
             display: flex;
@@ -1026,11 +1051,35 @@ async def index():
         }
 
         .greeting-center h1 {
-            font-size: 1.55rem;
+            font-size: 1.52rem;
             font-weight: 700;
             color: var(--text-primary);
-            line-height: 1.42;
+            line-height: 1.44;
             letter-spacing: 0.1px;
+        }
+
+        .starter-chips-row {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 4px;
+        }
+
+        .starter-chip {
+            padding: 8px 12px;
+            border-radius: 999px;
+            border: 1px solid var(--border-subtle);
+            background-color: var(--bg-surface);
+            color: var(--text-secondary);
+            font-size: 0.84rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .starter-chip:hover {
+            color: var(--text-primary);
+            border-color: var(--border-user);
         }
 
         .msg-row {
@@ -1071,13 +1120,31 @@ async def index():
             margin-bottom: 10px;
         }
 
+        .code-block-wrap {
+            position: relative;
+            margin: 8px 0 12px 0;
+        }
+
+        .code-copy-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            padding: 4px 9px;
+            border-radius: 6px;
+            border: 1px solid var(--border-subtle);
+            background-color: var(--bg-surface);
+            color: var(--text-secondary);
+            font-size: 0.74rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
         .msg-ai pre {
             background-color: var(--bg-elevated);
             border: 1px solid var(--border-subtle);
             border-radius: 10px;
             padding: 12px;
             overflow-x: auto;
-            margin: 8px 0 12px 0;
             font-size: 0.9rem;
         }
 
@@ -1102,11 +1169,11 @@ async def index():
             margin-top: 6px;
         }
 
-        /* Clean icon-only response action bar */
+        /* Clean borderless symbol buttons with liquid fill support */
         .msg-actions {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 10px;
             margin-top: 4px;
         }
 
@@ -1114,19 +1181,36 @@ async def index():
             width: 34px;
             height: 34px;
             border-radius: 9px;
-            background-color: var(--bg-elevated);
-            border: 1px solid var(--border-subtle);
+            background: transparent;
+            border: none;
             color: var(--text-secondary);
             display: inline-flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
+            transition: transform 0.14s ease, color 0.18s ease;
         }
 
-        .icon-symbol-btn:hover,
-        .icon-symbol-btn.selected-act {
+        .icon-symbol-btn:hover {
             color: var(--text-primary);
-            border-color: var(--border-user);
+            transform: scale(1.06);
+        }
+
+        .icon-symbol-btn.liquid-filled {
+            color: #ffffff;
+        }
+
+        .icon-symbol-btn.liquid-filled svg path {
+            fill: rgba(255, 255, 255, 0.92);
+            transition: fill 0.28s ease;
+        }
+
+        body.light-mode .icon-symbol-btn.liquid-filled {
+            color: #09090b;
+        }
+
+        body.light-mode .icon-symbol-btn.liquid-filled svg path {
+            fill: rgba(9, 9, 11, 0.88);
         }
 
         .thinking-dots {
@@ -1641,7 +1725,7 @@ async def index():
     </div>
 </div>
 
-<!-- 2. Full White Sign-Up Tab right after Splash (Email, Name, Password + Single Google button + Cross skip) -->
+<!-- 2. Full White Sign-Up Tab right after Splash (Email + Name + Gmail with Pyrox, no password, Cross skip) -->
 <div class="onboarding-signup-screen" id="onboardingSignupScreen">
     <div class="onboarding-top-row">
         <div style="display:flex;align-items:center;gap:8px;">
@@ -1664,21 +1748,18 @@ async def index():
         <label class="white-label" for="obName">Name</label>
         <input type="text" class="white-input" id="obName" placeholder="Your name" />
 
-        <label class="white-label" for="obPassword">Password</label>
-        <input type="password" class="white-input" id="obPassword" placeholder="Create a password" />
-
-        <button type="button" class="white-primary-btn" onclick="completeOnboardingForm()">Create account</button>
+        <button type="button" class="white-primary-btn" onclick="completeOnboardingForm()">Continue</button>
 
         <div class="white-or">or</div>
 
         <button type="button" class="white-google-btn" onclick="completeOnboardingGoogle()">
             <span>G</span>
-            <span>Sign up with Google</span>
+            <span>Gmail with Pyrox</span>
         </button>
     </div>
 
     <div style="text-align:center;font-size:0.78rem;color:#64748b;">
-        Tap ✕ to continue with Swagatam welcome screen
+        Tap ✕ to enter Swagatam welcome screen
     </div>
 </div>
 
@@ -1726,7 +1807,7 @@ async def index():
 
         <div class="sidebar-footer">
             <div class="google-pill" id="googleAccountBtn" onclick="openModal('googleModal')">
-                Continue with Google
+                Gmail with Pyrox
             </div>
             <div class="nav-item" onclick="openModal('settingsModal')">Settings</div>
         </div>
@@ -1781,7 +1862,12 @@ async def index():
                     </svg>
                     <span class="greeting-logo-title" id="greetingBrandName">Pyrox</span>
                 </div>
-                <h1 id="greetingText">Swagatam! Namaste, main aapki aaj kaise madad kar sakta hoon?</h1>
+                <h1 id="greetingText">Swagatam! How can I assist you today?</h1>
+                <div class="starter-chips-row">
+                    <button type="button" class="starter-chip" onclick="useStarterPrompt('Explain a complex topic simply')">Explain simply</button>
+                    <button type="button" class="starter-chip" onclick="useStarterPrompt('Help me write and debug Python code')">Coding help</button>
+                    <button type="button" class="starter-chip" onclick="useStarterPrompt('Generate an image of a futuristic mountain peak at sunset')">Generate image</button>
+                </div>
             </div>
         </section>
 
@@ -1838,7 +1924,7 @@ async def index():
                 <button type="button" class="icon-action-btn" id="plusBtn" onclick="togglePlusMenu(event)" title="More actions">+</button>
 
                 <button type="button" class="icon-action-btn" id="micBtn" onclick="toggleDictation(event)" title="Voice input">
-                    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1">
+                    <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
                         <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
                         <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
                         <line x1="12" y1="19" x2="12" y2="23"></line>
@@ -1846,6 +1932,8 @@ async def index():
                 </button>
 
                 <div class="freq-meter" id="freqMeter">
+                    <div class="freq-bar"></div>
+                    <div class="freq-bar"></div>
                     <div class="freq-bar"></div>
                     <div class="freq-bar"></div>
                     <div class="freq-bar"></div>
@@ -1887,7 +1975,7 @@ async def index():
     </main>
 </div>
 
-<!-- Account / Sign-In Modal -->
+<!-- Account / Sign-Up Modal (No password field) -->
 <div class="overlay-modal" id="googleModal" onclick="closeModal('googleModal')">
     <div class="modal-box" onclick="event.stopPropagation()">
         <div class="modal-head">
@@ -1895,9 +1983,9 @@ async def index():
             <button type="button" class="close-x" onclick="closeModal('googleModal')">✕</button>
         </div>
 
-        <button type="button" class="google-big-btn" style="background-color:var(--bg-elevated);color:var(--text-primary);border-color:var(--border-user);" onclick="quickGoogleSignIn()">
+        <button type="button" class="white-google-btn" style="background-color:var(--bg-elevated);color:var(--text-primary);border-color:var(--border-user);" onclick="quickGoogleSignIn()">
             <span style="font-weight:900;">G</span>
-            <span>Sign up with Google</span>
+            <span>Gmail with Pyrox</span>
         </button>
 
         <div class="divider-or">or</div>
@@ -1908,10 +1996,7 @@ async def index():
         <label class="field-label" for="googleNameInput">Name</label>
         <input type="text" class="field-input" id="googleNameInput" placeholder="Your name" />
 
-        <label class="field-label" for="googlePassInput">Password</label>
-        <input type="password" class="field-input" id="googlePassInput" placeholder="Password" />
-
-        <button type="button" class="action-btn" onclick="saveAccountForm()">Create account</button>
+        <button type="button" class="action-btn" onclick="saveAccountForm()">Continue</button>
     </div>
 </div>
 
@@ -1923,7 +2008,7 @@ async def index():
             <button type="button" class="close-x" onclick="closeModal('videoModal')">Close</button>
         </div>
         <p style="font-size:0.94rem;color:var(--text-secondary);line-height:1.55;">
-            AI Video generation module ready hai—dedicated video API connect hote hi yahan se video banegi.
+            AI Video generation module is staged for upcoming video API integration without slowing chat performance.
         </p>
     </div>
 </div>
@@ -1938,7 +2023,7 @@ async def index():
         <label class="field-label" for="customThemeInput">Custom Theme Name</label>
         <input type="text" class="field-input" id="customThemeInput" placeholder="e.g. Pyrox, Studio Dark" />
         <button type="button" class="action-btn" onclick="saveThemeName()">Save Theme Name</button>
-        <button type="button" class="action-btn" id="ttsToggleBtn" onclick="toggleTtsPreference()">Voice Reply (TTS): On</button>
+        <button type="button" class="action-btn" id="ttsToggleBtn" onclick="toggleTtsPreference()">Auto Voice Reply: Off</button>
         <button type="button" class="action-btn" onclick="clearSavedFolders()">Clear Library Folders</button>
     </div>
 </div>
@@ -2039,7 +2124,7 @@ async def index():
                 <button type="button" class="close-x" onclick="closeModal('feedbackModal')">✕</button>
             </div>
             <p style="font-size:0.92rem;color:#d4d4d8;">
-                Is response mein kya dikkat aayi? Select karo:
+                Select what went wrong with this response:
             </p>
             <div class="feedback-reasons-grid" id="feedbackReasonsGrid">
                 <button type="button" class="reason-chip" onclick="toggleFeedbackReason(this)">Unsafe</button>
@@ -2091,15 +2176,18 @@ async def index():
     let currentFacingMode = "environment";
     let cameraStream = null;
     let flashEnabled = false;
-    let ttsEnabled = true;
+    let ttsEnabled = false;
     let pendingAttachmentDataUrl = null;
     let pendingAttachmentName = "";
     let activeFolderId = null;
     let latestAudioPlayer = null;
     let feedbackTargetSnippet = "";
+    let activeDislikeBtn = null;
     let imageModeActive = false;
 
     let recognition = null;
+    let mediaRecorder = null;
+    let audioChunks = [];
     let isDictating = false;
     let audioCtx = null;
     let analyser = null;
@@ -2107,7 +2195,7 @@ async def index():
     let freqAnimId = null;
 
     const MIC_SVG = `
-        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1">
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
             <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
             <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
             <line x1="12" y1="19" x2="12" y2="23"></line>
@@ -2146,7 +2234,7 @@ async def index():
                     signupScreen.classList.add("show");
                 }
             }, 340);
-        }, 950);
+        }, 920);
     }
 
     function skipOnboardingToWelcome() {
@@ -2213,13 +2301,13 @@ async def index():
     function activateImageModeBar() {
         if (isImageLockedThisMonth()) {
             const banner = document.getElementById("imageModeBanner");
-            banner.textContent = "🔒 Is mahine ki 2 free images poori ho chuki hain. Agle mahine khulega.";
+            banner.textContent = "🔒 Monthly 2-image limit reached. Resets next month.";
             banner.classList.add("show");
             return;
         }
         imageModeActive = true;
         const banner = document.getElementById("imageModeBanner");
-        banner.textContent = "Image creation active — apna prompt likh kar send karein";
+        banner.textContent = "Image creation active — type a prompt and send";
         banner.classList.add("show");
         document.getElementById("promptInput").focus();
     }
@@ -2274,14 +2362,14 @@ async def index():
         const banner = document.getElementById("statusStrip");
 
         if (curr.total >= NORMAL_DAILY_LIMIT) {
-            banner.textContent = "Aaj ki 40 questions ki limit khatam ho chuki hai. Kal reset hogi.";
+            banner.textContent = "Daily 40-question limit reached. Resets tomorrow.";
             banner.classList.add("show");
         } else if (isHeavyContext && curr.heavy >= CODING_DAILY_LIMIT) {
-            banner.textContent = "Coding/heavy questions ki aaj ki 30 limit poori ho chuki hai. Kal reset hogi.";
+            banner.textContent = "Daily 30-question coding/heavy limit reached. Resets tomorrow.";
             banner.classList.add("show");
         } else if (remNormal <= WARNING_REMAINING_THRESHOLD || (isHeavyContext && remHeavy <= WARNING_REMAINING_THRESHOLD)) {
             const rem = isHeavyContext ? Math.min(remNormal, remHeavy) : remNormal;
-            banner.textContent = `Aaj ke sirf ${rem} questions bache hain. Limit kal reset hogi.`;
+            banner.textContent = `${rem} questions remaining today before daily reset.`;
             banner.classList.add("show");
         } else if (!banner.dataset.searching) {
             banner.textContent = "";
@@ -2293,7 +2381,7 @@ async def index():
         const banner = document.getElementById("statusStrip");
         if (active) {
             banner.dataset.searching = "1";
-            banner.textContent = "Web searching...";
+            banner.textContent = "Searching live web...";
             banner.classList.add("show");
         } else {
             delete banner.dataset.searching;
@@ -2314,11 +2402,11 @@ async def index():
         const el = document.getElementById("greetingText");
         if (el) {
             el.textContent = name
-                ? `Swagatam ${name}! Namaste, main aapki aaj kaise madad kar sakta hoon?`
-                : "Swagatam! Namaste, main aapki aaj kaise madad kar sakta hoon?";
+                ? `Swagatam ${name}! How can I assist you today?`
+                : "Swagatam! How can I assist you today?";
         }
         const gBtn = document.getElementById("googleAccountBtn");
-        gBtn.textContent = name ? `Google: ${name}` : "Continue with Google";
+        gBtn.textContent = name ? `Gmail: ${name}` : "Gmail with Pyrox";
     }
 
     function refreshThemeLabel() {
@@ -2329,6 +2417,12 @@ async def index():
         const greetBrand = document.getElementById("greetingBrandName");
         if (greetBrand) greetBrand.textContent = label;
         document.getElementById("customThemeInput").value = label;
+    }
+
+    function useStarterPrompt(text) {
+        const input = document.getElementById("promptInput");
+        input.value = text;
+        sendMessage();
     }
 
     function openSidebar(e) {
@@ -2422,11 +2516,11 @@ async def index():
 
     function toggleTtsPreference() {
         ttsEnabled = !ttsEnabled;
-        document.getElementById("ttsToggleBtn").textContent = `Voice Reply (TTS): ${ttsEnabled ? "On" : "Off"}`;
+        document.getElementById("ttsToggleBtn").textContent = `Auto Voice Reply: ${ttsEnabled ? "On" : "Off"}`;
     }
 
     function confirmUpgrade() {
-        document.getElementById("upgradeStatusMsg").textContent = "Pyrox Pro (₹139/mo) selected. Ready for payment integration.";
+        document.getElementById("upgradeStatusMsg").textContent = "Pyrox Pro (₹139/mo) selected. Ready for payment gateway checkout.";
     }
 
     function loadFolders() {
@@ -2500,7 +2594,7 @@ async def index():
                 row.textContent = m.content;
                 stage.appendChild(row);
             } else {
-                appendAIMessage(marked.parse(m.content), m.content, "");
+                appendAIMessage(renderRichMarkdown(m.content), m.content, "");
             }
         });
         stage.scrollTop = stage.scrollHeight;
@@ -2553,6 +2647,11 @@ async def index():
                     <span class="greeting-logo-title" id="greetingBrandName">${getThemeLabel()}</span>
                 </div>
                 <h1 id="greetingText"></h1>
+                <div class="starter-chips-row">
+                    <button type="button" class="starter-chip" onclick="useStarterPrompt('Explain a complex topic simply')">Explain simply</button>
+                    <button type="button" class="starter-chip" onclick="useStarterPrompt('Help me write and debug Python code')">Coding help</button>
+                    <button type="button" class="starter-chip" onclick="useStarterPrompt('Generate an image of a futuristic mountain peak at sunset')">Generate image</button>
+                </div>
             </div>
         `;
         refreshGreeting();
@@ -2679,6 +2778,7 @@ async def index():
         input.focus();
     }
 
+    // Mic -> Curved Square Stop Icon + Tightly Spaced Frequency Bar + Mobile MediaRecorder fallback
     async function startVoiceMeter() {
         const meter = document.getElementById("freqMeter");
         const inputEl = document.getElementById("promptInput");
@@ -2701,14 +2801,16 @@ async def index():
                 analyser.getByteFrequencyData(arr);
                 for (let i = 0; i < bars.length; i++) {
                     const v = arr[i] || 0;
-                    const h = v > 30 ? Math.max(4, Math.min(32, Math.round((v / 255) * 32))) : 3;
+                    const h = v > 28 ? Math.max(4, Math.min(32, Math.round((v / 255) * 32))) : 3;
                     bars[i].style.height = `${h}px`;
                 }
                 freqAnimId = requestAnimationFrame(step);
             };
             freqAnimId = requestAnimationFrame(step);
+            return micStream;
         } catch (_) {
             bars.forEach((b) => (b.style.height = "3px"));
+            return null;
         }
     }
 
@@ -2737,7 +2839,7 @@ async def index():
         micBtn.title = recording ? "Stop dictation" : "Voice input";
     }
 
-    function toggleDictation(e) {
+    async function toggleDictation(e) {
         if (e) e.stopPropagation();
         if (isDictating) {
             stopDictationManual();
@@ -2745,50 +2847,71 @@ async def index():
         }
 
         const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SR) {
-            alert("Browser speech recognition not supported.");
-            return;
+        const baseText = document.getElementById("promptInput").value;
+
+        if (SR) {
+            recognition = new SR();
+            recognition.lang = "en-IN";
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            let finalText = "";
+
+            recognition.onstart = async () => {
+                isDictating = true;
+                setMicButtonAsStopSquare(true);
+                await startVoiceMeter();
+            };
+
+            recognition.onresult = (event) => {
+                let interim = "";
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const seg = event.results[i][0].transcript;
+                    if (event.results[i].isFinal) {
+                        finalText += seg + " ";
+                    } else {
+                        interim += seg;
+                    }
+                }
+                document.getElementById("promptInput").value =
+                    `${baseText}${baseText ? " " : ""}${finalText}${interim}`.trim();
+            };
+
+            recognition.onerror = () => {
+                stopDictationManual();
+            };
+
+            recognition.onend = () => {
+                isDictating = false;
+                setMicButtonAsStopSquare(false);
+                stopVoiceMeter();
+            };
+
+            try {
+                recognition.start();
+                return;
+            } catch (_) {}
         }
 
-        recognition = new SR();
-        recognition.lang = "hi-IN";
-        recognition.continuous = true;
-        recognition.interimResults = true;
-
-        const baseText = document.getElementById("promptInput").value;
-        let finalText = "";
-
-        recognition.onstart = async () => {
-            isDictating = true;
-            setMicButtonAsStopSquare(true);
-            await startVoiceMeter();
-        };
-
-        recognition.onresult = (event) => {
-            let interim = "";
-            for (let i = event.resultIndex; i < event.results.length; i++) {
-                const seg = event.results[i][0].transcript;
-                if (event.results[i].isFinal) {
-                    finalText += seg + " ";
-                } else {
-                    interim += seg;
-                }
-            }
-            document.getElementById("promptInput").value =
-                `${baseText}${baseText ? " " : ""}${finalText}${interim}`.trim();
-        };
-
-        recognition.onerror = () => {
-            stopDictationManual();
-        };
-
-        recognition.onend = () => {
-            isDictating = false;
-            setMicButtonAsStopSquare(false);
-            stopVoiceMeter();
-        };
-
-        recognition.start();
+        // Mobile fallback when SpeechRecognition is blocked or unavailable
+        isDictating = true;
+        setMicButtonAsStopSquare(true);
+        const stream = await startVoiceMeter();
+        if (stream && typeof MediaRecorder !== "undefined") {
+            audioChunks = [];
+            try {
+                mediaRecorder = new MediaRecorder(stream);
+                mediaRecorder.ondataavailable = (ev) => {
+                    if (ev.data && ev.data.size > 0) audioChunks.push(ev.data);
+                };
+                mediaRecorder.onstop = () => {
+                    const inp = document.getElementById("promptInput");
+                    if (!inp.value.trim()) {
+                        inp.placeholder = "Voice captured — type or tap send";
+                    }
+                };
+                mediaRecorder.start();
+            } catch (_) {}
+        }
     }
 
     function stopDictationManual() {
@@ -2800,6 +2923,12 @@ async def index():
             } catch (_) {}
             recognition = null;
         }
+        if (mediaRecorder && mediaRecorder.state !== "inactive") {
+            try {
+                mediaRecorder.stop();
+            } catch (_) {}
+        }
+        mediaRecorder = null;
         stopVoiceMeter();
     }
 
@@ -2810,6 +2939,30 @@ async def index():
             if (g) g.remove();
             document.getElementById("upgradeBtn").classList.remove("shine-active");
         }
+    }
+
+    function renderRichMarkdown(mdText) {
+        const rawHtml = marked.parse(mdText || "");
+        const container = document.createElement("div");
+        container.innerHTML = rawHtml;
+        container.querySelectorAll("pre").forEach((pre) => {
+            const wrap = document.createElement("div");
+            wrap.className = "code-block-wrap";
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "code-copy-btn";
+            btn.textContent = "Copy";
+            btn.onclick = () => {
+                const codeText = pre.innerText || "";
+                navigator.clipboard.writeText(codeText).catch(() => {});
+                btn.textContent = "Copied";
+                setTimeout(() => (btn.textContent = "Copy"), 1100);
+            };
+            pre.parentNode.insertBefore(wrap, pre);
+            wrap.appendChild(pre);
+            wrap.appendChild(btn);
+        });
+        return container.innerHTML;
     }
 
     function appendUserMessage(text, imgUrl) {
@@ -2834,7 +2987,7 @@ async def index():
 
     async function speakTextOnDemand(text, btnEl) {
         if (!text) return;
-        btnEl.classList.add("selected-act");
+        btnEl.classList.add("liquid-filled");
         try {
             const res = await fetch("/api/listen", {
                 method: "POST",
@@ -2845,17 +2998,17 @@ async def index():
             if (res.ok && data.audio_url) {
                 if (latestAudioPlayer) latestAudioPlayer.pause();
                 latestAudioPlayer = new Audio(data.audio_url);
-                latestAudioPlayer.onended = () => btnEl.classList.remove("selected-act");
-                latestAudioPlayer.play().catch(() => btnEl.classList.remove("selected-act"));
+                latestAudioPlayer.onended = () => btnEl.classList.remove("liquid-filled");
+                latestAudioPlayer.play().catch(() => btnEl.classList.remove("liquid-filled"));
             } else {
-                btnEl.classList.remove("selected-act");
+                btnEl.classList.remove("liquid-filled");
             }
         } catch (_) {
-            btnEl.classList.remove("selected-act");
+            btnEl.classList.remove("liquid-filled");
         }
     }
 
-    // Symbol-only response controls: Like, Dislike, Cycle/Redo, Listen/Audio, Copy, Share
+    // Clean icon-only controls with liquid-fill animation on Like & Dislike submit
     function buildResponseActionsBar(plainText, originalPrompt) {
         const bar = document.createElement("div");
         bar.className = "msg-actions";
@@ -2865,7 +3018,7 @@ async def index():
         likeBtn.className = "icon-symbol-btn";
         likeBtn.title = "Good";
         likeBtn.innerHTML = `
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3z"></path>
                 <path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path>
             </svg>
@@ -2876,20 +3029,22 @@ async def index():
         dislikeBtn.className = "icon-symbol-btn";
         dislikeBtn.title = "Bad";
         dislikeBtn.innerHTML = `
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3z"></path>
                 <path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"></path>
             </svg>
         `;
 
         likeBtn.onclick = () => {
-            likeBtn.classList.add("selected-act");
-            dislikeBtn.classList.remove("selected-act");
+            likeBtn.classList.toggle("liquid-filled");
+            if (likeBtn.classList.contains("liquid-filled")) {
+                dislikeBtn.classList.remove("liquid-filled");
+            }
         };
 
         dislikeBtn.onclick = () => {
-            dislikeBtn.classList.add("selected-act");
-            likeBtn.classList.remove("selected-act");
+            likeBtn.classList.remove("liquid-filled");
+            activeDislikeBtn = dislikeBtn;
             feedbackTargetSnippet = plainText.slice(0, 200);
             openModal("feedbackModal");
         };
@@ -2899,7 +3054,7 @@ async def index():
         cycleBtn.className = "icon-symbol-btn";
         cycleBtn.title = "Regenerate";
         cycleBtn.innerHTML = `
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="23 4 23 10 17 10"></polyline>
                 <polyline points="1 20 1 14 7 14"></polyline>
                 <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
@@ -2907,8 +3062,7 @@ async def index():
         `;
         cycleBtn.onclick = () => {
             if (originalPrompt) {
-                document.getElementById("promptInput").value = originalPrompt;
-                sendMessage();
+                sendMessage(originalPrompt, true);
             }
         };
 
@@ -2917,7 +3071,7 @@ async def index():
         listenBtn.className = "icon-symbol-btn";
         listenBtn.title = "Listen";
         listenBtn.innerHTML = `
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
                 <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
                 <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
@@ -2930,15 +3084,15 @@ async def index():
         copyBtn.className = "icon-symbol-btn";
         copyBtn.title = "Copy";
         copyBtn.innerHTML = `
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                 <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
             </svg>
         `;
         copyBtn.onclick = () => {
             navigator.clipboard.writeText(plainText).catch(() => {});
-            copyBtn.classList.add("selected-act");
-            setTimeout(() => copyBtn.classList.remove("selected-act"), 1000);
+            copyBtn.classList.add("liquid-filled");
+            setTimeout(() => copyBtn.classList.remove("liquid-filled"), 950);
         };
 
         const shareBtn = document.createElement("button");
@@ -2946,7 +3100,7 @@ async def index():
         shareBtn.className = "icon-symbol-btn";
         shareBtn.title = "Share / Export";
         shareBtn.innerHTML = `
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="18" cy="5" r="3"></circle>
                 <circle cx="6" cy="12" r="3"></circle>
                 <circle cx="18" cy="19" r="3"></circle>
@@ -3013,6 +3167,11 @@ async def index():
             });
         } catch (_) {}
 
+        if (activeDislikeBtn) {
+            activeDislikeBtn.classList.add("liquid-filled");
+            activeDislikeBtn = null;
+        }
+
         document.querySelectorAll("#feedbackReasonsGrid .reason-chip").forEach((c) => c.classList.remove("active"));
         document.getElementById("feedbackCustomNote").value = "";
         closeModal("feedbackModal");
@@ -3065,13 +3224,13 @@ async def index():
         return { isImage: false, prompt: text };
     }
 
-    async function sendMessage() {
+    async function sendMessage(overrideText = null, isRegenerate = false) {
         if (isDictating) {
             stopDictationManual();
         }
 
         const input = document.getElementById("promptInput");
-        const raw = input.value.trim();
+        const raw = overrideText !== null ? String(overrideText).trim() : input.value.trim();
         if (!raw && !pendingAttachmentDataUrl) return;
 
         const messageToSend = raw || `Please check ${pendingAttachmentName || "this image"}`;
@@ -3089,9 +3248,11 @@ async def index():
         pendingAttachmentDataUrl = null;
         pendingAttachmentName = "";
 
-        input.value = "";
-        input.blur();
-        input.focus();
+        if (overrideText === null) {
+            input.value = "";
+            input.blur();
+            input.focus();
+        }
 
         ensureFolderForPrompt(messageToSend);
         appendUserMessage(messageToSend, attachmentToSend);
@@ -3122,7 +3283,7 @@ async def index():
             if (imgIntent.isImage || wasImageMode) {
                 if (isImageLockedThisMonth()) {
                     bodyDiv.textContent =
-                        "🔒 Is mahine ki 2 free images poori ho chuki hain. Agle mahine phir se khul jaayega.";
+                        "🔒 Monthly 2-image free limit reached. Resets next month.";
                 } else {
                     const res = await fetch("/api/generate-image", {
                         method: "POST",
@@ -3156,6 +3317,7 @@ async def index():
                         model_mode: selectedModelMode,
                         enable_tts: ttsEnabled,
                         image_data_url: attachmentToSend,
+                        regenerate: isRegenerate,
                     }),
                     signal: activeAbortController.signal,
                 });
@@ -3164,7 +3326,7 @@ async def index():
                     bodyDiv.textContent = data.detail || "Request failed.";
                 } else {
                     const reply = data.reply || "";
-                    bodyDiv.innerHTML = marked.parse(reply);
+                    bodyDiv.innerHTML = renderRichMarkdown(reply);
                     row.appendChild(buildResponseActionsBar(reply, messageToSend));
                     appendItemToActiveFolder("ai", reply);
                     if (data.audio_url) {
