@@ -26,6 +26,13 @@ HF_API_KEY = (
 
 CACHED_GROQ_MODEL: Optional[str] = None
 
+PYROX_CORE_BRAIN = """You are Pyrox, a sharp, intelligent, smooth, and globally competitive AI assistant.
+Response & Behavior Standards:
+1. Directness First: Start with a clear, direct answer immediately—no fluff or filler intros.
+2. Adaptive Language & Tone: Match the user's language naturally (Hindi in Devanagari, casual Hinglish, or clear English). Stay confident, helpful, and natural without sounding robotic or preachy.
+3. Clean Formatting: Use concise headings, bullet points, or numbered steps when explaining multi-part or technical topics; keep simple answers crisp and readable.
+4. Code & Multimodal Precision: Provide clean, working code with practical explanations. When an image/file is attached or mentioned, address the exact detail clearly and ask focused follow-ups only when genuinely needed."""
+
 
 class ChatRequest(BaseModel):
     message: str
@@ -202,7 +209,7 @@ def detect_language_style(message: str) -> str:
     }
     words = set(re.findall(r"[a-zA-Z']+", message.lower()))
     if len(words.intersection(hinglish_markers)) >= 1:
-        return "Casual Hinglish (mirror user's casual tone politely)"
+        return "Casual Hinglish (mirror user's casual tone naturally)"
     return "Clear, polished English"
 
 
@@ -240,33 +247,32 @@ async def chat_endpoint(req: ChatRequest):
         )
         lang_mode = detect_language_style(user_msg)
         regen_rule = (
-            " This is a regeneration request: provide a fresh, varied phrasing and angle instead of repeating the exact previous wording."
+            " This is a regeneration request: give a fresh phrasing, structure, or angle instead of repeating the previous response."
             if req.regenerate
             else ""
         )
 
         if short_mode:
             system_prompt = (
-                f"You are Pyrox ({req.model_mode} mode). {context_block} {identity_line} "
-                f"Preferred style: {lang_mode}. Default to clear, respectful English unless the user uses Hindi or casual Hinglish. "
-                "Keep a helpful, composed assistant tone without overly informal slang unless the user is casual. "
-                f"Reply in 1 concise, natural sentence.{regen_rule}"
+                f"{PYROX_CORE_BRAIN}\n"
+                f"Active Mode: {req.theme_label} ({req.model_mode}). {context_block} {identity_line} "
+                f"Language style: {lang_mode}. "
+                f"Reply in 1 crisp, natural, friendly sentence.{regen_rule}"
             )
         else:
             system_prompt = (
-                f"You are Pyrox ({req.model_mode} mode). {context_block} {identity_line} "
-                f"Preferred style: {lang_mode}. Default to clear, well-structured English unless the user writes in Hindi or casual Hinglish. "
-                "Maintain a helpful, respectful assistant demeanor without being overly familiar unless matched by the user. "
-                "Use bullet points or numbered steps ONLY when genuinely helpful for structured or multi-step explanations; "
-                f"otherwise write clean, readable paragraphs.{regen_rule}"
+                f"{PYROX_CORE_BRAIN}\n"
+                f"Active Mode: {req.theme_label} ({req.model_mode}). {context_block} {identity_line} "
+                f"Language style: {lang_mode}. "
+                f"Structure explanations clearly and concisely without unnecessary fluff.{regen_rule}"
             )
 
         effective_prompt = user_msg or "User shared an image."
         if req.image_data_url and "vision" not in model_id.lower():
             effective_prompt = (
                 f"{effective_prompt}\n[Note: User attached an image from camera/file. "
-                "If image pixels cannot be inspected directly by this text model, politely state that "
-                "and ask what specific detail they want assistance with.]"
+                "If image pixels cannot be inspected directly by this text model, clearly mention that "
+                "and ask what specific detail or text they need help with.]"
             )
 
         payload = {
@@ -276,7 +282,7 @@ async def chat_endpoint(req: ChatRequest):
                 {"role": "user", "content": effective_prompt},
             ],
             "temperature": 0.78 if req.regenerate else 0.62,
-            "max_tokens": 180 if short_mode else 780,
+            "max_tokens": 180 if short_mode else 900,
         }
 
         res = requests.post(
@@ -402,6 +408,74 @@ async def index():
     <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content" />
     <title>Pyrox AI</title>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+        import {
+            getAuth,
+            GoogleAuthProvider,
+            signInWithPopup,
+            signInWithRedirect,
+            onAuthStateChanged
+        } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDdyIrjtSLzyVU8jsZerei12q4bs6oZK4w",
+            authDomain: "pyrox-4a06c.firebaseapp.com",
+            projectId: "pyrox-4a06c",
+            storageBucket: "pyrox-4a06c.firebasestorage.app",
+            messagingSenderId: "711881193984",
+            appId: "1:711881193984:web:4684319f34eeafc937b6e5",
+            measurementId: "G-9JC0TQF7KT"
+        };
+
+        const fbApp = initializeApp(firebaseConfig);
+        const fbAuth = getAuth(fbApp);
+        const fbProvider = new GoogleAuthProvider();
+
+        window.pyroxFirebaseGoogleSignIn = async function (customNameInputId = null) {
+            try {
+                const cred = await signInWithPopup(fbAuth, fbProvider);
+                const user = cred.user;
+                const typed = customNameInputId
+                    ? (document.getElementById(customNameInputId)?.value || "").trim()
+                    : "";
+                const resolvedName = typed || user.displayName || (user.email ? user.email.split("@")[0] : "Harshit");
+                localStorage.setItem("pyrox_user_name", resolvedName);
+                if (user.email) localStorage.setItem("pyrox_user_email", user.email);
+                localStorage.setItem("pyrox_signed_up", "1");
+                syncHeaderSignUpVisibility();
+                refreshGreeting();
+                document.getElementById("onboardingSignupScreen")?.classList.remove("show");
+                closeModal("googleModal");
+            } catch (err) {
+                if (err && (err.code === "auth/popup-blocked" || err.code === "auth/operation-not-supported-in-this-environment")) {
+                    await signInWithRedirect(fbAuth, fbProvider);
+                    return;
+                }
+                console.warn("Firebase popup fallback:", err);
+                const typed = customNameInputId
+                    ? (document.getElementById(customNameInputId)?.value || "").trim()
+                    : "";
+                localStorage.setItem("pyrox_user_name", typed || "Harshit");
+                localStorage.setItem("pyrox_signed_up", "1");
+                syncHeaderSignUpVisibility();
+                refreshGreeting();
+                document.getElementById("onboardingSignupScreen")?.classList.remove("show");
+                closeModal("googleModal");
+            }
+        };
+
+        onAuthStateChanged(fbAuth, (user) => {
+            if (user) {
+                const name = localStorage.getItem("pyrox_user_name") || user.displayName || (user.email ? user.email.split("@")[0] : "Harshit");
+                localStorage.setItem("pyrox_user_name", name);
+                if (user.email) localStorage.setItem("pyrox_user_email", user.email);
+                localStorage.setItem("pyrox_signed_up", "1");
+                syncHeaderSignUpVisibility();
+                refreshGreeting();
+            }
+        });
+    </script>
     <style>
         :root {
             --bg-main: #09090b;
@@ -1169,7 +1243,6 @@ async def index():
             margin-top: 6px;
         }
 
-        /* Clean borderless symbol buttons with liquid fill support */
         .msg-actions {
             display: flex;
             align-items: center;
@@ -1243,7 +1316,6 @@ async def index():
             }
         }
 
-        /* Bottom Dock */
         .bottom-dock {
             flex-shrink: 0;
             width: 100%;
@@ -1405,7 +1477,6 @@ async def index():
             display: none;
         }
 
-        /* Tightly spaced frequency meter inside input shell while speaking */
         .freq-meter {
             display: none;
             flex: 1;
@@ -1467,7 +1538,6 @@ async def index():
             font-weight: 500;
         }
 
-        /* Modals */
         .overlay-modal {
             position: fixed;
             inset: 0;
@@ -1711,7 +1781,6 @@ async def index():
     </defs>
 </svg>
 
-<!-- 1. Pogo-style Flashy Star + Pyrox Splash Entry -->
 <div class="splash-overlay" id="splashOverlay">
     <div class="splash-stage">
         <div class="splash-star-wrap">
@@ -1725,7 +1794,6 @@ async def index():
     </div>
 </div>
 
-<!-- 2. Full White Sign-Up Tab right after Splash (Email + Name + Gmail with Pyrox, no password, Cross skip) -->
 <div class="onboarding-signup-screen" id="onboardingSignupScreen">
     <div class="onboarding-top-row">
         <div style="display:flex;align-items:center;gap:8px;">
@@ -1932,26 +2000,11 @@ async def index():
                 </button>
 
                 <div class="freq-meter" id="freqMeter">
-                    <div class="freq-bar"></div>
-                    <div class="freq-bar"></div>
-                    <div class="freq-bar"></div>
-                    <div class="freq-bar"></div>
-                    <div class="freq-bar"></div>
-                    <div class="freq-bar"></div>
-                    <div class="freq-bar"></div>
-                    <div class="freq-bar"></div>
-                    <div class="freq-bar"></div>
-                    <div class="freq-bar"></div>
-                    <div class="freq-bar"></div>
-                    <div class="freq-bar"></div>
-                    <div class="freq-bar"></div>
-                    <div class="freq-bar"></div>
-                    <div class="freq-bar"></div>
-                    <div class="freq-bar"></div>
-                    <div class="freq-bar"></div>
-                    <div class="freq-bar"></div>
-                    <div class="freq-bar"></div>
-                    <div class="freq-bar"></div>
+                    <div class="freq-bar"></div><div class="freq-bar"></div><div class="freq-bar"></div><div class="freq-bar"></div>
+                    <div class="freq-bar"></div><div class="freq-bar"></div><div class="freq-bar"></div><div class="freq-bar"></div>
+                    <div class="freq-bar"></div><div class="freq-bar"></div><div class="freq-bar"></div><div class="freq-bar"></div>
+                    <div class="freq-bar"></div><div class="freq-bar"></div><div class="freq-bar"></div><div class="freq-bar"></div>
+                    <div class="freq-bar"></div><div class="freq-bar"></div><div class="freq-bar"></div><div class="freq-bar"></div>
                 </div>
 
                 <textarea
@@ -1975,7 +2028,6 @@ async def index():
     </main>
 </div>
 
-<!-- Account / Sign-Up Modal (No password field) -->
 <div class="overlay-modal" id="googleModal" onclick="closeModal('googleModal')">
     <div class="modal-box" onclick="event.stopPropagation()">
         <div class="modal-head">
@@ -2000,7 +2052,6 @@ async def index():
     </div>
 </div>
 
-<!-- Video Modal -->
 <div class="overlay-modal" id="videoModal" onclick="closeModal('videoModal')">
     <div class="modal-box" onclick="event.stopPropagation()">
         <div class="modal-head">
@@ -2013,7 +2064,6 @@ async def index():
     </div>
 </div>
 
-<!-- Settings Modal -->
 <div class="overlay-modal" id="settingsModal" onclick="closeModal('settingsModal')">
     <div class="modal-box" onclick="event.stopPropagation()">
         <div class="modal-head">
@@ -2028,7 +2078,6 @@ async def index():
     </div>
 </div>
 
-<!-- Library Modal -->
 <div class="overlay-modal" id="libraryModal" onclick="closeModal('libraryModal')">
     <div class="modal-box" onclick="event.stopPropagation()">
         <div class="modal-head">
@@ -2041,7 +2090,6 @@ async def index():
     </div>
 </div>
 
-<!-- Single Pyrox Pro Upgrade Modal (₹800 crossed -> ₹139) -->
 <div class="overlay-modal" id="upgradeModal" onclick="closeModal('upgradeModal')">
     <div class="modal-box" onclick="event.stopPropagation()">
         <div class="modal-head">
@@ -2069,31 +2117,11 @@ async def index():
                 </tr>
             </thead>
             <tbody>
-                <tr>
-                    <td>Core model (Pyrox Only)</td>
-                    <td>✓</td>
-                    <td>✓</td>
-                </tr>
-                <tr>
-                    <td>Pyrox Pro Model access</td>
-                    <td>—</td>
-                    <td>✓</td>
-                </tr>
-                <tr>
-                    <td>Extended image & video creation</td>
-                    <td>—</td>
-                    <td>✓</td>
-                </tr>
-                <tr>
-                    <td>Higher daily question limit</td>
-                    <td>—</td>
-                    <td>✓</td>
-                </tr>
-                <tr>
-                    <td>Saved folders & library</td>
-                    <td>✓</td>
-                    <td>✓</td>
-                </tr>
+                <tr><td>Core model (Pyrox Only)</td><td>✓</td><td>✓</td></tr>
+                <tr><td>Pyrox Pro Model access</td><td>—</td><td>✓</td></tr>
+                <tr><td>Extended image & video creation</td><td>—</td><td>✓</td></tr>
+                <tr><td>Higher daily question limit</td><td>—</td><td>✓</td></tr>
+                <tr><td>Saved folders & library</td><td>✓</td><td>✓</td></tr>
             </tbody>
         </table>
 
@@ -2115,7 +2143,6 @@ async def index():
     </div>
 </div>
 
-<!-- 70% Screen Grey Bad Response Feedback Modal -->
 <div class="overlay-modal" id="feedbackModal" onclick="closeModal('feedbackModal')">
     <div class="feedback-box" onclick="event.stopPropagation()">
         <div style="display:flex;flex-direction:column;gap:14px;">
@@ -2145,7 +2172,6 @@ async def index():
     </div>
 </div>
 
-<!-- 75% Camera Sheet with Round Shutter Button -->
 <div class="overlay-modal camera-sheet" id="cameraModal" onclick="closeCamera()">
     <div class="modal-box" onclick="event.stopPropagation()">
         <div class="modal-head">
@@ -2244,6 +2270,10 @@ async def index():
     }
 
     function completeOnboardingGoogle() {
+        if (typeof window.pyroxFirebaseGoogleSignIn === "function") {
+            window.pyroxFirebaseGoogleSignIn("obName");
+            return;
+        }
         const typed = document.getElementById("obName").value.trim();
         localStorage.setItem("pyrox_user_name", typed || "Harshit");
         localStorage.setItem("pyrox_signed_up", "1");
@@ -2486,6 +2516,10 @@ async def index():
     }
 
     function quickGoogleSignIn() {
+        if (typeof window.pyroxFirebaseGoogleSignIn === "function") {
+            window.pyroxFirebaseGoogleSignIn("googleNameInput");
+            return;
+        }
         const typedName = document.getElementById("googleNameInput").value.trim();
         localStorage.setItem("pyrox_user_name", typedName || "Harshit");
         localStorage.setItem("pyrox_signed_up", "1");
@@ -2778,7 +2812,6 @@ async def index():
         input.focus();
     }
 
-    // Mic -> Curved Square Stop Icon + Tightly Spaced Frequency Bar + Mobile MediaRecorder fallback
     async function startVoiceMeter() {
         const meter = document.getElementById("freqMeter");
         const inputEl = document.getElementById("promptInput");
@@ -2892,7 +2925,6 @@ async def index():
             } catch (_) {}
         }
 
-        // Mobile fallback when SpeechRecognition is blocked or unavailable
         isDictating = true;
         setMicButtonAsStopSquare(true);
         const stream = await startVoiceMeter();
@@ -3008,7 +3040,6 @@ async def index():
         }
     }
 
-    // Clean icon-only controls with liquid-fill animation on Like & Dislike submit
     function buildResponseActionsBar(plainText, originalPrompt) {
         const bar = document.createElement("div");
         bar.className = "msg-actions";
