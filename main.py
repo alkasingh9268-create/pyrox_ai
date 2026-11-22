@@ -28,12 +28,12 @@ FAL_KEY = (
     or os.environ.get("PALM_KEY", "").strip()
 )
 
+MAX_CHAT_CHARS = 8000
 CACHED_GROQ_MODEL: Optional[str] = None
 
 FAL_MODELS = {
     "flux1": "https://fal.run/fal-ai/flux/schnell",
     "ultra": "https://fal.run/fal-ai/flux-pro/v1.1-ultra",
-    "edit": "https://fal.run/fal-ai/flux-pro/v1.1",
 }
 
 ULTRA_KEYWORDS = (
@@ -64,12 +64,6 @@ class ChatRequest(BaseModel):
 class ImageRequest(BaseModel):
     prompt: str
     mode: str = "auto"
-    image_size: str = "square_hd"
-
-
-class EditImageRequest(BaseModel):
-    prompt: str
-    image_url: str
     image_size: str = "square_hd"
 
 
@@ -305,6 +299,14 @@ async def chat_endpoint(req: ChatRequest):
         )
 
     user_msg = req.message.strip()
+    if len(user_msg) > MAX_CHAT_CHARS:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "detail": f"Message too large ({len(user_msg)} chars). Keep input under {MAX_CHAT_CHARS} characters."
+            },
+        )
+
     doc_text = extract_text_from_data_url(req.file_name, req.file_data_url)
 
     if not user_msg and not req.image_data_url and not doc_text:
@@ -354,10 +356,9 @@ async def chat_endpoint(req: ChatRequest):
             parts.append(user_msg)
         if doc_text:
             parts.append(f"[Attached Document: {req.file_name or 'file'}]\n{doc_text}")
-        if req.image_data_url and "vision" not in model_id.lower():
+        if req.image_data_url:
             parts.append(
-                "[Note: User attached an image. If direct pixel inspection is unavailable in this text model, "
-                "state that clearly and ask what specific details they want help with.]"
+                f"[Attached Image: {req.file_name or 'photo.png'} received. Analyze context and assist the user clearly.]"
             )
 
         effective_prompt = "\n\n".join(parts) or "User shared an attachment."
@@ -480,36 +481,6 @@ async def generate_image_endpoint(req: ImageRequest):
         return JSONResponse(status_code=500, content={"detail": str(exc)})
 
 
-@app.post("/api/edit-image")
-async def edit_image_endpoint(req: EditImageRequest):
-    if not FAL_KEY:
-        return JSONResponse(
-            status_code=400,
-            content={"detail": "FAL_KEY missing in environment variables."},
-        )
-    prompt = req.prompt.strip()
-    img_url = req.image_url.strip()
-    if not prompt or not img_url:
-        return JSONResponse(
-            status_code=400,
-            content={"detail": "Both image_url and edit prompt are required."},
-        )
-    try:
-        payload = {
-            "prompt": prompt,
-            "image_url": img_url,
-            "image_size": req.image_size or "square_hd",
-            "num_images": 1,
-            "enable_safety_checker": True,
-        }
-        res = call_fal_endpoint(FAL_MODELS["edit"], payload)
-        if not res["ok"]:
-            return JSONResponse(status_code=502, content={"detail": res.get("error")})
-        return {"image_url": res["url"], "model": "edit"}
-    except Exception as exc:
-        return JSONResponse(status_code=500, content={"detail": str(exc)})
-
-
 @app.post("/api/feedback")
 async def feedback_endpoint(req: FeedbackRequest):
     return {"status": "recorded", "reason": req.reason}
@@ -567,24 +538,60 @@ async def index():
             overflow: hidden;
             font-weight: 500;
             font-size: 16px;
-            transition: background-color 0.2s ease, color 0.2s ease;
+            transition: background-color 0.85s cubic-bezier(0.22, 1, 0.36, 1), color 0.85s ease;
+        }
+
+        body.pre-login-white {
+            background-color: #ffffff;
+            color: #09090b;
+        }
+
+        .pyrox-fog-layer {
+            position: fixed;
+            inset: -12%;
+            pointer-events: none;
+            z-index: 1;
+            opacity: 0.46;
+            background:
+                radial-gradient(circle at 22% 24%, rgba(56, 189, 248, 0.24), transparent 44%),
+                radial-gradient(circle at 78% 28%, rgba(168, 85, 247, 0.22), transparent 46%),
+                radial-gradient(circle at 52% 76%, rgba(236, 72, 153, 0.18), transparent 48%);
+            filter: blur(28px);
+            animation: pyroxFogDrift 14s ease-in-out infinite alternate;
+        }
+
+        body.light-mode .pyrox-fog-layer {
+            opacity: 0.22;
+        }
+
+        @keyframes pyroxFogDrift {
+            0% {
+                transform: translate3d(-2%, -2%, 0) scale(1);
+            }
+            50% {
+                transform: translate3d(2.5%, 1.5%, 0) scale(1.04);
+            }
+            100% {
+                transform: translate3d(-1.5%, 2.5%, 0) scale(1.02);
+            }
         }
 
         .splash-overlay {
             position: fixed;
             inset: 0;
-            background-color: var(--bg-main);
+            background-color: #ffffff;
+            color: #09090b;
             display: flex;
             align-items: center;
             justify-content: center;
             z-index: 600;
             overflow: hidden;
-            transition: opacity 0.32s ease, transform 0.32s ease;
+            transition: opacity 0.35s ease, transform 0.35s ease;
         }
 
         .splash-overlay.done {
             opacity: 0;
-            transform: scale(1.05);
+            transform: scale(1.04);
             pointer-events: none;
         }
 
@@ -605,46 +612,40 @@ async def index():
             font-size: 2.6rem;
             font-weight: 800;
             letter-spacing: 0.6px;
-            color: var(--text-primary);
+            color: #09090b;
             opacity: 0;
             transform: translateX(-30px) skewX(-12deg);
             animation: flashRevealPyrox 0.75s cubic-bezier(0.16, 1, 0.3, 1) 0.14s forwards;
         }
 
         @keyframes pogoStarPop {
-            0% {
-                transform: scale(0.15) rotate(-140deg);
-                opacity: 0;
-            }
-            55% {
-                transform: scale(1.25) rotate(12deg);
-                opacity: 1;
-            }
-            80% {
-                transform: scale(0.94) rotate(-6deg);
-            }
-            100% {
-                transform: scale(1) rotate(0deg);
-                opacity: 1;
-            }
+            0% { transform: scale(0.15) rotate(-140deg); opacity: 0; }
+            55% { transform: scale(1.25) rotate(12deg); opacity: 1; }
+            80% { transform: scale(0.94) rotate(-6deg); }
+            100% { transform: scale(1) rotate(0deg); opacity: 1; }
         }
 
         @keyframes flashRevealPyrox {
-            0% {
-                opacity: 0;
-                transform: translateX(-32px) skewX(-16deg);
-                text-shadow: 0 0 24px rgba(255, 255, 255, 0.9);
-            }
-            45% {
-                opacity: 1;
-                transform: translateX(4px) skewX(-6deg);
-                text-shadow: 0 0 18px rgba(59, 130, 246, 0.85);
-            }
-            100% {
-                opacity: 1;
-                transform: translateX(0) skewX(0deg);
-                text-shadow: none;
-            }
+            0% { opacity: 0; transform: translateX(-32px) skewX(-16deg); }
+            45% { opacity: 1; transform: translateX(4px) skewX(-6deg); }
+            100% { opacity: 1; transform: translateX(0) skewX(0deg); }
+        }
+
+        .pyrox-welcome-screen {
+            position: fixed;
+            inset: 0;
+            background-color: #ffffff;
+            color: #09090b;
+            z-index: 540;
+            display: none;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 20px 22px 26px 22px;
+            overflow-y: auto;
+        }
+
+        .pyrox-welcome-screen.show {
+            display: flex;
         }
 
         .onboarding-signup-screen {
@@ -765,6 +766,7 @@ async def index():
             width: 100%;
             position: relative;
             overflow: hidden;
+            z-index: 2;
         }
 
         .sidebar {
@@ -785,8 +787,8 @@ async def index():
         }
 
         .sidebar.open {
-            width: 72vw;
-            min-width: 240px;
+            width: 76vw;
+            min-width: 248px;
             max-width: 340px;
             border-right-color: var(--border-subtle);
             padding: 16px 12px;
@@ -842,6 +844,22 @@ async def index():
             transform: scale(0.97);
         }
 
+        .all-history-section {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            padding-top: 4px;
+        }
+
+        .all-section-label {
+            font-size: 0.84rem;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            padding: 2px 10px;
+        }
+
         .quota-pill {
             font-size: 0.78rem;
             font-weight: 700;
@@ -883,15 +901,13 @@ async def index():
         }
 
         .library-folders {
-            display: none;
+            display: flex;
             flex-direction: column;
             gap: 6px;
             margin-top: 2px;
-            padding-left: 6px;
-        }
-
-        .library-folders.show {
-            display: flex;
+            padding-left: 4px;
+            max-height: 220px;
+            overflow-y: auto;
         }
 
         .folder-chip {
@@ -1057,21 +1073,10 @@ async def index():
         }
 
         @keyframes upgradeSweep {
-            0% {
-                top: -130%;
-                opacity: 0;
-            }
-            25% {
-                opacity: 1;
-            }
-            75% {
-                top: 130%;
-                opacity: 1;
-            }
-            100% {
-                top: 130%;
-                opacity: 0;
-            }
+            0% { top: -130%; opacity: 0; }
+            25% { opacity: 1; }
+            75% { top: 130%; opacity: 1; }
+            100% { top: 130%; opacity: 0; }
         }
 
         .dots-btn {
@@ -1351,14 +1356,8 @@ async def index():
         }
 
         @keyframes twoDotPulse {
-            0%, 80%, 100% {
-                transform: translateY(0);
-                opacity: 0.4;
-            }
-            40% {
-                transform: translateY(-6px);
-                opacity: 1;
-            }
+            0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+            40% { transform: translateY(-6px); opacity: 1; }
         }
 
         .bottom-dock {
@@ -1369,6 +1368,14 @@ async def index():
             border-top: 1px solid var(--border-subtle);
             position: relative;
             z-index: 30;
+            transform: translateY(24px);
+            opacity: 0;
+            transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.45s ease;
+        }
+
+        .bottom-dock.dock-slid-up {
+            transform: translateY(0);
+            opacity: 1;
         }
 
         .image-generating-strip {
@@ -1385,6 +1392,25 @@ async def index():
 
         .image-generating-strip.show {
             display: block;
+        }
+
+        .attachment-chip-bar {
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 6px;
+            padding: 7px 12px;
+            border-radius: 11px;
+            background-color: var(--bg-elevated);
+            border: 1px solid var(--border-subtle);
+            font-size: 0.88rem;
+            font-weight: 650;
+            color: var(--text-primary);
+        }
+
+        .attachment-chip-bar.show {
+            display: flex;
         }
 
         .plus-menu {
@@ -1512,32 +1538,6 @@ async def index():
 
         .prompt-input::placeholder {
             color: var(--text-muted);
-        }
-
-        .prompt-input.hidden-while-speaking {
-            display: none;
-        }
-
-        .freq-meter {
-            display: none;
-            flex: 1;
-            align-items: center;
-            justify-content: center;
-            gap: 2px;
-            height: 36px;
-            padding: 0 6px;
-        }
-
-        .freq-meter.visible {
-            display: flex;
-        }
-
-        .freq-bar {
-            width: 2.5px;
-            height: 3px;
-            border-radius: 2px;
-            background-color: var(--text-primary);
-            transition: height 0.06s linear;
         }
 
         .send-btn, .stop-btn {
@@ -1802,7 +1802,9 @@ async def index():
         }
     </style>
 </head>
-<body>
+<body class="pre-login-white">
+<div class="pyrox-fog-layer" aria-hidden="true"></div>
+
 <svg width="0" height="0" style="position:absolute;visibility:hidden;">
     <defs>
         <linearGradient id="pyroxOuterGrad" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -1835,6 +1837,35 @@ async def index():
     </div>
 </div>
 
+<div class="pyrox-welcome-screen" id="pyroxWelcomeScreen">
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:14px;padding:16px;">
+        <svg width="56" height="56" viewBox="0 0 100 100" fill="none">
+            <path d="M50 4 C55 34, 66 45, 96 50 C66 55, 55 66, 50 96 C45 66, 34 55, 4 50 C34 45, 45 34, 50 4 Z" fill="url(#pyroxOuterGrad)" />
+            <path d="M50 20 C53 40, 60 47, 80 50 C60 53, 53 60, 50 80 C47 60, 40 53, 20 50 C40 47, 47 40, 50 20 Z" fill="url(#pyroxMidGrad)" />
+            <path d="M50 34 C51.5 44, 56 48.5, 66 50 C56 51.5, 51.5 56, 50 66 C48.5 56, 44 51.5, 34 50 C44 48.5, 48.5 44, 50 34 Z" fill="url(#pyroxCoreGrad)" />
+        </svg>
+        <div style="font-size:1.85rem;font-weight:800;letter-spacing:0.2px;color:#09090b;">Welcome to Pyrox</div>
+        <p style="max-width:340px;font-size:0.98rem;color:#475569;line-height:1.5;">
+            Bring your files, your ideas, and your next big question. Log in for the full experience.
+        </p>
+    </div>
+
+    <div style="width:100%;max-width:420px;margin:0 auto;display:flex;flex-direction:column;gap:10px;padding:12px 12px 20px 12px;">
+        <div style="font-size:0.74rem;text-align:center;color:#64748b;line-height:1.45;margin-bottom:4px;">
+            Pyrox can make mistakes, so check anything important. By continuing, you agree to Pyrox terms and privacy policy.
+        </div>
+        <button type="button" class="action-btn" style="background-color:#09090b;color:#ffffff;font-weight:800;padding:13px 16px;border-radius:999px;" onclick="openGoogleAccountChooser()">
+            G &nbsp; Continue with Google
+        </button>
+        <button type="button" class="action-btn" style="background-color:#f8fafc;color:#09090b;font-weight:700;padding:13px 16px;border-radius:999px;" onclick="openSignUpFormScreen()">
+            Log in or sign up
+        </button>
+        <button type="button" style="background:none;border:none;color:#09090b;font-size:0.96rem;font-weight:700;padding:8px;cursor:pointer;" onclick="skipWelcomeToDarkApp()">
+            Skip
+        </button>
+    </div>
+</div>
+
 <div class="onboarding-signup-screen" id="onboardingSignupScreen">
     <div class="onboarding-top-row">
         <div style="display:flex;align-items:center;gap:8px;">
@@ -1845,7 +1876,7 @@ async def index():
             </svg>
             <span style="font-weight:800;font-size:1.12rem;color:#09090b;">Pyrox</span>
         </div>
-        <button type="button" class="onboarding-cross-btn" onclick="skipOnboardingToWelcome()" aria-label="Skip sign up">✕</button>
+        <button type="button" class="onboarding-cross-btn" onclick="skipWelcomeToDarkApp()" aria-label="Skip sign up">✕</button>
     </div>
 
     <div class="onboarding-body">
@@ -1861,14 +1892,50 @@ async def index():
 
         <div class="white-or">or</div>
 
-        <button type="button" class="white-google-btn" onclick="completeOnboardingGoogle()">
+        <button type="button" class="white-google-btn" onclick="openGoogleAccountChooser()">
             <span>G</span>
-            <span>Gmail with Pyrox</span>
+            <span>Continue with Google</span>
         </button>
     </div>
 
     <div style="text-align:center;font-size:0.82rem;color:#475569;">
-        Tap ✕ to enter Swagatam welcome screen
+        Tap ✕ to enter Pyrox studio
+    </div>
+</div>
+
+<div class="overlay-modal" id="googleChooserModal" onclick="closeModal('googleChooserModal')">
+    <div class="modal-box" style="background-color:#ffffff;color:#09090b;border-radius:20px;padding:22px 18px;max-width:390px;" onclick="event.stopPropagation()">
+        <div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;">
+            <svg width="34" height="34" viewBox="0 0 100 100" fill="none">
+                <path d="M50 4 C55 34, 66 45, 96 50 C66 55, 55 66, 50 96 C45 66, 34 55, 4 50 C34 45, 45 34, 50 4 Z" fill="url(#pyroxOuterGrad)" />
+                <path d="M50 20 C53 40, 60 47, 80 50 C60 53, 53 60, 50 80 C47 60, 40 53, 20 50 C40 47, 47 40, 50 20 Z" fill="url(#pyroxMidGrad)" />
+                <path d="M50 34 C51.5 44, 56 48.5, 66 50 C56 51.5, 51.5 56, 50 66 C48.5 56, 44 51.5, 34 50 C44 48.5, 48.5 44, 50 34 Z" fill="url(#pyroxCoreGrad)" />
+            </svg>
+            <div style="font-size:1.35rem;font-weight:700;color:#0f172a;">Choose an account</div>
+            <div style="font-size:0.9rem;color:#475569;">to continue to Pyrox</div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;margin-top:8px;">
+            <button type="button" onclick="selectChooserAccount('Harshit Singh', 'harshit@pyrox.app')" style="display:flex;align-items:center;gap:12px;padding:12px 8px;background:none;border:none;border-bottom:1px solid #e2e8f0;text-align:left;cursor:pointer;color:#0f172a;">
+                <span style="width:36px;height:36px;border-radius:999px;background:#2563eb;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;">H</span>
+                <span style="display:flex;flex-direction:column;">
+                    <strong style="font-size:0.95rem;">Harshit Singh</strong>
+                    <span style="font-size:0.82rem;color:#475569;">harshit@pyrox.app</span>
+                </span>
+            </button>
+
+            <button type="button" onclick="selectChooserAccount('Alka Singh', 'alkasingh9268@gmail.com')" style="display:flex;align-items:center;gap:12px;padding:12px 8px;background:none;border:none;border-bottom:1px solid #e2e8f0;text-align:left;cursor:pointer;color:#0f172a;">
+                <span style="width:36px;height:36px;border-radius:999px;background:#0f766e;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;">A</span>
+                <span style="display:flex;flex-direction:column;">
+                    <strong style="font-size:0.95rem;">Alka Singh</strong>
+                    <span style="font-size:0.82rem;color:#475569;">alkasingh9268@gmail.com</span>
+                </span>
+            </button>
+
+            <button type="button" onclick="closeModal('googleChooserModal'); openModal('googleModal');" style="display:flex;align-items:center;gap:12px;padding:13px 8px;background:none;border:none;text-align:left;cursor:pointer;color:#0f172a;font-weight:650;font-size:0.92rem;">
+                <span>+ Add another account</span>
+            </button>
+        </div>
     </div>
 </div>
 
@@ -1888,8 +1955,11 @@ async def index():
             </div>
 
             <div class="nav-item" onclick="newChat(); closeSidebar();">+ New Chat</div>
-            <div class="nav-item" onclick="toggleLibraryFolders()">Library</div>
-            <div class="library-folders" id="libraryFolders"></div>
+
+            <div class="all-history-section">
+                <div class="all-section-label">All</div>
+                <div class="library-folders" id="libraryFolders"></div>
+            </div>
 
             <div class="nav-item" onclick="activateImageModeBar(); closeSidebar();">
                 <span>Images</span>
@@ -1980,9 +2050,14 @@ async def index():
             </div>
         </section>
 
-        <footer class="bottom-dock" id="bottomDock" onclick="event.stopPropagation()">
+        <footer class="bottom-dock dock-slid-up" id="bottomDock" onclick="event.stopPropagation()">
             <div class="image-generating-strip" id="imageModeBanner">
                 Image generation mode active — enter prompt to generate image
+            </div>
+
+            <div class="attachment-chip-bar" id="attachmentChipBar">
+                <span id="attachmentChipLabel">Attached file</span>
+                <button type="button" class="close-x" onclick="clearPendingAttachment()">✕</button>
             </div>
 
             <div class="plus-menu" id="plusMenu">
@@ -2040,29 +2115,6 @@ async def index():
                     </svg>
                 </button>
 
-                <div class="freq-meter" id="freqMeter">
-                    <div class="freq-bar"></div>
-                    <div class="freq-bar"></div>
-                    <div class="freq-bar"></div>
-                    <div class="freq-bar"></div>
-                    <div class="freq-bar"></div>
-                    <div class="freq-bar"></div>
-                    <div class="freq-bar"></div>
-                    <div class="freq-bar"></div>
-                    <div class="freq-bar"></div>
-                    <div class="freq-bar"></div>
-                    <div class="freq-bar"></div>
-                    <div class="freq-bar"></div>
-                    <div class="freq-bar"></div>
-                    <div class="freq-bar"></div>
-                    <div class="freq-bar"></div>
-                    <div class="freq-bar"></div>
-                    <div class="freq-bar"></div>
-                    <div class="freq-bar"></div>
-                    <div class="freq-bar"></div>
-                    <div class="freq-bar"></div>
-                </div>
-
                 <textarea
                     id="promptInput"
                     class="prompt-input"
@@ -2091,12 +2143,12 @@ async def index():
             <button type="button" class="close-x" onclick="closeModal('googleModal')">✕</button>
         </div>
 
-        <button type="button" class="white-google-btn" style="background-color:var(--bg-elevated);color:var(--text-primary);border-color:var(--border-user);" onclick="quickGoogleSignIn()">
+        <button type="button" class="white-google-btn" style="background-color:var(--bg-elevated);color:var(--text-primary);border-color:var(--border-user);" onclick="openGoogleAccountChooser()">
             <span style="font-weight:900;">G</span>
-            <span>Gmail with Pyrox</span>
+            <span>Continue with Google</span>
         </button>
 
-        <div class="divider-or">or</div>
+        <div class="white-or">or</div>
 
         <label class="field-label" for="googleEmailInput">Email</label>
         <input type="email" class="field-input" id="googleEmailInput" placeholder="you@gmail.com" />
@@ -2137,7 +2189,7 @@ async def index():
 <div class="overlay-modal" id="libraryModal" onclick="closeModal('libraryModal')">
     <div class="modal-box" onclick="event.stopPropagation()">
         <div class="modal-head">
-            <span>Library Folders</span>
+            <span>All Chats & Library</span>
             <button type="button" class="close-x" onclick="closeModal('libraryModal')">Close</button>
         </div>
         <div id="libraryModalBody" style="display:flex;flex-direction:column;gap:8px;font-size:0.98rem;color:var(--text-secondary);">
@@ -2184,7 +2236,7 @@ async def index():
                     <td>✓</td>
                 </tr>
                 <tr>
-                    <td>Extended image & video creation</td>
+                    <td>Extended image generation</td>
                     <td>—</td>
                     <td>✓</td>
                 </tr>
@@ -2194,7 +2246,7 @@ async def index():
                     <td>✓</td>
                 </tr>
                 <tr>
-                    <td>Saved folders & library</td>
+                    <td>All chats & saved folders</td>
                     <td>✓</td>
                     <td>✓</td>
                 </tr>
@@ -2271,6 +2323,7 @@ async def index():
     const CODING_DAILY_LIMIT = 30;
     const WARNING_REMAINING_THRESHOLD = 5;
     const MONTHLY_FREE_IMAGE_LIMIT = 2;
+    const MAX_INPUT_CHARS = 6000;
 
     let chatStarted = false;
     let activeAbortController = null;
@@ -2290,13 +2343,7 @@ async def index():
     let imageModeActive = false;
 
     let recognition = null;
-    let mediaRecorder = null;
-    let audioChunks = [];
     let isDictating = false;
-    let audioCtx = null;
-    let analyser = null;
-    let micStream = null;
-    let freqAnimId = null;
 
     const MIC_SVG = `
         <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
@@ -2305,15 +2352,6 @@ async def index():
             <line x1="12" y1="19" x2="12" y2="23"></line>
         </svg>
     `;
-
-    function syncSystemTheme() {
-        const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
-        document.body.classList.toggle("light-mode", !prefersDark);
-    }
-
-    if (window.matchMedia) {
-        window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", syncSystemTheme);
-    }
 
     function isUserSignedUp() {
         return Boolean(localStorage.getItem("pyrox_signed_up"));
@@ -2326,34 +2364,65 @@ async def index():
         }
     }
 
-    function runSplashAndSignUpFlow() {
+    function triggerInputSlideUp() {
+        const dock = document.getElementById("bottomDock");
+        if (!dock) return;
+        dock.classList.remove("dock-slid-up");
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                dock.classList.add("dock-slid-up");
+            });
+        });
+    }
+
+    function transitionToDarkStudio() {
+        document.getElementById("pyroxWelcomeScreen")?.classList.remove("show");
+        document.getElementById("onboardingSignupScreen")?.classList.remove("show");
+        closeModal("googleChooserModal");
+        setTimeout(() => {
+            document.body.classList.remove("pre-login-white");
+            syncHeaderSignUpVisibility();
+            refreshGreeting();
+            triggerInputSlideUp();
+        }, 60);
+    }
+
+    function runSplashAndWelcomeFlow() {
         const splash = document.getElementById("splashOverlay");
-        const signupScreen = document.getElementById("onboardingSignupScreen");
+        const welcome = document.getElementById("pyroxWelcomeScreen");
 
         setTimeout(() => {
             splash.classList.add("done");
             setTimeout(() => {
                 splash.style.display = "none";
                 if (!isUserSignedUp() && !sessionStorage.getItem("pyrox_skipped_signup")) {
-                    signupScreen.classList.add("show");
+                    welcome.classList.add("show");
+                } else {
+                    transitionToDarkStudio();
                 }
-            }, 340);
+            }, 350);
         }, 920);
     }
 
-    function skipOnboardingToWelcome() {
-        sessionStorage.setItem("pyrox_skipped_signup", "1");
-        document.getElementById("onboardingSignupScreen").classList.remove("show");
-        refreshGreeting();
+    function openGoogleAccountChooser() {
+        openModal("googleChooserModal");
     }
 
-    function completeOnboardingGoogle() {
-        const typed = document.getElementById("obName").value.trim();
-        localStorage.setItem("pyrox_user_name", typed || "Harshit");
+    function openSignUpFormScreen() {
+        document.getElementById("pyroxWelcomeScreen")?.classList.remove("show");
+        document.getElementById("onboardingSignupScreen")?.classList.add("show");
+    }
+
+    function skipWelcomeToDarkApp() {
+        sessionStorage.setItem("pyrox_skipped_signup", "1");
+        transitionToDarkStudio();
+    }
+
+    function selectChooserAccount(name, email) {
+        localStorage.setItem("pyrox_user_name", name);
+        localStorage.setItem("pyrox_user_email", email);
         localStorage.setItem("pyrox_signed_up", "1");
-        document.getElementById("onboardingSignupScreen").classList.remove("show");
-        syncHeaderSignUpVisibility();
-        refreshGreeting();
+        transitionToDarkStudio();
     }
 
     function completeOnboardingForm() {
@@ -2362,9 +2431,7 @@ async def index():
         if (nameVal) localStorage.setItem("pyrox_user_name", nameVal);
         if (emailVal) localStorage.setItem("pyrox_user_email", emailVal);
         localStorage.setItem("pyrox_signed_up", "1");
-        document.getElementById("onboardingSignupScreen").classList.remove("show");
-        syncHeaderSignUpVisibility();
-        refreshGreeting();
+        transitionToDarkStudio();
     }
 
     function getMonthKey() {
@@ -2422,6 +2489,23 @@ async def index():
         banner.classList.remove("show");
     }
 
+    function showPendingAttachmentChip(label) {
+        const bar = document.getElementById("attachmentChipBar");
+        const txt = document.getElementById("attachmentChipLabel");
+        if (bar && txt) {
+            txt.textContent = `Attached: ${label}`;
+            bar.classList.add("show");
+        }
+    }
+
+    function clearPendingAttachment() {
+        pendingAttachmentDataUrl = null;
+        pendingFileDataUrl = null;
+        pendingAttachmentName = "";
+        const bar = document.getElementById("attachmentChipBar");
+        if (bar) bar.classList.remove("show");
+    }
+
     function getTodayKey() {
         const now = new Date();
         return `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
@@ -2475,7 +2559,7 @@ async def index():
             const rem = isHeavyContext ? Math.min(remNormal, remHeavy) : remNormal;
             banner.textContent = `${rem} questions remaining today before daily reset.`;
             banner.classList.add("show");
-        } else if (!banner.dataset.searching) {
+        } else if (!banner.dataset.searching && !banner.dataset.limitAlert) {
             banner.textContent = "";
             banner.classList.remove("show");
         }
@@ -2483,6 +2567,7 @@ async def index():
 
     function setSearchingBanner(active) {
         const banner = document.getElementById("statusStrip");
+        delete banner.dataset.limitAlert;
         if (active) {
             banner.dataset.searching = "1";
             banner.textContent = "Searching live web...";
@@ -2491,6 +2576,21 @@ async def index():
             delete banner.dataset.searching;
             updateLimitWarningBanner();
         }
+    }
+
+    function checkInputCharLimit(text) {
+        const banner = document.getElementById("statusStrip");
+        if ((text || "").length > MAX_INPUT_CHARS) {
+            banner.dataset.limitAlert = "1";
+            banner.textContent = `Input limit is ${MAX_INPUT_CHARS} characters (${text.length} entered). Send in smaller parts.`;
+            banner.classList.add("show");
+            return false;
+        }
+        if (banner.dataset.limitAlert) {
+            delete banner.dataset.limitAlert;
+            updateLimitWarningBanner();
+        }
+        return true;
     }
 
     function getUserName() {
@@ -2590,24 +2690,13 @@ async def index():
         document.getElementById(id).classList.remove("show");
     }
 
-    function quickGoogleSignIn() {
-        const typedName = document.getElementById("googleNameInput").value.trim();
-        localStorage.setItem("pyrox_user_name", typedName || "Harshit");
-        localStorage.setItem("pyrox_signed_up", "1");
-        syncHeaderSignUpVisibility();
-        refreshGreeting();
-        closeModal("googleModal");
-    }
-
     function saveAccountForm() {
         const name = document.getElementById("googleNameInput").value.trim();
         const email = document.getElementById("googleEmailInput").value.trim();
         if (name) localStorage.setItem("pyrox_user_name", name);
         if (email) localStorage.setItem("pyrox_user_email", email);
         localStorage.setItem("pyrox_signed_up", "1");
-        syncHeaderSignUpVisibility();
-        refreshGreeting();
-        closeModal("googleModal");
+        transitionToDarkStudio();
     }
 
     function saveThemeName() {
@@ -2633,7 +2722,7 @@ async def index():
     }
 
     function saveFolders(folders) {
-        localStorage.setItem("pyrox_folders", JSON.stringify(folders.slice(0, 25)));
+        localStorage.setItem("pyrox_folders", JSON.stringify(folders.slice(0, 30)));
     }
 
     function ensureFolderForPrompt(promptText) {
@@ -2667,7 +2756,14 @@ async def index():
         const box = document.getElementById("libraryFolders");
         const folders = loadFolders();
         box.innerHTML = "";
-        folders.slice(0, 8).forEach((f) => {
+        if (!folders.length) {
+            const empty = document.createElement("div");
+            empty.className = "folder-chip";
+            empty.textContent = "No chats yet";
+            box.appendChild(empty);
+            return;
+        }
+        folders.slice(0, 12).forEach((f) => {
             const chip = document.createElement("div");
             chip.className = "folder-chip";
             chip.textContent = f.title;
@@ -2677,10 +2773,6 @@ async def index():
             };
             box.appendChild(chip);
         });
-    }
-
-    function toggleLibraryFolders() {
-        document.getElementById("libraryFolders").classList.toggle("show");
     }
 
     function openFolderInStage(folderId) {
@@ -2737,10 +2829,8 @@ async def index():
     function newChat() {
         stopGeneration();
         clearImageModeBar();
+        clearPendingAttachment();
         activeFolderId = null;
-        pendingAttachmentDataUrl = null;
-        pendingFileDataUrl = null;
-        pendingAttachmentName = "";
         const stage = document.getElementById("scrollStage");
         stage.innerHTML = `
             <div class="greeting-center" id="greetingBox">
@@ -2811,9 +2901,8 @@ async def index():
                 pendingFileDataUrl = reader.result;
                 pendingAttachmentDataUrl = null;
             }
-            const input = document.getElementById("promptInput");
-            input.value = `${input.value ? input.value + " " : ""}[Attached: ${file.name}]`;
-            input.focus();
+            showPendingAttachmentChip(file.name);
+            document.getElementById("promptInput").focus();
         };
         reader.readAsDataURL(file);
         e.target.value = "";
@@ -2886,63 +2975,9 @@ async def index():
         pendingAttachmentDataUrl = canvas.toDataURL("image/png");
         pendingFileDataUrl = null;
         pendingAttachmentName = "camera_photo.png";
-        const input = document.getElementById("promptInput");
-        input.value = `${input.value ? input.value + " " : ""}[Photo captured]`;
+        showPendingAttachmentChip("camera_photo.png");
         closeCamera();
-        input.focus();
-    }
-
-    async function startVoiceMeter() {
-        const meter = document.getElementById("freqMeter");
-        const inputEl = document.getElementById("promptInput");
-        const bars = meter.querySelectorAll(".freq-bar");
-        inputEl.classList.add("hidden-while-speaking");
-        meter.classList.add("visible");
-
-        try {
-            micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-            const AudioCtx = window.AudioContext || window.webkitAudioContext;
-            audioCtx = new AudioCtx();
-            const src = audioCtx.createMediaStreamSource(micStream);
-            analyser = audioCtx.createAnalyser();
-            analyser.fftSize = 64;
-            src.connect(analyser);
-
-            const arr = new Uint8Array(analyser.frequencyBinCount);
-            const step = () => {
-                if (!isDictating || !analyser) return;
-                analyser.getByteFrequencyData(arr);
-                for (let i = 0; i < bars.length; i++) {
-                    const v = arr[i] || 0;
-                    const h = v > 28 ? Math.max(4, Math.min(32, Math.round((v / 255) * 32))) : 3;
-                    bars[i].style.height = `${h}px`;
-                }
-                freqAnimId = requestAnimationFrame(step);
-            };
-            freqAnimId = requestAnimationFrame(step);
-            return micStream;
-        } catch (_) {
-            bars.forEach((b) => (b.style.height = "3px"));
-            return null;
-        }
-    }
-
-    function stopVoiceMeter() {
-        if (freqAnimId) cancelAnimationFrame(freqAnimId);
-        freqAnimId = null;
-        if (micStream) {
-            micStream.getTracks().forEach((t) => t.stop());
-            micStream = null;
-        }
-        if (audioCtx) {
-            audioCtx.close().catch(() => {});
-            audioCtx = null;
-        }
-        const meter = document.getElementById("freqMeter");
-        const inputEl = document.getElementById("promptInput");
-        meter.classList.remove("visible");
-        inputEl.classList.remove("hidden-while-speaking");
-        meter.querySelectorAll(".freq-bar").forEach((b) => (b.style.height = "3px"));
+        document.getElementById("promptInput").focus();
     }
 
     function setMicButtonAsStopSquare(recording) {
@@ -2952,7 +2987,7 @@ async def index():
         micBtn.title = recording ? "Stop dictation" : "Voice input";
     }
 
-    async function toggleDictation(e) {
+    function toggleDictation(e) {
         if (e) e.stopPropagation();
         if (isDictating) {
             stopDictationManual(false);
@@ -2960,72 +2995,52 @@ async def index():
         }
 
         const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-        const baseText = document.getElementById("promptInput").value;
+        const inputEl = document.getElementById("promptInput");
+        if (!SR || !inputEl) return;
 
-        if (SR) {
-            recognition = new SR();
-            recognition.lang = "en-IN";
-            recognition.continuous = true;
-            recognition.interimResults = true;
-            let finalText = "";
+        const baseText = inputEl.value.trim();
+        let finalCommitted = "";
 
-            recognition.onstart = async () => {
-                isDictating = true;
-                setMicButtonAsStopSquare(true);
-                await startVoiceMeter();
-            };
+        recognition = new SR();
+        recognition.lang = "en-IN";
+        recognition.continuous = false;
+        recognition.interimResults = true;
 
-            recognition.onresult = (event) => {
-                if (!isDictating) return;
-                let interim = "";
-                for (let i = event.resultIndex; i < event.results.length; i++) {
-                    const seg = event.results[i][0].transcript;
-                    if (event.results[i].isFinal) {
-                        finalText += seg + " ";
-                    } else {
-                        interim += seg;
-                    }
+        recognition.onstart = () => {
+            isDictating = true;
+            setMicButtonAsStopSquare(true);
+        };
+
+        recognition.onresult = (event) => {
+            if (!isDictating) return;
+            let interim = "";
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                const seg = event.results[i][0].transcript || "";
+                if (event.results[i].isFinal) {
+                    finalCommitted += (finalCommitted ? " " : "") + seg.trim();
+                } else {
+                    interim += seg;
                 }
-                const inp = document.getElementById("promptInput");
-                if (inp) {
-                    inp.value = `${baseText}${baseText ? " " : ""}${finalText}${interim}`.trim();
-                }
-            };
+            }
+            const merged = [baseText, finalCommitted, interim.trim()].filter(Boolean).join(" ").trim();
+            inputEl.value = merged;
+            checkInputCharLimit(merged);
+        };
 
-            recognition.onerror = () => {
-                stopDictationManual(false);
-            };
+        recognition.onerror = () => {
+            stopDictationManual(false);
+        };
 
-            recognition.onend = () => {
-                isDictating = false;
-                setMicButtonAsStopSquare(false);
-                stopVoiceMeter();
-            };
+        recognition.onend = () => {
+            isDictating = false;
+            setMicButtonAsStopSquare(false);
+            recognition = null;
+        };
 
-            try {
-                recognition.start();
-                return;
-            } catch (_) {}
-        }
-
-        isDictating = true;
-        setMicButtonAsStopSquare(true);
-        const stream = await startVoiceMeter();
-        if (stream && typeof MediaRecorder !== "undefined") {
-            audioChunks = [];
-            try {
-                mediaRecorder = new MediaRecorder(stream);
-                mediaRecorder.ondataavailable = (ev) => {
-                    if (ev.data && ev.data.size > 0) audioChunks.push(ev.data);
-                };
-                mediaRecorder.onstop = () => {
-                    const inp = document.getElementById("promptInput");
-                    if (inp && !inp.value.trim()) {
-                        inp.placeholder = "Voice captured — type or tap send";
-                    }
-                };
-                mediaRecorder.start();
-            } catch (_) {}
+        try {
+            recognition.start();
+        } catch (_) {
+            stopDictationManual(false);
         }
     }
 
@@ -3038,17 +3053,12 @@ async def index():
             recognition.onerror = null;
             try {
                 recognition.stop();
+            } catch (_) {}
+            try {
                 recognition.abort();
             } catch (_) {}
             recognition = null;
         }
-        if (mediaRecorder && mediaRecorder.state !== "inactive") {
-            try {
-                mediaRecorder.stop();
-            } catch (_) {}
-        }
-        mediaRecorder = null;
-        stopVoiceMeter();
         if (clearInputText) {
             const inp = document.getElementById("promptInput");
             if (inp) inp.value = "";
@@ -3088,7 +3098,7 @@ async def index():
         return container.innerHTML;
     }
 
-    function appendUserMessage(text, imgUrl) {
+    function appendUserMessage(text, imgUrl, fileLabel) {
         markChatStarted();
         const stage = document.getElementById("scrollStage");
         const row = document.createElement("div");
@@ -3100,6 +3110,14 @@ async def index():
             img.style.borderRadius = "10px";
             img.style.marginBottom = "6px";
             row.appendChild(img);
+        }
+        if (fileLabel && !imgUrl) {
+            const fBadge = document.createElement("div");
+            fBadge.style.fontSize = "0.86rem";
+            fBadge.style.color = "var(--text-secondary)";
+            fBadge.style.marginBottom = "4px";
+            fBadge.textContent = `File: ${fileLabel}`;
+            row.appendChild(fBadge);
         }
         const span = document.createElement("div");
         span.textContent = text;
@@ -3358,6 +3376,11 @@ async def index():
 
         const input = document.getElementById("promptInput");
         const raw = overrideText !== null ? String(overrideText).trim() : input.value.trim();
+
+        if (!checkInputCharLimit(raw)) {
+            return;
+        }
+
         if (!raw && !pendingAttachmentDataUrl && !pendingFileDataUrl) return;
 
         const messageToSend = raw || `Please check ${pendingAttachmentName || "this attachment"}`;
@@ -3375,9 +3398,7 @@ async def index():
         const fileToSend = pendingFileDataUrl;
         const fileNameToSend = pendingAttachmentName;
 
-        pendingAttachmentDataUrl = null;
-        pendingFileDataUrl = null;
-        pendingAttachmentName = "";
+        clearPendingAttachment();
 
         if (overrideText === null) {
             input.value = "";
@@ -3385,7 +3406,7 @@ async def index():
         }
 
         ensureFolderForPrompt(messageToSend);
-        appendUserMessage(messageToSend, attachmentToSend);
+        appendUserMessage(messageToSend, attachmentToSend, fileNameToSend);
         appendItemToActiveFolder("user", messageToSend);
         recordQuestionUsage(isHeavy);
 
@@ -3485,9 +3506,8 @@ async def index():
         }
     }
 
-    syncSystemTheme();
     syncHeaderSignUpVisibility();
-    runSplashAndSignUpFlow();
+    runSplashAndWelcomeFlow();
     refreshGreeting();
     refreshThemeLabel();
     renderLibraryFolders();
