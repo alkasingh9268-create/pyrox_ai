@@ -2,7 +2,6 @@ import asyncio
 import base64
 import datetime
 import io
-import json
 import os
 import re
 from typing import Optional
@@ -565,15 +564,9 @@ async def index():
         }
 
         @keyframes pyroxFogDrift {
-            0% {
-                transform: translate3d(-2%, -2%, 0) scale(1);
-            }
-            50% {
-                transform: translate3d(2.5%, 1.5%, 0) scale(1.04);
-            }
-            100% {
-                transform: translate3d(-1.5%, 2.5%, 0) scale(1.02);
-            }
+            0% { transform: translate3d(-2%, -2%, 0) scale(1); }
+            50% { transform: translate3d(2.5%, 1.5%, 0) scale(1.04); }
+            100% { transform: translate3d(-1.5%, 2.5%, 0) scale(1.02); }
         }
 
         .splash-overlay {
@@ -631,29 +624,13 @@ async def index():
             100% { opacity: 1; transform: translateX(0) skewX(0deg); }
         }
 
-        .pyrox-welcome-screen {
-            position: fixed;
-            inset: 0;
-            background-color: #ffffff;
-            color: #09090b;
-            z-index: 540;
-            display: none;
-            flex-direction: column;
-            justify-content: space-between;
-            padding: 20px 22px 26px 22px;
-            overflow-y: auto;
-        }
-
-        .pyrox-welcome-screen.show {
-            display: flex;
-        }
-
+        .pyrox-welcome-screen,
         .onboarding-signup-screen {
             position: fixed;
             inset: 0;
             background-color: #ffffff;
             color: #09090b;
-            z-index: 520;
+            z-index: 530;
             display: none;
             flex-direction: column;
             justify-content: space-between;
@@ -661,6 +638,7 @@ async def index():
             overflow-y: auto;
         }
 
+        .pyrox-welcome-screen.show,
         .onboarding-signup-screen.show {
             display: flex;
         }
@@ -718,10 +696,6 @@ async def index():
             font-size: 1.02rem;
             font-weight: 600;
             outline: none;
-        }
-
-        .white-input:focus {
-            border-color: #2563eb;
         }
 
         .white-primary-btn {
@@ -789,7 +763,7 @@ async def index():
         .sidebar.open {
             width: 76vw;
             min-width: 248px;
-            max-width: 340px;
+            max-width: 330px;
             border-right-color: var(--border-subtle);
             padding: 16px 12px;
         }
@@ -797,7 +771,7 @@ async def index():
         .sidebar-top {
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 8px;
         }
 
         .sidebar-title {
@@ -820,9 +794,9 @@ async def index():
         }
 
         .nav-item {
-            padding: 12px 12px;
-            border-radius: 11px;
-            font-size: 1.04rem;
+            padding: 11px 12px;
+            border-radius: 10px;
+            font-size: 1.02rem;
             font-weight: 650;
             color: var(--text-primary);
             cursor: pointer;
@@ -833,31 +807,10 @@ async def index():
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            transition: background-color 0.15s ease, transform 0.1s ease;
         }
 
         .nav-item:hover {
             background-color: var(--bg-elevated);
-        }
-
-        .nav-item:active {
-            transform: scale(0.97);
-        }
-
-        .all-history-section {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-            padding-top: 4px;
-        }
-
-        .all-section-label {
-            font-size: 0.84rem;
-            font-weight: 800;
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
-            color: var(--text-muted);
-            padding: 2px 10px;
         }
 
         .quota-pill {
@@ -873,7 +826,7 @@ async def index():
         .model-sublist {
             display: none;
             flex-direction: column;
-            gap: 5px;
+            gap: 4px;
             margin-left: 8px;
             padding-left: 8px;
             border-left: 1px solid var(--border-subtle);
@@ -884,9 +837,9 @@ async def index():
         }
 
         .model-option {
-            padding: 10px 10px;
+            padding: 9px 10px;
             border-radius: 8px;
-            font-size: 0.96rem;
+            font-size: 0.95rem;
             font-weight: 600;
             color: var(--text-secondary);
             cursor: pointer;
@@ -900,31 +853,33 @@ async def index():
             color: var(--text-primary);
         }
 
-        .library-folders {
+        .all-history-block {
             display: flex;
             flex-direction: column;
-            gap: 6px;
+            gap: 2px;
             margin-top: 2px;
-            padding-left: 4px;
-            max-height: 220px;
+            padding: 4px 12px 8px 12px;
+            max-height: 210px;
             overflow-y: auto;
         }
 
-        .folder-chip {
-            padding: 9px 10px;
-            font-size: 0.92rem;
-            font-weight: 600;
+        .plain-history-line {
+            padding: 7px 2px;
+            font-size: 0.94rem;
+            font-weight: 500;
             color: var(--text-secondary);
-            background-color: var(--bg-elevated);
-            border: 1px solid var(--border-subtle);
-            border-radius: 8px;
             cursor: pointer;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.12);
         }
 
-        .folder-chip:hover {
+        .plain-history-line:last-child {
+            border-bottom: none;
+        }
+
+        .plain-history-line:hover {
             color: var(--text-primary);
         }
 
@@ -991,19 +946,10 @@ async def index():
             justify-content: center;
             cursor: pointer;
             flex-shrink: 0;
-            transition: transform 0.12s ease, background-color 0.15s ease;
         }
 
         .menu-toggle-btn.hidden-burger {
             display: none;
-        }
-
-        .menu-toggle-btn:active,
-        .icon-action-btn:active,
-        .send-btn:active,
-        .stop-btn:active,
-        .action-btn:active {
-            transform: scale(0.95);
         }
 
         .brand-heading {
@@ -1024,19 +970,19 @@ async def index():
             flex-shrink: 0;
         }
 
-        .header-signup-btn {
+        .header-gmail-btn {
             background-color: var(--bg-elevated);
             color: var(--text-primary);
             border: 1px solid var(--border-subtle);
             border-radius: 10px;
-            padding: 7px 11px;
-            font-size: 0.84rem;
+            padding: 7px 10px;
+            font-size: 0.82rem;
             font-weight: 700;
             cursor: pointer;
-        }
-
-        .header-signup-btn.logged-in-hide {
-            display: none;
+            max-width: 110px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .upgrade-btn {
@@ -1179,7 +1125,6 @@ async def index():
             font-weight: 750;
             color: var(--text-primary);
             line-height: 1.44;
-            letter-spacing: 0.1px;
         }
 
         .starter-chips-row {
@@ -1201,11 +1146,6 @@ async def index():
             cursor: pointer;
         }
 
-        .starter-chip:hover {
-            background-color: var(--bg-elevated);
-            border-color: var(--border-user);
-        }
-
         .msg-row {
             display: flex;
             flex-direction: column;
@@ -1223,7 +1163,6 @@ async def index():
             font-size: 1.12rem;
             font-weight: 550;
             line-height: 1.62;
-            letter-spacing: 0.15px;
             word-break: break-word;
         }
 
@@ -1235,8 +1174,6 @@ async def index():
             font-size: 1.14rem;
             font-weight: 500;
             line-height: 1.75;
-            letter-spacing: 0.15px;
-            word-spacing: 1px;
             padding: 4px 2px;
         }
 
@@ -1272,19 +1209,6 @@ async def index():
             font-size: 0.96rem;
         }
 
-        .msg-ai code {
-            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-        }
-
-        .msg-ai ul, .msg-ai ol {
-            padding-left: 22px;
-            margin: 8px 0 12px 0;
-        }
-
-        .msg-ai li {
-            margin-bottom: 6px;
-        }
-
         .msg-ai img {
             max-width: 100%;
             max-height: 380px;
@@ -1311,12 +1235,6 @@ async def index():
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            transition: transform 0.14s ease, color 0.18s ease;
-        }
-
-        .icon-symbol-btn:hover {
-            color: var(--text-primary);
-            transform: scale(1.06);
         }
 
         .icon-symbol-btn.liquid-filled {
@@ -1325,15 +1243,6 @@ async def index():
 
         .icon-symbol-btn.liquid-filled svg path {
             fill: rgba(255, 255, 255, 0.92);
-            transition: fill 0.28s ease;
-        }
-
-        body.light-mode .icon-symbol-btn.liquid-filled {
-            color: #09090b;
-        }
-
-        body.light-mode .icon-symbol-btn.liquid-filled svg path {
-            fill: rgba(9, 9, 11, 0.88);
         }
 
         .thinking-dots {
@@ -1448,10 +1357,6 @@ async def index():
             text-align: left;
         }
 
-        .plus-big-btn:hover {
-            background-color: var(--bg-main);
-        }
-
         .plus-small-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -1500,7 +1405,6 @@ async def index():
             flex-shrink: 0;
             font-size: 1.25rem;
             font-weight: 700;
-            transition: transform 0.18s ease, border-color 0.18s ease;
         }
 
         .icon-action-btn.open-minus {
@@ -1534,10 +1438,6 @@ async def index():
             resize: none;
             padding: 9px 4px;
             line-height: 1.42;
-        }
-
-        .prompt-input::placeholder {
-            color: var(--text-muted);
         }
 
         .send-btn, .stop-btn {
@@ -1772,6 +1672,13 @@ async def index():
             object-fit: cover;
         }
 
+        .cam-status-msg {
+            color: #e2e8f0;
+            font-size: 0.94rem;
+            padding: 14px;
+            text-align: center;
+        }
+
         .cam-bar {
             display: flex;
             align-items: center;
@@ -1956,11 +1863,6 @@ async def index():
 
             <div class="nav-item" onclick="newChat(); closeSidebar();">+ New Chat</div>
 
-            <div class="all-history-section">
-                <div class="all-section-label">All</div>
-                <div class="library-folders" id="libraryFolders"></div>
-            </div>
-
             <div class="nav-item" onclick="activateImageModeBar(); closeSidebar();">
                 <span>Images</span>
                 <span class="quota-pill" id="sidebarImgQuota">2/2</span>
@@ -1982,6 +1884,9 @@ async def index():
                     <span>Upgrade</span>
                 </div>
             </div>
+
+            <div class="nav-item" onclick="toggleAllHistorySection()">All ▾</div>
+            <div class="all-history-block" id="libraryFolders"></div>
         </div>
 
         <div class="sidebar-footer">
@@ -2006,8 +1911,8 @@ async def index():
             </div>
 
             <div class="top-right" onclick="event.stopPropagation()">
-                <button type="button" class="header-signup-btn" id="headerSignUpBtn" onclick="openModal('googleModal')">
-                    Sign Up
+                <button type="button" class="header-gmail-btn" id="headerGmailBtn" onclick="openModal('googleModal')">
+                    Gmail
                 </button>
                 <button type="button" class="upgrade-btn shine-active" id="upgradeBtn" onclick="openModal('upgradeModal')">
                     Upgrade
@@ -2023,7 +1928,7 @@ async def index():
                 <div class="dots-menu" id="dotsMenu">
                     <div class="dots-item" onclick="newChat(); closeDotsMenu();">Clear Chat</div>
                     <div class="dots-item" onclick="exportChat(); closeDotsMenu();">Export Chat</div>
-                    <div class="dots-item" onclick="openModal('libraryModal'); closeDotsMenu();">Library</div>
+                    <div class="dots-item" onclick="openModal('libraryModal'); closeDotsMenu();">All Chats</div>
                     <div class="dots-item" onclick="openModal('settingsModal'); closeDotsMenu();">Settings</div>
                 </div>
             </div>
@@ -2139,13 +2044,17 @@ async def index():
 <div class="overlay-modal" id="googleModal" onclick="closeModal('googleModal')">
     <div class="modal-box" onclick="event.stopPropagation()">
         <div class="modal-head">
-            <span>Sign up for Pyrox</span>
+            <span>Gmail with Pyrox</span>
             <button type="button" class="close-x" onclick="closeModal('googleModal')">✕</button>
+        </div>
+
+        <div id="connectedAccountCard" style="padding:10px 12px;border-radius:10px;background:var(--bg-elevated);border:1px solid var(--border-subtle);font-size:0.9rem;color:var(--text-secondary);">
+            Not connected yet
         </div>
 
         <button type="button" class="white-google-btn" style="background-color:var(--bg-elevated);color:var(--text-primary);border-color:var(--border-user);" onclick="openGoogleAccountChooser()">
             <span style="font-weight:900;">G</span>
-            <span>Continue with Google</span>
+            <span>Choose Google Account</span>
         </button>
 
         <div class="white-or">or</div>
@@ -2156,7 +2065,7 @@ async def index():
         <label class="field-label" for="googleNameInput">Name</label>
         <input type="text" class="field-input" id="googleNameInput" placeholder="Your name" />
 
-        <button type="button" class="action-btn" onclick="saveAccountForm()">Continue</button>
+        <button type="button" class="action-btn" onclick="saveAccountForm()">Save & Connect</button>
     </div>
 </div>
 
@@ -2182,18 +2091,18 @@ async def index():
         <input type="text" class="field-input" id="customThemeInput" placeholder="e.g. Pyrox, Studio Dark" />
         <button type="button" class="action-btn" onclick="saveThemeName()">Save Theme Name</button>
         <button type="button" class="action-btn" id="ttsToggleBtn" onclick="toggleTtsPreference()">Auto Voice Reply: Off</button>
-        <button type="button" class="action-btn" onclick="clearSavedFolders()">Clear Library Folders</button>
+        <button type="button" class="action-btn" onclick="clearSavedFolders()">Clear Chat History</button>
     </div>
 </div>
 
 <div class="overlay-modal" id="libraryModal" onclick="closeModal('libraryModal')">
     <div class="modal-box" onclick="event.stopPropagation()">
         <div class="modal-head">
-            <span>All Chats & Library</span>
+            <span>All Chats</span>
             <button type="button" class="close-x" onclick="closeModal('libraryModal')">Close</button>
         </div>
         <div id="libraryModalBody" style="display:flex;flex-direction:column;gap:8px;font-size:0.98rem;color:var(--text-secondary);">
-            No chat folders created yet.
+            No chats yet.
         </div>
     </div>
 </div>
@@ -2246,7 +2155,7 @@ async def index():
                     <td>✓</td>
                 </tr>
                 <tr>
-                    <td>All chats & saved folders</td>
+                    <td>All chats & saved history</td>
                     <td>✓</td>
                     <td>✓</td>
                 </tr>
@@ -2306,8 +2215,9 @@ async def index():
             <span>Camera</span>
             <button type="button" class="close-x" onclick="closeCamera()">Close</button>
         </div>
-        <div class="video-frame">
+        <div class="video-frame" id="cameraFrame">
             <video id="cameraVideo" autoplay playsinline muted></video>
+            <div class="cam-status-msg" id="camStatusMsg"></div>
             <canvas id="cameraCanvas" style="display:none;"></canvas>
         </div>
         <div class="cam-bar">
@@ -2357,10 +2267,23 @@ async def index():
         return Boolean(localStorage.getItem("pyrox_signed_up"));
     }
 
-    function syncHeaderSignUpVisibility() {
-        const btn = document.getElementById("headerSignUpBtn");
-        if (btn) {
-            btn.classList.toggle("logged-in-hide", isUserSignedUp());
+    function syncHeaderAccountUI() {
+        const gBtn = document.getElementById("headerGmailBtn");
+        const sideBtn = document.getElementById("googleAccountBtn");
+        const card = document.getElementById("connectedAccountCard");
+        const name = (localStorage.getItem("pyrox_user_name") || "").trim();
+        const email = (localStorage.getItem("pyrox_user_email") || "").trim();
+
+        if (gBtn) {
+            gBtn.textContent = name ? `Gmail: ${name.split(" ")[0]}` : "Gmail";
+        }
+        if (sideBtn) {
+            sideBtn.textContent = name ? `Gmail: ${name}` : "Gmail with Pyrox";
+        }
+        if (card) {
+            card.textContent = (name || email)
+                ? `Connected: ${name || "User"} (${email || "No email"})`
+                : "Not connected yet";
         }
     }
 
@@ -2381,7 +2304,7 @@ async def index():
         closeModal("googleChooserModal");
         setTimeout(() => {
             document.body.classList.remove("pre-login-white");
-            syncHeaderSignUpVisibility();
+            syncHeaderAccountUI();
             refreshGreeting();
             triggerInputSlideUp();
         }, 60);
@@ -2441,9 +2364,7 @@ async def index():
 
     function getMonthlyImageCount() {
         const data = JSON.parse(localStorage.getItem("pyrox_monthly_images") || "{}");
-        if (data.month !== getMonthKey()) {
-            return 0;
-        }
+        if (data.month !== getMonthKey()) return 0;
         return Number(data.count || 0);
     }
 
@@ -2513,9 +2434,7 @@ async def index():
 
     function getUsageToday() {
         const saved = JSON.parse(localStorage.getItem("pyrox_daily_usage") || "{}");
-        if (saved.date !== getTodayKey()) {
-            return { total: 0, heavy: 0 };
-        }
+        if (saved.date !== getTodayKey()) return { total: 0, heavy: 0 };
         return {
             total: Number(saved.total || 0),
             heavy: Number(saved.heavy || 0),
@@ -2609,8 +2528,6 @@ async def index():
                 ? `Swagatam ${name}! How can I assist you today?`
                 : "Swagatam! How can I assist you today?";
         }
-        const gBtn = document.getElementById("googleAccountBtn");
-        gBtn.textContent = name ? `Gmail: ${name}` : "Gmail with Pyrox";
     }
 
     function refreshThemeLabel() {
@@ -2676,6 +2593,11 @@ async def index():
         document.getElementById("modelSublist").classList.toggle("show");
     }
 
+    function toggleAllHistorySection() {
+        const block = document.getElementById("libraryFolders");
+        block.style.display = block.style.display === "none" ? "flex" : "none";
+    }
+
     function selectModelMode(mode) {
         selectedModelMode = mode;
         document.getElementById("optPyroxOnly").classList.toggle("active", mode === "Pyrox Only");
@@ -2683,6 +2605,7 @@ async def index():
 
     function openModal(id) {
         if (id === "libraryModal") renderLibraryModal();
+        if (id === "googleModal") syncHeaderAccountUI();
         document.getElementById(id).classList.add("show");
     }
 
@@ -2696,7 +2619,9 @@ async def index():
         if (name) localStorage.setItem("pyrox_user_name", name);
         if (email) localStorage.setItem("pyrox_user_email", email);
         localStorage.setItem("pyrox_signed_up", "1");
-        transitionToDarkStudio();
+        syncHeaderAccountUI();
+        refreshGreeting();
+        closeModal("googleModal");
     }
 
     function saveThemeName() {
@@ -2728,10 +2653,10 @@ async def index():
     function ensureFolderForPrompt(promptText) {
         const folders = loadFolders();
         if (!activeFolderId) {
-            const folderTitle = (promptText || "New Chat").slice(0, 28);
+            const cleanTitle = (promptText || "New Chat").replace(/\s+/g, " ").trim().slice(0, 34);
             const newFolder = {
                 id: "fld_" + Date.now(),
-                title: folderTitle,
+                title: cleanTitle || "New Chat",
                 items: [],
             };
             folders.unshift(newFolder);
@@ -2758,20 +2683,20 @@ async def index():
         box.innerHTML = "";
         if (!folders.length) {
             const empty = document.createElement("div");
-            empty.className = "folder-chip";
-            empty.textContent = "No chats yet";
+            empty.className = "plain-history-line";
+            empty.textContent = "No recent chats";
             box.appendChild(empty);
             return;
         }
-        folders.slice(0, 12).forEach((f) => {
-            const chip = document.createElement("div");
-            chip.className = "folder-chip";
-            chip.textContent = f.title;
-            chip.onclick = () => {
+        folders.slice(0, 14).forEach((f) => {
+            const line = document.createElement("div");
+            line.className = "plain-history-line";
+            line.textContent = f.title;
+            line.onclick = () => {
                 openFolderInStage(f.id);
                 closeSidebar();
             };
-            box.appendChild(chip);
+            box.appendChild(line);
         });
     }
 
@@ -2801,21 +2726,19 @@ async def index():
         const body = document.getElementById("libraryModalBody");
         const folders = loadFolders();
         if (!folders.length) {
-            body.textContent = "No chat folders created yet.";
+            body.textContent = "No chats yet.";
             return;
         }
         body.innerHTML = "";
         folders.forEach((f) => {
-            const btn = document.createElement("button");
-            btn.type = "button";
-            btn.className = "action-btn";
-            btn.style.textAlign = "left";
-            btn.textContent = `${f.title} (${f.items.length} messages)`;
-            btn.onclick = () => {
-                openFolderInStage(f.id);
+            const line = document.createElement("div");
+            line.className = "plain-history-line";
+            line.textContent = `${f.title} (${f.items.length})`;
+            line.onclick = () => {
                 closeModal("libraryModal");
+                openFolderInStage(f.id);
             };
-            body.appendChild(btn);
+            body.appendChild(line);
         });
     }
 
@@ -2923,15 +2846,30 @@ async def index():
 
     async function startCameraStream() {
         stopCameraStream();
-        try {
-            cameraStream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: currentFacingMode },
-                audio: false,
-            });
-            document.getElementById("cameraVideo").srcObject = cameraStream;
-        } catch (_) {
-            alert("Camera access unavailable or denied.");
+        const video = document.getElementById("cameraVideo");
+        const statusEl = document.getElementById("camStatusMsg");
+        statusEl.textContent = "Starting camera...";
+
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            statusEl.textContent = "Camera API not supported in this browser/context (requires HTTPS or localhost).";
+            return;
         }
+
+        const attempts = [
+            { video: { facingMode: { ideal: currentFacingMode } }, audio: false },
+            { video: true, audio: false },
+        ];
+
+        for (const constraints of attempts) {
+            try {
+                cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = cameraStream;
+                statusEl.textContent = "";
+                return;
+            } catch (_) {}
+        }
+
+        statusEl.textContent = "Camera permission blocked or no camera device found.";
     }
 
     function stopCameraStream() {
@@ -2939,6 +2877,8 @@ async def index():
             cameraStream.getTracks().forEach((t) => t.stop());
             cameraStream = null;
         }
+        const video = document.getElementById("cameraVideo");
+        if (video) video.srcObject = null;
     }
 
     function closeCamera() {
@@ -2956,7 +2896,7 @@ async def index():
         document.getElementById("flashToggleBtn").textContent = `Flash: ${flashEnabled ? "On" : "Off"}`;
         if (cameraStream) {
             const track = cameraStream.getVideoTracks()[0];
-            const caps = track.getCapabilities ? track.getCapabilities() : {};
+            const caps = track && track.getCapabilities ? track.getCapabilities() : {};
             if (caps.torch) {
                 try {
                     await track.applyConstraints({ advanced: [{ torch: flashEnabled }] });
@@ -2968,7 +2908,10 @@ async def index():
     function captureCameraPhoto() {
         const video = document.getElementById("cameraVideo");
         const canvas = document.getElementById("cameraCanvas");
-        if (!video.videoWidth) return;
+        if (!video.videoWidth || !video.videoHeight) {
+            document.getElementById("camStatusMsg").textContent = "Camera frame not ready yet. Wait a second or check permission.";
+            return;
+        }
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         canvas.getContext("2d").drawImage(video, 0, 0);
@@ -3051,12 +2994,8 @@ async def index():
             recognition.onresult = null;
             recognition.onend = null;
             recognition.onerror = null;
-            try {
-                recognition.stop();
-            } catch (_) {}
-            try {
-                recognition.abort();
-            } catch (_) {}
+            try { recognition.stop(); } catch (_) {}
+            try { recognition.abort(); } catch (_) {}
             recognition = null;
         }
         if (clearInputText) {
@@ -3319,9 +3258,7 @@ async def index():
 
     function playAudioFromUrl(url) {
         if (!ttsEnabled || !url) return;
-        if (latestAudioPlayer) {
-            latestAudioPlayer.pause();
-        }
+        if (latestAudioPlayer) latestAudioPlayer.pause();
         latestAudioPlayer = new Audio(url);
         latestAudioPlayer.play().catch(() => {});
     }
@@ -3366,21 +3303,13 @@ async def index():
     }
 
     async function sendMessage(overrideText = null, isRegenerate = false) {
-        if (isRequestInFlight) {
-            return;
-        }
-
-        if (isDictating) {
-            stopDictationManual(false);
-        }
+        if (isRequestInFlight) return;
+        if (isDictating) stopDictationManual(false);
 
         const input = document.getElementById("promptInput");
         const raw = overrideText !== null ? String(overrideText).trim() : input.value.trim();
 
-        if (!checkInputCharLimit(raw)) {
-            return;
-        }
-
+        if (!checkInputCharLimit(raw)) return;
         if (!raw && !pendingAttachmentDataUrl && !pendingFileDataUrl) return;
 
         const messageToSend = raw || `Please check ${pendingAttachmentName || "this attachment"}`;
@@ -3426,9 +3355,7 @@ async def index():
                 messageToSend
             );
 
-        if (searchLikely) {
-            setSearchingBanner(true);
-        }
+        if (searchLikely) setSearchingBanner(true);
 
         try {
             if (imgIntent.isImage || wasImageMode) {
@@ -3486,17 +3413,11 @@ async def index():
                     bodyDiv.innerHTML = renderRichMarkdown(reply);
                     row.appendChild(buildResponseActionsBar(reply, messageToSend));
                     appendItemToActiveFolder("ai", reply);
-                    if (data.audio_url) {
-                        playAudioFromUrl(data.audio_url);
-                    }
+                    if (data.audio_url) playAudioFromUrl(data.audio_url);
                 }
             }
         } catch (err) {
-            if (err.name === "AbortError") {
-                bodyDiv.textContent = "Stopped.";
-            } else {
-                bodyDiv.textContent = "Connection error.";
-            }
+            bodyDiv.textContent = err.name === "AbortError" ? "Stopped." : "Connection error.";
         } finally {
             activeAbortController = null;
             setSearchingBanner(false);
@@ -3506,7 +3427,7 @@ async def index():
         }
     }
 
-    syncHeaderSignUpVisibility();
+    syncHeaderAccountUI();
     runSplashAndWelcomeFlow();
     refreshGreeting();
     refreshThemeLabel();
