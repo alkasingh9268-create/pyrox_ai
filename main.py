@@ -29,6 +29,7 @@ FAL_KEY = (
 
 MAX_CHAT_CHARS = 8000
 CACHED_GROQ_MODEL: Optional[str] = None
+VISION_GROQ_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 
 FAL_MODELS = {
     "flux1": "https://fal.run/fal-ai/flux/schnell",
@@ -101,9 +102,11 @@ def resolve_groq_model() -> str:
             filtered = [
                 m_id
                 for m_id in ids
-                if "guard" not in m_id.lower() and "whisper" not in m_id.lower()
+                if "guard" not in m_id.lower()
+                and "whisper" not in m_id.lower()
+                and "tts" not in m_id.lower()
             ]
-            for pref in ["llama-3.3-70b-versatile", "llama", "qwen", "gemma"]:
+            for pref in ["llama-3.3-70b-versatile", "llama-4", "llama", "qwen", "gemma"]:
                 for m_id in filtered:
                     if pref in m_id.lower():
                         CACHED_GROQ_MODEL = m_id
@@ -119,33 +122,43 @@ def resolve_groq_model() -> str:
 
 
 def should_search_web(message: str) -> bool:
-    q = message.lower()
+    q = (message or "").lower()
     triggers = [
         "aaj",
         "kal",
+        "parso",
         "today",
         "tomorrow",
+        "yesterday",
         "news",
         "latest",
         "festival",
         "tyohar",
+        "diwali",
+        "holi",
+        "eid",
+        "christmas",
         "holiday",
         "weather",
+        "mausam",
         "price",
         "score",
         "2026",
         "2027",
         "current",
         "kab hai",
+        "kya hai",
         "kya chal raha",
         "trend",
         "update",
+        "live",
     ]
     return any(t in q for t in triggers)
 
 
 def search_live_context(query: str) -> str:
-    today_str = datetime.datetime.now().strftime("%A, %d %B %Y")
+    now_ist = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=5, minutes=30)))
+    today_str = now_ist.strftime("%A, %d %B %Y, %I:%M %p IST")
     base_info = f"Current Date & Time: {today_str} (India)."
     if not SERP_API_KEY:
         return base_info
@@ -156,12 +169,12 @@ def search_live_context(query: str) -> str:
             f"https://serpapi.com/search.json?q={encoded}"
             f"&api_key={SERP_API_KEY}&hl=en&gl=in"
         )
-        res = requests.get(url, timeout=7)
+        res = requests.get(url, timeout=8)
         if res.status_code == 200:
             data = res.json()
             snippets = [
                 item.get("snippet", "")
-                for item in data.get("organic_results", [])[:4]
+                for item in data.get("organic_results", [])[:5]
                 if item.get("snippet")
             ]
             if snippets:
@@ -289,6 +302,26 @@ def call_fal_endpoint(endpoint_url: str, payload: dict) -> dict:
     return {"ok": False, "error": "No image returned from fal.ai"}
 
 
+def generate_pollinations_image(prompt: str, image_size: str = "square_hd") -> dict:
+    width, height = 1024, 1024
+    if image_size == "landscape_4_3":
+        width, height = 1152, 896
+    elif image_size == "portrait_4_3":
+        width, height = 896, 1152
+    encoded = requests.utils.quote(prompt)
+    url = f"https://image.pollinations.ai/prompt/{encoded}?width={width}&height={height}&nologo=true"
+    try:
+        res = requests.get(url, timeout=45)
+        if res.status_code == 200 and res.content:
+            content_type = res.headers.get("content-type", "image/jpeg")
+            if "image" in content_type:
+                b64 = base64.b64encode(res.content).decode("utf-8")
+                return {"ok": True, "image_data": f"data:{content_type};base64,{b64}"}
+        return {"ok": True, "url": url}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)[:200]}
+
+
 @app.post("/api/chat")
 async def chat_endpoint(req: ChatRequest):
     if not GROQ_API_KEY:
@@ -314,7 +347,8 @@ async def chat_endpoint(req: ChatRequest):
         )
 
     try:
-        model_id = resolve_groq_model()
+        has_image = bool(req.image_data_url and req.image_data_url.startswith("data:image/"))
+        model_id = VISION_GROQ_MODEL if has_image else resolve_groq_model()
         used_search = should_search_web(user_msg)
         context_block = (
             search_live_context(user_msg)
@@ -322,9 +356,9 @@ async def chat_endpoint(req: ChatRequest):
             else f"Current Date: {datetime.datetime.now().strftime('%A, %d %B %Y')} (India)."
         )
 
-        short_mode = is_short_greeting(user_msg) and not req.image_data_url and not doc_text
+        short_mode = is_short_greeting(user_msg) and not has_image and not doc_text
         user_label = req.user_name.strip() if req.user_name and req.user_name.strip() else ""
-        identity_line = f"User name: {user_label}." if user_label else ""
+        identity_line = f"User profile name: {user_label}." if user_label else ""
         lang_mode = detect_language_style(user_msg)
         regen_rule = (
             " Provide a fresh, sharper explanation or angle without repeating identical wording."
@@ -335,8 +369,13 @@ async def chat_endpoint(req: ChatRequest):
         core_persona = (
             "You are Pyrox, an authoritative, sharp, high-precision AI assistant engineered to match "
             "top frontier assistants in clarity, accuracy, structured reasoning, and practical depth. "
-            "Never guess or invent facts when uncertain; state clearly what is verified vs unknown. "
-            "Format responses cleanly with bold key terms, concise paragraphs, and structured lists or code blocks where helpful."
+            "When asked who created or built you, state clearly that you are Pyrox AI, built by Pyrox Studio "
+            "(an independent AI builder project) — never claim to be built by Alibaba or any unrelated company, "
+            "and do not force the user's personal name as your creator unless asked. "
+            "Never output SVG markup or Python matplotlib scripts when asked to generate an image; image generation "
+            "uses the dedicated image pipeline. Never guess or invent facts when uncertain; state clearly what is "
+            "verified vs unknown. Format responses cleanly with bold key terms, concise paragraphs, and structured "
+            "lists or code blocks where helpful."
         )
 
         if short_mode:
@@ -350,23 +389,29 @@ async def chat_endpoint(req: ChatRequest):
                 f"Style: {lang_mode}. Give direct, high-signal answers first, followed by clear breakdown.{regen_rule}"
             )
 
-        parts = []
+        text_parts = []
         if user_msg:
-            parts.append(user_msg)
+            text_parts.append(user_msg)
         if doc_text:
-            parts.append(f"[Attached Document: {req.file_name or 'file'}]\n{doc_text}")
-        if req.image_data_url:
-            parts.append(
-                f"[Attached Image: {req.file_name or 'photo.png'} received. Analyze context and assist the user clearly.]"
-            )
+            text_parts.append(f"[Attached Document: {req.file_name or 'file'}]\n{doc_text}")
+        if has_image and not user_msg:
+            text_parts.append("Analyze this image carefully, describe what is visible, and read any text on clothing, signs, or screens.")
 
-        effective_prompt = "\n\n".join(parts) or "User shared an attachment."
+        effective_text = "\n\n".join(text_parts) or "Analyze the attached image."
+
+        if has_image:
+            user_content = [
+                {"type": "text", "text": effective_text},
+                {"type": "image_url", "image_url": {"url": req.image_data_url}},
+            ]
+        else:
+            user_content = effective_text
 
         payload = {
             "model": model_id,
             "messages": [
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": effective_prompt},
+                {"role": "user", "content": user_content},
             ],
             "temperature": 0.75 if req.regenerate else 0.55,
             "max_tokens": 200 if short_mode else 950,
@@ -379,7 +424,7 @@ async def chat_endpoint(req: ChatRequest):
                 "Content-Type": "application/json",
             },
             json=payload,
-            timeout=25,
+            timeout=30,
         )
 
         if res.status_code != 200:
@@ -434,14 +479,6 @@ async def listen_endpoint(req: ListenRequest):
 
 @app.post("/api/generate-image")
 async def generate_image_endpoint(req: ImageRequest):
-    if not FAL_KEY:
-        return JSONResponse(
-            status_code=400,
-            content={
-                "detail": "FAL_KEY missing in environment variables. Set FAL_KEY on Render first."
-            },
-        )
-
     prompt = req.prompt.strip()
     if not prompt:
         return JSONResponse(
@@ -449,32 +486,42 @@ async def generate_image_endpoint(req: ImageRequest):
         )
 
     try:
-        chosen_key = pick_fal_model_key(prompt, req.mode)
-        base_payload = {
-            "prompt": prompt,
-            "image_size": req.image_size or "square_hd",
-            "num_images": 1,
-            "enable_safety_checker": True,
-        }
-        first = call_fal_endpoint(FAL_MODELS[chosen_key], base_payload)
-        if first["ok"]:
-            return {
-                "image_url": first["url"],
-                "model": chosen_key,
+        if FAL_KEY:
+            chosen_key = pick_fal_model_key(prompt, req.mode)
+            base_payload = {
+                "prompt": prompt,
+                "image_size": req.image_size or "square_hd",
+                "num_images": 1,
+                "enable_safety_checker": True,
             }
+            first = call_fal_endpoint(FAL_MODELS[chosen_key], base_payload)
+            if first["ok"]:
+                return {
+                    "image_url": first["url"],
+                    "model": chosen_key,
+                }
 
-        fallback_key = "ultra" if chosen_key == "flux1" else "flux1"
-        second = call_fal_endpoint(FAL_MODELS[fallback_key], base_payload)
-        if second["ok"]:
+            fallback_key = "ultra" if chosen_key == "flux1" else "flux1"
+            second = call_fal_endpoint(FAL_MODELS[fallback_key], base_payload)
+            if second["ok"]:
+                return {
+                    "image_url": second["url"],
+                    "model": fallback_key,
+                    "fallback": True,
+                }
+
+        poll = generate_pollinations_image(prompt, req.image_size or "square_hd")
+        if poll["ok"]:
             return {
-                "image_url": second["url"],
-                "model": fallback_key,
+                "image_url": poll.get("url", ""),
+                "image_data": poll.get("image_data", ""),
+                "model": "pollinations",
                 "fallback": True,
             }
 
         return JSONResponse(
             status_code=502,
-            content={"detail": second.get("error") or first.get("error") or "Image generation failed."},
+            content={"detail": poll.get("error") or "Image generation failed."},
         )
     except Exception as exc:
         return JSONResponse(status_code=500, content={"detail": str(exc)})
@@ -761,9 +808,9 @@ async def index():
         }
 
         .sidebar.open {
-            width: 76vw;
+            width: 78vw;
             min-width: 248px;
-            max-width: 330px;
+            max-width: 320px;
             border-right-color: var(--border-subtle);
             padding: 16px 12px;
         }
@@ -771,7 +818,7 @@ async def index():
         .sidebar-top {
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 6px;
         }
 
         .sidebar-title {
@@ -821,6 +868,7 @@ async def index():
             background-color: var(--bg-elevated);
             border: 1px solid var(--border-subtle);
             color: var(--text-secondary);
+            flex-shrink: 0;
         }
 
         .model-sublist {
@@ -856,23 +904,27 @@ async def index():
         .all-history-block {
             display: flex;
             flex-direction: column;
-            gap: 2px;
+            gap: 0;
             margin-top: 2px;
-            padding: 4px 12px 8px 12px;
-            max-height: 210px;
+            padding: 2px 12px 8px 14px;
+            max-height: 220px;
             overflow-y: auto;
+            overflow-x: hidden;
         }
 
         .plain-history-line {
-            padding: 7px 2px;
-            font-size: 0.94rem;
+            padding: 8px 4px;
+            font-size: 0.92rem;
             font-weight: 500;
             color: var(--text-secondary);
             cursor: pointer;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+            background: transparent;
+            border: none;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+            border-radius: 0;
         }
 
         .plain-history-line:last-child {
@@ -888,19 +940,7 @@ async def index():
             padding-top: 10px;
             display: flex;
             flex-direction: column;
-            gap: 8px;
-        }
-
-        .google-pill {
-            padding: 11px 10px;
-            border-radius: 10px;
-            border: 1px solid var(--border-subtle);
-            background-color: var(--bg-elevated);
-            font-size: 0.96rem;
-            font-weight: 700;
-            color: var(--text-primary);
-            cursor: pointer;
-            text-align: center;
+            gap: 6px;
         }
 
         .main-area {
@@ -953,7 +993,7 @@ async def index():
         }
 
         .brand-heading {
-            font-size: 1.22rem;
+            font-size: 1.2rem;
             font-weight: 800;
             letter-spacing: 0.2px;
             color: var(--text-primary);
@@ -965,24 +1005,9 @@ async def index():
         .top-right {
             display: flex;
             align-items: center;
-            gap: 7px;
+            gap: 8px;
             position: relative;
             flex-shrink: 0;
-        }
-
-        .header-gmail-btn {
-            background-color: var(--bg-elevated);
-            color: var(--text-primary);
-            border: 1px solid var(--border-subtle);
-            border-radius: 10px;
-            padding: 7px 10px;
-            font-size: 0.82rem;
-            font-weight: 700;
-            cursor: pointer;
-            max-width: 110px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
         }
 
         .upgrade-btn {
@@ -999,6 +1024,10 @@ async def index():
             display: inline-flex;
             align-items: center;
             gap: 4px;
+        }
+
+        .upgrade-btn.hidden-upgraded {
+            display: none;
         }
 
         .upgrade-btn.shine-active::after {
@@ -1074,7 +1103,7 @@ async def index():
         .status-strip {
             display: none;
             padding: 8px 14px;
-            font-size: 0.92rem;
+            font-size: 0.9rem;
             font-weight: 650;
             background-color: var(--bg-surface);
             border-bottom: 1px solid var(--border-subtle);
@@ -1106,22 +1135,14 @@ async def index():
             gap: 14px;
         }
 
-        .greeting-logo-row {
+        .greeting-logo-wrap {
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 12px;
-        }
-
-        .greeting-logo-title {
-            font-size: 2.1rem;
-            font-weight: 800;
-            letter-spacing: 0.3px;
-            color: var(--text-primary);
         }
 
         .greeting-center h1 {
-            font-size: 1.56rem;
+            font-size: 1.44rem;
             font-weight: 750;
             color: var(--text-primary);
             line-height: 1.44;
@@ -1141,7 +1162,7 @@ async def index():
             border: 1px solid var(--border-subtle);
             background-color: var(--bg-surface);
             color: var(--text-primary);
-            font-size: 0.9rem;
+            font-size: 0.88rem;
             font-weight: 600;
             cursor: pointer;
         }
@@ -1160,7 +1181,7 @@ async def index():
             border: 1px solid var(--border-user);
             border-radius: 16px 16px 4px 16px;
             padding: 12px 16px;
-            font-size: 1.12rem;
+            font-size: 1.08rem;
             font-weight: 550;
             line-height: 1.62;
             word-break: break-word;
@@ -1171,7 +1192,7 @@ async def index():
             width: 100%;
             max-width: 100%;
             color: var(--text-primary);
-            font-size: 1.14rem;
+            font-size: 1.1rem;
             font-weight: 500;
             line-height: 1.75;
             padding: 4px 2px;
@@ -1206,7 +1227,7 @@ async def index():
             border-radius: 10px;
             padding: 12px;
             overflow-x: auto;
-            font-size: 0.96rem;
+            font-size: 0.95rem;
         }
 
         .msg-ai img {
@@ -1384,7 +1405,7 @@ async def index():
             display: flex;
             align-items: center;
             gap: 8px;
-            min-height: 64px;
+            min-height: 62px;
             background-color: var(--bg-main);
             border: 1px solid var(--border-subtle);
             border-radius: 24px;
@@ -1392,8 +1413,8 @@ async def index():
         }
 
         .icon-action-btn {
-            width: 44px;
-            height: 44px;
+            width: 42px;
+            height: 42px;
             border-radius: 13px;
             border: 1px solid var(--border-subtle);
             background-color: var(--bg-elevated);
@@ -1427,13 +1448,13 @@ async def index():
         .prompt-input {
             flex: 1;
             min-width: 0;
-            min-height: 44px;
+            min-height: 42px;
             max-height: 120px;
             background: transparent;
             border: none;
             outline: none;
             color: var(--text-primary);
-            font-size: 1.1rem;
+            font-size: 1.06rem;
             font-weight: 550;
             resize: none;
             padding: 9px 4px;
@@ -1441,8 +1462,8 @@ async def index():
         }
 
         .send-btn, .stop-btn {
-            width: 46px;
-            height: 46px;
+            width: 44px;
+            height: 44px;
             border-radius: 15px;
             border: none;
             background-color: var(--text-primary);
@@ -1581,7 +1602,7 @@ async def index():
         }
 
         .field-label {
-            font-size: 0.92rem;
+            font-size: 0.9rem;
             font-weight: 650;
             color: var(--text-secondary);
         }
@@ -1592,8 +1613,8 @@ async def index():
             border: 1px solid var(--border-subtle);
             color: var(--text-primary);
             border-radius: 10px;
-            padding: 11px 12px;
-            font-size: 1rem;
+            padding: 10px 12px;
+            font-size: 0.98rem;
             font-weight: 550;
             outline: none;
         }
@@ -1612,12 +1633,12 @@ async def index():
         .compare-table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 0.96rem;
+            font-size: 0.94rem;
         }
 
         .compare-table th,
         .compare-table td {
-            padding: 10px 6px;
+            padding: 9px 6px;
             border-bottom: 1px solid var(--border-subtle);
             text-align: left;
             font-weight: 600;
@@ -1649,9 +1670,19 @@ async def index():
         }
 
         .new-price {
-            font-size: 1.36rem;
+            font-size: 1.34rem;
             font-weight: 800;
             color: var(--text-primary);
+        }
+
+        .upgrade-account-box {
+            border: 1px solid var(--border-subtle);
+            background-color: var(--bg-elevated);
+            border-radius: 12px;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
         }
 
         .video-frame {
@@ -1839,8 +1870,8 @@ async def index():
                 </span>
             </button>
 
-            <button type="button" onclick="closeModal('googleChooserModal'); openModal('googleModal');" style="display:flex;align-items:center;gap:12px;padding:13px 8px;background:none;border:none;text-align:left;cursor:pointer;color:#0f172a;font-weight:650;font-size:0.92rem;">
-                <span>+ Add another account</span>
+            <button type="button" onclick="closeModal('googleChooserModal'); openModal('upgradeModal');" style="display:flex;align-items:center;gap:12px;padding:13px 8px;background:none;border:none;text-align:left;cursor:pointer;color:#0f172a;font-weight:650;font-size:0.92rem;">
+                <span>+ Add or connect account</span>
             </button>
         </div>
     </div>
@@ -1890,10 +1921,8 @@ async def index():
         </div>
 
         <div class="sidebar-footer">
-            <div class="google-pill" id="googleAccountBtn" onclick="openModal('googleModal')">
-                Gmail with Pyrox
-            </div>
             <div class="nav-item" onclick="openModal('settingsModal')">Settings</div>
+            <div class="nav-item" id="sidebarAccountItem" onclick="openModal('upgradeModal')">Account</div>
         </div>
     </aside>
 
@@ -1911,9 +1940,6 @@ async def index():
             </div>
 
             <div class="top-right" onclick="event.stopPropagation()">
-                <button type="button" class="header-gmail-btn" id="headerGmailBtn" onclick="openModal('googleModal')">
-                    Gmail
-                </button>
                 <button type="button" class="upgrade-btn shine-active" id="upgradeBtn" onclick="openModal('upgradeModal')">
                     Upgrade
                 </button>
@@ -1929,6 +1955,7 @@ async def index():
                     <div class="dots-item" onclick="newChat(); closeDotsMenu();">Clear Chat</div>
                     <div class="dots-item" onclick="exportChat(); closeDotsMenu();">Export Chat</div>
                     <div class="dots-item" onclick="openModal('libraryModal'); closeDotsMenu();">All Chats</div>
+                    <div class="dots-item" onclick="openModal('upgradeModal'); closeDotsMenu();">Account</div>
                     <div class="dots-item" onclick="openModal('settingsModal'); closeDotsMenu();">Settings</div>
                 </div>
             </div>
@@ -1938,17 +1965,16 @@ async def index():
 
         <section class="scroll-stage" id="scrollStage">
             <div class="greeting-center" id="greetingBox">
-                <div class="greeting-logo-row">
-                    <svg width="46" height="46" viewBox="0 0 100 100" fill="none">
+                <div class="greeting-logo-wrap">
+                    <svg width="52" height="52" viewBox="0 0 100 100" fill="none">
                         <path d="M50 4 C55 34, 66 45, 96 50 C66 55, 55 66, 50 96 C45 66, 34 55, 4 50 C34 45, 45 34, 50 4 Z" fill="url(#pyroxOuterGrad)" />
                         <path d="M50 20 C53 40, 60 47, 80 50 C60 53, 53 60, 50 80 C47 60, 40 53, 20 50 C40 47, 47 40, 50 20 Z" fill="url(#pyroxMidGrad)" />
                         <path d="M50 34 C51.5 44, 56 48.5, 66 50 C56 51.5, 51.5 56, 50 66 C48.5 56, 44 51.5, 34 50 C44 48.5, 48.5 44, 50 34 Z" fill="url(#pyroxCoreGrad)" />
                     </svg>
-                    <span class="greeting-logo-title" id="greetingBrandName">Pyrox</span>
                 </div>
-                <h1 id="greetingText">Swagatam! How can I assist you today?</h1>
+                <h1 id="greetingText"></h1>
                 <div class="starter-chips-row">
-                    <button type="button" class="starter-chip" onclick="useStarterPrompt('Explain a complex topic simply')">Explain simply</button>
+                    <button type="button" class="starter-chip" onclick="useStarterPrompt('Aaj kya khaas hai ya kya trend chal raha hai?')">Today & trends</button>
                     <button type="button" class="starter-chip" onclick="useStarterPrompt('Help me write and debug Python code')">Coding help</button>
                     <button type="button" class="starter-chip" onclick="useStarterPrompt('Generate an ultra detailed image of a futuristic mountain peak at sunset')">Generate image</button>
                 </div>
@@ -2041,34 +2067,6 @@ async def index():
     </main>
 </div>
 
-<div class="overlay-modal" id="googleModal" onclick="closeModal('googleModal')">
-    <div class="modal-box" onclick="event.stopPropagation()">
-        <div class="modal-head">
-            <span>Gmail with Pyrox</span>
-            <button type="button" class="close-x" onclick="closeModal('googleModal')">✕</button>
-        </div>
-
-        <div id="connectedAccountCard" style="padding:10px 12px;border-radius:10px;background:var(--bg-elevated);border:1px solid var(--border-subtle);font-size:0.9rem;color:var(--text-secondary);">
-            Not connected yet
-        </div>
-
-        <button type="button" class="white-google-btn" style="background-color:var(--bg-elevated);color:var(--text-primary);border-color:var(--border-user);" onclick="openGoogleAccountChooser()">
-            <span style="font-weight:900;">G</span>
-            <span>Choose Google Account</span>
-        </button>
-
-        <div class="white-or">or</div>
-
-        <label class="field-label" for="googleEmailInput">Email</label>
-        <input type="email" class="field-input" id="googleEmailInput" placeholder="you@gmail.com" />
-
-        <label class="field-label" for="googleNameInput">Name</label>
-        <input type="text" class="field-input" id="googleNameInput" placeholder="Your name" />
-
-        <button type="button" class="action-btn" onclick="saveAccountForm()">Save & Connect</button>
-    </div>
-</div>
-
 <div class="overlay-modal" id="videoModal" onclick="closeModal('videoModal')">
     <div class="modal-box" onclick="event.stopPropagation()">
         <div class="modal-head">
@@ -2101,7 +2099,7 @@ async def index():
             <span>All Chats</span>
             <button type="button" class="close-x" onclick="closeModal('libraryModal')">Close</button>
         </div>
-        <div id="libraryModalBody" style="display:flex;flex-direction:column;gap:8px;font-size:0.98rem;color:var(--text-secondary);">
+        <div id="libraryModalBody" style="display:flex;flex-direction:column;gap:4px;font-size:0.98rem;color:var(--text-secondary);">
             No chats yet.
         </div>
     </div>
@@ -2116,14 +2114,28 @@ async def index():
                     <path d="M50 20 C53 40, 60 47, 80 50 C60 53, 53 60, 50 80 C47 60, 40 53, 20 50 C40 47, 47 40, 50 20 Z" fill="url(#pyroxMidGrad)" />
                     <path d="M50 34 C51.5 44, 56 48.5, 66 50 C56 51.5, 51.5 56, 50 66 C48.5 56, 44 51.5, 34 50 C44 48.5, 48.5 44, 50 34 Z" fill="url(#pyroxCoreGrad)" />
                 </svg>
-                <span>Upgrade to Pyrox Pro</span>
+                <span>Account & Pyrox Pro</span>
             </div>
             <button type="button" class="close-x" onclick="closeModal('upgradeModal')">✕</button>
         </div>
 
-        <p style="font-size:0.94rem;color:var(--text-secondary);">
-            Personalized AI for study, creation, and daily work
+        <p style="font-size:0.92rem;color:var(--text-secondary);">
+            Connect your account and manage Pro access in one place.
         </p>
+
+        <div class="upgrade-account-box">
+            <div style="font-weight:750;font-size:0.95rem;" id="upgradeAccountSummary">Account: Not connected</div>
+            <label class="field-label" for="upgNameInput">Account Name</label>
+            <input type="text" class="field-input" id="upgNameInput" placeholder="Your name" />
+            <label class="field-label" for="upgEmailInput">Email / Gmail</label>
+            <input type="email" class="field-input" id="upgEmailInput" placeholder="you@gmail.com" />
+            <label class="field-label" for="upgPayoutInput">UPI / Payout Account (optional)</label>
+            <input type="text" class="field-input" id="upgPayoutInput" placeholder="upi-id@bank or account note" />
+            <div style="display:flex;gap:8px;margin-top:2px;">
+                <button type="button" class="action-btn" style="flex:1;" onclick="openGoogleAccountChooser()">Google Account</button>
+                <button type="button" class="action-btn" style="flex:1;background-color:var(--accent-upgrade);border-color:var(--accent-upgrade-border);color:#fff;" onclick="connectAccountFromUpgrade()">Save Account</button>
+            </div>
+        </div>
 
         <table class="compare-table">
             <thead>
@@ -2174,7 +2186,7 @@ async def index():
         </div>
 
         <button type="button" class="action-btn" style="background-color:var(--accent-upgrade);border-color:var(--accent-upgrade-border);color:#ffffff;font-size:1.02rem;" onclick="confirmUpgrade()">
-            Upgrade to Pyrox Pro
+            Activate Pyrox Pro
         </button>
         <div id="upgradeStatusMsg" style="font-size:0.88rem;color:var(--text-secondary);"></div>
     </div>
@@ -2267,24 +2279,45 @@ async def index():
         return Boolean(localStorage.getItem("pyrox_signed_up"));
     }
 
-    function syncHeaderAccountUI() {
-        const gBtn = document.getElementById("headerGmailBtn");
-        const sideBtn = document.getElementById("googleAccountBtn");
-        const card = document.getElementById("connectedAccountCard");
+    function syncAccountAndUpgradeUI() {
+        const upgBtn = document.getElementById("upgradeBtn");
+        const sideAcc = document.getElementById("sidebarAccountItem");
+        const sumEl = document.getElementById("upgradeAccountSummary");
         const name = (localStorage.getItem("pyrox_user_name") || "").trim();
         const email = (localStorage.getItem("pyrox_user_email") || "").trim();
+        const payout = (localStorage.getItem("pyrox_payout_account") || "").trim();
+        const connected = Boolean(isUserSignedUp() || name || email);
 
-        if (gBtn) {
-            gBtn.textContent = name ? `Gmail: ${name.split(" ")[0]}` : "Gmail";
+        if (upgBtn) {
+            upgBtn.classList.toggle("hidden-upgraded", connected);
         }
-        if (sideBtn) {
-            sideBtn.textContent = name ? `Gmail: ${name}` : "Gmail with Pyrox";
+        if (sideAcc) {
+            sideAcc.textContent = name ? `Account (${name.split(" ")[0]})` : "Account";
         }
-        if (card) {
-            card.textContent = (name || email)
-                ? `Connected: ${name || "User"} (${email || "No email"})`
-                : "Not connected yet";
+        if (sumEl) {
+            sumEl.textContent = connected
+                ? `Connected: ${name || "User"}${email ? " · " + email : ""}${payout ? " · " + payout : ""}`
+                : "Account: Not connected";
         }
+        const nInp = document.getElementById("upgNameInput");
+        const eInp = document.getElementById("upgEmailInput");
+        const pInp = document.getElementById("upgPayoutInput");
+        if (nInp && name) nInp.value = name;
+        if (eInp && email) eInp.value = email;
+        if (pInp && payout) pInp.value = payout;
+    }
+
+    function connectAccountFromUpgrade() {
+        const name = document.getElementById("upgNameInput").value.trim();
+        const email = document.getElementById("upgEmailInput").value.trim();
+        const payout = document.getElementById("upgPayoutInput").value.trim();
+        if (name) localStorage.setItem("pyrox_user_name", name);
+        if (email) localStorage.setItem("pyrox_user_email", email);
+        if (payout) localStorage.setItem("pyrox_payout_account", payout);
+        localStorage.setItem("pyrox_signed_up", "1");
+        syncAccountAndUpgradeUI();
+        refreshGreeting();
+        document.getElementById("upgradeStatusMsg").textContent = "Account connected.";
     }
 
     function triggerInputSlideUp() {
@@ -2304,7 +2337,7 @@ async def index():
         closeModal("googleChooserModal");
         setTimeout(() => {
             document.body.classList.remove("pre-login-white");
-            syncHeaderAccountUI();
+            syncAccountAndUpgradeUI();
             refreshGreeting();
             triggerInputSlideUp();
         }, 60);
@@ -2520,13 +2553,19 @@ async def index():
         return localStorage.getItem("pyrox_theme_label") || "Pyrox";
     }
 
+    function buildSmartLiveGreeting() {
+        const now = new Date();
+        const dayName = now.toLocaleDateString("en-US", { weekday: "long" });
+        const dateStr = now.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+        const hr = now.getHours();
+        const partOfDay = hr < 12 ? "Morning" : hr < 17 ? "Afternoon" : "Evening";
+        return `${partOfDay} · ${dayName}, ${dateStr} — What’s on your mind today?`;
+    }
+
     function refreshGreeting() {
-        const name = getUserName().trim();
         const el = document.getElementById("greetingText");
         if (el) {
-            el.textContent = name
-                ? `Swagatam ${name}! How can I assist you today?`
-                : "Swagatam! How can I assist you today?";
+            el.textContent = buildSmartLiveGreeting();
         }
     }
 
@@ -2535,8 +2574,6 @@ async def index():
         document.getElementById("headerBrandTitle").textContent = label;
         document.getElementById("sidebarThemeTitle").textContent = label;
         document.getElementById("splashWord").textContent = label;
-        const greetBrand = document.getElementById("greetingBrandName");
-        if (greetBrand) greetBrand.textContent = label;
         document.getElementById("customThemeInput").value = label;
     }
 
@@ -2605,23 +2642,12 @@ async def index():
 
     function openModal(id) {
         if (id === "libraryModal") renderLibraryModal();
-        if (id === "googleModal") syncHeaderAccountUI();
+        if (id === "upgradeModal") syncAccountAndUpgradeUI();
         document.getElementById(id).classList.add("show");
     }
 
     function closeModal(id) {
         document.getElementById(id).classList.remove("show");
-    }
-
-    function saveAccountForm() {
-        const name = document.getElementById("googleNameInput").value.trim();
-        const email = document.getElementById("googleEmailInput").value.trim();
-        if (name) localStorage.setItem("pyrox_user_name", name);
-        if (email) localStorage.setItem("pyrox_user_email", email);
-        localStorage.setItem("pyrox_signed_up", "1");
-        syncHeaderAccountUI();
-        refreshGreeting();
-        closeModal("googleModal");
     }
 
     function saveThemeName() {
@@ -2639,7 +2665,13 @@ async def index():
     }
 
     function confirmUpgrade() {
-        document.getElementById("upgradeStatusMsg").textContent = "Pyrox Pro (₹139/mo) selected. Ready for payment gateway checkout.";
+        const name = (localStorage.getItem("pyrox_user_name") || "").trim();
+        const email = (localStorage.getItem("pyrox_user_email") || "").trim();
+        if (!name && !email) {
+            localStorage.setItem("pyrox_signed_up", "1");
+        }
+        syncAccountAndUpgradeUI();
+        document.getElementById("upgradeStatusMsg").textContent = "Pyrox Pro (₹139/mo) activated for this account.";
     }
 
     function loadFolders() {
@@ -2708,7 +2740,6 @@ async def index():
         const stage = document.getElementById("scrollStage");
         stage.innerHTML = "";
         chatStarted = true;
-        document.getElementById("upgradeBtn").classList.remove("shine-active");
         target.items.forEach((m) => {
             if (m.role === "user") {
                 const row = document.createElement("div");
@@ -2757,17 +2788,16 @@ async def index():
         const stage = document.getElementById("scrollStage");
         stage.innerHTML = `
             <div class="greeting-center" id="greetingBox">
-                <div class="greeting-logo-row">
-                    <svg width="46" height="46" viewBox="0 0 100 100" fill="none">
+                <div class="greeting-logo-wrap">
+                    <svg width="52" height="52" viewBox="0 0 100 100" fill="none">
                         <path d="M50 4 C55 34, 66 45, 96 50 C66 55, 55 66, 50 96 C45 66, 34 55, 4 50 C34 45, 45 34, 50 4 Z" fill="url(#pyroxOuterGrad)" />
                         <path d="M50 20 C53 40, 60 47, 80 50 C60 53, 53 60, 50 80 C47 60, 40 53, 20 50 C40 47, 47 40, 50 20 Z" fill="url(#pyroxMidGrad)" />
                         <path d="M50 34 C51.5 44, 56 48.5, 66 50 C56 51.5, 51.5 56, 50 66 C48.5 56, 44 51.5, 34 50 C44 48.5, 48.5 44, 50 34 Z" fill="url(#pyroxCoreGrad)" />
                     </svg>
-                    <span class="greeting-logo-title" id="greetingBrandName">${getThemeLabel()}</span>
                 </div>
                 <h1 id="greetingText"></h1>
                 <div class="starter-chips-row">
-                    <button type="button" class="starter-chip" onclick="useStarterPrompt('Explain a complex topic simply')">Explain simply</button>
+                    <button type="button" class="starter-chip" onclick="useStarterPrompt('Aaj kya khaas hai ya kya trend chal raha hai?')">Today & trends</button>
                     <button type="button" class="starter-chip" onclick="useStarterPrompt('Help me write and debug Python code')">Coding help</button>
                     <button type="button" class="starter-chip" onclick="useStarterPrompt('Generate an ultra detailed image of a futuristic mountain peak at sunset')">Generate image</button>
                 </div>
@@ -2775,7 +2805,6 @@ async def index():
         `;
         refreshGreeting();
         chatStarted = false;
-        document.getElementById("upgradeBtn").classList.add("shine-active");
     }
 
     function exportChat() {
@@ -3009,7 +3038,6 @@ async def index():
             chatStarted = true;
             const g = document.getElementById("greetingBox");
             if (g) g.remove();
-            document.getElementById("upgradeBtn").classList.remove("shine-active");
         }
     }
 
@@ -3351,7 +3379,7 @@ async def index():
         const imgIntent = detectImageGenerationIntent(messageToSend);
         const searchLikely =
             !imgIntent.isImage &&
-            /\b(aaj|kal|today|tomorrow|news|latest|festival|tyohar|weather|2026|2027|kab hai|kya chal raha)\b/i.test(
+            /\b(aaj|kal|today|tomorrow|news|latest|festival|tyohar|diwali|holi|weather|2026|2027|kab hai|kya chal raha)\b/i.test(
                 messageToSend
             );
 
@@ -3427,7 +3455,7 @@ async def index():
         }
     }
 
-    syncHeaderAccountUI();
+    syncAccountAndUpgradeUI();
     runSplashAndWelcomeFlow();
     refreshGreeting();
     refreshThemeLabel();
@@ -3439,3 +3467,4 @@ async def index():
 </html>
 """
     return html
+    
