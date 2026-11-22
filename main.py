@@ -23,34 +23,15 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "").strip()
 SERP_API_KEY = os.environ.get("SERPAPI_API_KEY", "").strip()
-FAL_KEY = (
-    os.environ.get("FAL_KEY", "").strip()
-    or os.environ.get("PALM_KEY", "").strip()
-)
 
 MAX_CHAT_CHARS = 8000
-CACHED_GROQ_MODEL: Optional[str] = None
-
-FAL_MODELS = {
-    "flux1": "https://fal.run/fal-ai/flux/schnell",
-    "ultra": "https://fal.run/fal-ai/flux-pro/v1.1-ultra",
-}
-
-ULTRA_KEYWORDS = (
-    "ultra",
-    "4k",
-    "8k",
-    "high detail",
-    "hyper realistic",
-    "photorealistic",
-    "cinematic",
-    "pro",
-)
+CACHED_TEXT_MODEL: Optional[str] = None
+VISION_MODEL_ID = "qwen/qwen3.8-27b"
 
 
 class ChatRequest(BaseModel):
     message: str
-    voice: str = "en-US-AriaNeural"
+    voice: str = "hi-IN-MadhurNeural"
     user_name: Optional[str] = None
     theme_label: str = "Pyrox"
     model_mode: str = "Pyrox Only"
@@ -61,12 +42,6 @@ class ChatRequest(BaseModel):
     regenerate: bool = False
 
 
-class ImageRequest(BaseModel):
-    prompt: str
-    mode: str = "auto"
-    image_size: str = "square_hd"
-
-
 class FeedbackRequest(BaseModel):
     reason: str
     details: Optional[str] = ""
@@ -75,17 +50,20 @@ class FeedbackRequest(BaseModel):
 
 class ListenRequest(BaseModel):
     text: str
-    voice: str = "en-US-AriaNeural"
+    voice: str = "hi-IN-MadhurNeural"
 
 
-def resolve_groq_model() -> str:
-    global CACHED_GROQ_MODEL
-    if CACHED_GROQ_MODEL:
-        return CACHED_GROQ_MODEL
+def resolve_groq_text_model() -> str:
+    global CACHED_TEXT_MODEL
+    if CACHED_TEXT_MODEL:
+        return CACHED_TEXT_MODEL
 
-    default_model = "llama-3.3-70b-versatile"
+    preferred_models = [
+        "openai/gpt-oss-120b",
+        "openai/gpt-oss-20b",
+    ]
     if not GROQ_API_KEY:
-        return default_model
+        return preferred_models[0]
 
     try:
         res = requests.get(
@@ -94,33 +72,31 @@ def resolve_groq_model() -> str:
             timeout=5,
         )
         if res.status_code == 200:
-            ids = [
+            available = {
                 m.get("id", "")
                 for m in res.json().get("data", [])
                 if m.get("id")
-            ]
+            }
+            for pref in preferred_models:
+                if pref in available:
+                    CACHED_TEXT_MODEL = pref
+                    return pref
             filtered = [
                 m_id
-                for m_id in ids
+                for m_id in available
                 if "guard" not in m_id.lower() and "whisper" not in m_id.lower()
             ]
-            for pref in ["llama-3.3-70b-versatile", "llama", "qwen", "gemma"]:
-                for m_id in filtered:
-                    if pref in m_id.lower():
-                        CACHED_GROQ_MODEL = m_id
-                        return m_id
             if filtered:
-                CACHED_GROQ_MODEL = filtered[0]
+                CACHED_TEXT_MODEL = filtered[0]
                 return filtered[0]
     except Exception:
         pass
 
-    CACHED_GROQ_MODEL = default_model
-    return default_model
+    CACHED_TEXT_MODEL = preferred_models[0]
+    return preferred_models[0]
 
 
 def get_special_day_note(dt: datetime.datetime) -> str:
-    # Fixed/common India calendar markers for awareness (festivals vary by lunar/panchang calendar)
     md = (dt.month, dt.day)
     fixed_days = {
         (1, 1): "New Year's Day",
@@ -161,12 +137,6 @@ def should_search_web(message: str) -> bool:
         "kya chal raha",
         "trend",
         "update",
-        "who is",
-        "what is",
-        "how much",
-        "fal.ai",
-        "fal ai",
-        "api",
     ]
     return any(t in q for t in triggers)
 
@@ -197,7 +167,6 @@ def search_live_context(query: str) -> str:
         except Exception:
             pass
 
-    # Lightweight public search fallback when SERPAPI_API_KEY is not configured
     try:
         ddg_url = f"https://html.duckduckgo.com/html/?q={urllib.parse.quote(query)}"
         res = requests.get(
@@ -223,60 +192,75 @@ def search_live_context(query: str) -> str:
     return base_info
 
 
-def extract_text_from_data_url(file_name: Optional[str], data_url: Optional[str]) -> str:
+def extract_text_from_data_url(
+    file_name: Optional[str], data_url: Optional[str]
+) -> tuple[str, Optional[str]]:
+    """
+    Returns (extracted_text, image_data_url_if_image).
+    If the attached file is an image, returns ("", data_url) so vision model reads it directly.
+    """
     if not data_url or "," not in data_url:
-        return ""
+        return "", None
+
+    header, b64_part = data_url.split(",", 1)
+    header_lower = header.lower()
+    lower_name = (file_name or "").lower()
+
+    if "image/" in header_lower or lower_name.endswith(
+        (".png", ".jpg", ".jpeg", ".webp", ".gif")
+    ):
+        normalized_url = (
+            data_url
+            if data_url.startswith("data:image/")
+            else f"data:image/jpeg;base64,{b64_part}"
+        )
+        return "", normalized_url
+
     try:
-        _, b64_part = data_url.split(",", 1)
         raw_bytes = base64.b64decode(b64_part)
-        lower_name = (file_name or "").lower()
 
         if lower_name.endswith(".docx"):
             with zipfile.ZipFile(io.BytesIO(raw_bytes)) as zf:
                 xml_bytes = zf.read("word/document.xml")
                 root = ET.fromstring(xml_bytes)
                 texts = [elem.text for elem in root.iter() if elem.text]
-                return " ".join(texts)[:4000].strip()
+                return " ".join(texts)[:4500].strip(), None
+
+        if lower_name.endswith(".pdf"):
+            try:
+                import pypdf
+
+                reader = pypdf.PdfReader(io.BytesIO(raw_bytes))
+                pages_txt = []
+                for page in reader.pages[:15]:
+                    t = page.extract_text() or ""
+                    if t.strip():
+                        pages_txt.append(t.strip())
+                joined = "\n".join(pages_txt)[:4500].strip()
+                if joined:
+                    return joined, None
+            except Exception:
+                pass
+            return (
+                "[PDF file attached, but PDF text parser library is not installed on server. Ask user to paste text or share a clear photo/screenshot of the page.]",
+                None,
+            )
 
         decoded = raw_bytes.decode("utf-8", errors="ignore")
         cleaned = re.sub(r"\s+", " ", decoded).strip()
-        return cleaned[:4000]
+        if cleaned:
+            return cleaned[:4500], None
+        return (
+            f"[Attached file '{file_name or 'document'}' had no readable plain text.]",
+            None,
+        )
     except Exception:
-        return ""
+        return f"[Could not read attached file '{file_name or 'document'}'.]", None
 
 
-async def generate_edge_audio(
-    text: str, voice_name: str, filename: str = "static/response.mp3"
-) -> bool:
-    try:
-        cleaned = re.sub(r"[*_`#~]+", "", text)
-        cleaned = re.sub(r"\s+", " ", cleaned).strip()
-        if not cleaned:
-            return False
-        communicate = edge_tts.Communicate(cleaned[:700], voice_name, rate="+14%")
-        await communicate.save(filename)
+def looks_hindi_or_hinglish(text: str) -> bool:
+    if re.search(r"[\u0900-\u097F]", text):
         return True
-    except Exception:
-        return False
-
-
-def is_short_greeting(message: str) -> bool:
-    normalized = re.sub(r"[^a-zA-Z\s]", "", message).strip().lower()
-    return normalized in {
-        "hi",
-        "hii",
-        "hiii",
-        "hey",
-        "hello",
-        "namaste",
-        "yo",
-        "sup",
-    }
-
-
-def detect_language_style(message: str) -> str:
-    if re.search(r"[\u0900-\u097F]", message):
-        return "Hindi (Devanagari)"
     hinglish_markers = {
         "kya",
         "hai",
@@ -299,46 +283,50 @@ def detect_language_style(message: str) -> str:
         "kyun",
         "kab",
         "kahan",
+        "bharna",
+        "likha",
+        "photo",
+        "samjhao",
     }
-    words = set(re.findall(r"[a-zA-Z']+", message.lower()))
-    if len(words.intersection(hinglish_markers)) >= 1:
-        return "Casual Hinglish (mirror user's tone naturally and clearly)"
-    return "Clear, authoritative English"
+    words = set(re.findall(r"[a-zA-Z']+", text.lower()))
+    return len(words.intersection(hinglish_markers)) >= 1
 
 
-def pick_fal_model_key(prompt: str, mode: str = "auto") -> str:
-    m = (mode or "auto").strip().lower()
-    if m in ("ultra", "pro", "high"):
-        return "ultra"
-    if m in ("flux1", "fast", "normal"):
-        return "flux1"
-    p = (prompt or "").lower()
-    return "ultra" if any(k in p for k in ULTRA_KEYWORDS) else "flux1"
-
-
-def call_fal_endpoint(endpoint_url: str, payload: dict) -> dict:
-    if not FAL_KEY:
-        return {"ok": False, "error": "FAL_KEY missing in server environment."}
-    headers = {
-        "Authorization": f"Key {FAL_KEY}",
-        "Content-Type": "application/json",
-    }
-    res = requests.post(endpoint_url, json=payload, headers=headers, timeout=90)
+async def generate_edge_audio(
+    text: str, voice_name: str, filename: str = "static/response.mp3"
+) -> bool:
     try:
-        data = res.json()
+        cleaned = re.sub(r"[*_`#~]+", "", text)
+        cleaned = re.sub(r"\s+", " ", cleaned).strip()
+        if not cleaned:
+            return False
+        communicate = edge_tts.Communicate(cleaned[:700], voice_name, rate="+10%")
+        await communicate.save(filename)
+        return True
     except Exception:
-        data = {"detail": res.text[:250]}
+        return False
 
-    if res.status_code != 200:
-        err_detail = data.get("detail") or data.get("error") or str(data)
-        return {"ok": False, "error": str(err_detail)[:250]}
 
-    images = data.get("images") or []
-    if images and images[0].get("url"):
-        return {"ok": True, "url": images[0]["url"]}
-    if data.get("image") and isinstance(data["image"], dict) and data["image"].get("url"):
-        return {"ok": True, "url": data["image"]["url"]}
-    return {"ok": False, "error": "No image returned from fal.ai"}
+def is_short_greeting(message: str) -> bool:
+    normalized = re.sub(r"[^a-zA-Z\s]", "", message).strip().lower()
+    return normalized in {
+        "hi",
+        "hii",
+        "hiii",
+        "hey",
+        "hello",
+        "namaste",
+        "yo",
+        "sup",
+    }
+
+
+def detect_language_style(message: str) -> str:
+    if re.search(r"[\u0900-\u097F]", message):
+        return "Natural Hindi / Hinglish (easy, clear, friendly)"
+    if looks_hindi_or_hinglish(message):
+        return "Natural Hinglish (Roman Hindi + English words naturally, like a smart Indian study/tech helper)"
+    return "Clear, practical English (or Hinglish if user mixes Hindi words)"
 
 
 @app.post("/api/chat")
@@ -358,40 +346,62 @@ async def chat_endpoint(req: ChatRequest):
             },
         )
 
-    doc_text = extract_text_from_data_url(req.file_name, req.file_data_url)
+    doc_text, file_image_url = extract_text_from_data_url(
+        req.file_name, req.file_data_url
+    )
+    final_image_url = req.image_data_url or file_image_url
 
-    if not user_msg and not req.image_data_url and not doc_text:
+    if not user_msg and not final_image_url and not doc_text:
         return JSONResponse(
             status_code=400, content={"detail": "Message cannot be empty."}
         )
 
+    has_vision_input = bool(final_image_url)
+    model_id = VISION_MODEL_ID if has_vision_input else resolve_groq_text_model()
+
     try:
-        model_id = resolve_groq_model()
         used_search = should_search_web(user_msg)
+        now = datetime.datetime.now()
         context_block = (
             search_live_context(user_msg)
             if used_search
-            else f"Current Date: {datetime.datetime.now().strftime('%A, %d %B %Y')} (India). {get_special_day_note(datetime.datetime.now())}"
+            else f"Current Date: {now.strftime('%A, %d %B %Y')} (India). {get_special_day_note(now)}"
         )
 
-        short_mode = is_short_greeting(user_msg) and not req.image_data_url and not doc_text
-        user_label = req.user_name.strip() if req.user_name and req.user_name.strip() else ""
+        short_mode = (
+            is_short_greeting(user_msg) and not has_vision_input and not doc_text
+        )
+        user_label = (
+            req.user_name.strip()
+            if req.user_name and req.user_name.strip()
+            else ""
+        )
         identity_line = f"User name: {user_label}." if user_label else ""
-        lang_mode = detect_language_style(user_msg)
+        lang_mode = detect_language_style(user_msg or "kya likha hai")
         regen_rule = (
-            " Provide a fresh, sharper explanation or angle without repeating identical wording."
+            " Provide a fresh, clearer explanation without repeating identical wording."
             if req.regenerate
             else ""
         )
 
+        creator_rule = (
+            "IDENTITY & CREATOR RULE: You are Pyrox, created by Harshit. "
+            "Whenever anyone asks who made you, who created you, or who your creator/developer is, "
+            "clearly say you were created by Harshit. Never say Alibaba or any other company made you."
+        )
+
+        vision_rule = (
+            "VISION & WORKSHEET RULE: When an image/photo is provided, carefully read all visible text, questions, "
+            "blanks, numbers, and instructions. Tell the user clearly what is written and give accurate, step-by-step "
+            "answers or what to fill in each blank. If part of the image is blurry or cut off, say exactly what is unclear."
+            if has_vision_input
+            else ""
+        )
+
         core_persona = (
-            "You are Pyrox, a sharp, clear, and persuasive AI assistant built to help both young learners (students/kids) "
-            "and adults with calm clarity, practical logic, and structured answers. "
-            "Adapt your tone smoothly: keep explanations simple and encouraging when a concept is tricky, "
-            "and direct, structured, and high-signal when solving technical, coding, or real-world questions. "
-            "When explaining trade-offs or recommending a practical approach, persuade clearly with honest reasons and real pros/cons—never sounding robotic or dismissive. "
-            "Never guess or invent facts when uncertain; state clearly what is verified vs unknown. "
-            "Format responses cleanly with bold key terms, concise paragraphs, and structured lists or code blocks where helpful."
+            "You are Pyrox, a helpful, sharp, and practical AI assistant for students and everyday users. "
+            f"{creator_rule} {vision_rule} "
+            "Keep explanations clear, structured, and easy to follow. Never guess or invent facts when uncertain."
         )
 
         if short_mode:
@@ -402,29 +412,44 @@ async def chat_endpoint(req: ChatRequest):
         else:
             system_prompt = (
                 f"{core_persona} Mode: {req.model_mode}. {context_block} {identity_line} "
-                f"Style: {lang_mode}. Give direct, high-signal answers first, followed by clear breakdown.{regen_rule}"
+                f"Style: {lang_mode}. Give a direct, clear answer first, then helpful breakdown.{regen_rule}"
             )
 
-        parts = []
+        text_parts = []
         if user_msg:
-            parts.append(user_msg)
-        if doc_text:
-            parts.append(f"[Attached Document: {req.file_name or 'file'}]\n{doc_text}")
-        if req.image_data_url:
-            parts.append(
-                f"[Attached Image: {req.file_name or 'photo.png'} received. Analyze context and assist the user clearly.]"
+            text_parts.append(user_msg)
+        elif has_vision_input:
+            text_parts.append(
+                "Is photo/page mein kya likha hai? Agar koi questions ya fill in the blanks hain to clearly batao ki kya bharna hai aur kyun."
+            )
+        elif doc_text:
+            text_parts.append(
+                "Is attached file ko padhkar summary aur main points/answers clearly batao."
             )
 
-        effective_prompt = "\n\n".join(parts) or "User shared an attachment."
+        if doc_text:
+            text_parts.append(
+                f"[Attached Document: {req.file_name or 'file'}]\n{doc_text}"
+            )
+
+        combined_text = "\n\n".join(text_parts)
+
+        if has_vision_input:
+            user_content = [
+                {"type": "text", "text": combined_text},
+                {"type": "image_url", "image_url": {"url": final_image_url}},
+            ]
+        else:
+            user_content = combined_text
 
         payload = {
             "model": model_id,
             "messages": [
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": effective_prompt},
+                {"role": "user", "content": user_content},
             ],
-            "temperature": 0.75 if req.regenerate else 0.55,
-            "max_tokens": 200 if short_mode else 950,
+            "temperature": 0.65 if req.regenerate else 0.45,
+            "max_tokens": 220 if short_mode else 1100,
         }
 
         res = requests.post(
@@ -434,24 +459,59 @@ async def chat_endpoint(req: ChatRequest):
                 "Content-Type": "application/json",
             },
             json=payload,
-            timeout=25,
+            timeout=35,
         )
 
-        if res.status_code != 200:
+        if res.status_code != 200 and has_vision_input:
+            # Fallback to text model with clear note if vision model id is unavailable on account
+            fallback_model = resolve_groq_text_model()
+            fallback_payload = {
+                "model": fallback_model,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {
+                        "role": "user",
+                        "content": f"{combined_text}\n[Note: Image was attached by user ({req.file_name or 'photo'}), but vision model returned: {res.text[:180]}]",
+                    },
+                ],
+                "temperature": 0.45,
+                "max_tokens": 900,
+            }
+            res2 = requests.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {GROQ_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json=fallback_payload,
+                timeout=30,
+            )
+            if res2.status_code == 200:
+                reply_text = res2.json()["choices"][0]["message"]["content"].strip()
+                model_id = fallback_model
+            else:
+                return JSONResponse(
+                    status_code=res.status_code,
+                    content={"detail": f"Groq API error: {res.text[:250]}"},
+                )
+        elif res.status_code != 200:
             return JSONResponse(
                 status_code=res.status_code,
                 content={"detail": f"Groq API error: {res.text[:250]}"},
             )
+        else:
+            reply_text = res.json()["choices"][0]["message"]["content"].strip()
 
-        reply_text = res.json()["choices"][0]["message"]["content"].strip()
         audio_url = None
         if req.enable_tts:
             voice_to_use = (
                 "hi-IN-MadhurNeural"
-                if re.search(r"[\u0900-\u097F]", reply_text)
+                if looks_hindi_or_hinglish(reply_text)
                 else req.voice
             )
-            ok = await generate_edge_audio(reply_text, voice_to_use, "static/response.mp3")
+            ok = await generate_edge_audio(
+                reply_text, voice_to_use, "static/response.mp3"
+            )
             if ok:
                 audio_url = f"/static/response.mp3?v={int(asyncio.get_event_loop().time() * 1000)}"
 
@@ -474,7 +534,7 @@ async def listen_endpoint(req: ListenRequest):
         )
     voice_to_use = (
         "hi-IN-MadhurNeural"
-        if re.search(r"[\u0900-\u097F]", req.text)
+        if looks_hindi_or_hinglish(req.text)
         else req.voice
     )
     stamp = int(asyncio.get_event_loop().time() * 1000)
@@ -485,54 +545,6 @@ async def listen_endpoint(req: ListenRequest):
             status_code=500, content={"detail": "Unable to generate voice audio."}
         )
     return {"audio_url": f"/static/listen_out.mp3?v={stamp}"}
-
-
-@app.post("/api/generate-image")
-async def generate_image_endpoint(req: ImageRequest):
-    if not FAL_KEY:
-        return JSONResponse(
-            status_code=400,
-            content={
-                "detail": "FAL_KEY missing in environment variables. Set FAL_KEY on Render first."
-            },
-        )
-
-    prompt = req.prompt.strip()
-    if not prompt:
-        return JSONResponse(
-            status_code=400, content={"detail": "Please enter an image prompt."}
-        )
-
-    try:
-        chosen_key = pick_fal_model_key(prompt, req.mode)
-        base_payload = {
-            "prompt": prompt,
-            "image_size": req.image_size or "square_hd",
-            "num_images": 1,
-            "enable_safety_checker": True,
-        }
-        first = call_fal_endpoint(FAL_MODELS[chosen_key], base_payload)
-        if first["ok"]:
-            return {
-                "image_url": first["url"],
-                "model": chosen_key,
-            }
-
-        fallback_key = "ultra" if chosen_key == "flux1" else "flux1"
-        second = call_fal_endpoint(FAL_MODELS[fallback_key], base_payload)
-        if second["ok"]:
-            return {
-                "image_url": second["url"],
-                "model": fallback_key,
-                "fallback": True,
-            }
-
-        return JSONResponse(
-            status_code=502,
-            content={"detail": second.get("error") or first.get("error") or "Image generation failed."},
-        )
-    except Exception as exc:
-        return JSONResponse(status_code=500, content={"detail": str(exc)})
 
 
 @app.post("/api/feedback")
@@ -559,21 +571,6 @@ async def index():
             --text-primary: #f8fafc;
             --text-secondary: #cbd5e1;
             --text-muted: #94a3b8;
-            --accent-upgrade: #2563eb;
-            --accent-upgrade-border: #60a5fa;
-        }
-
-        body.light-mode {
-            --bg-main: #ffffff;
-            --bg-surface: #f8fafc;
-            --bg-elevated: #eef2ff;
-            --border-subtle: #cbd5e1;
-            --border-user: #2563eb;
-            --text-primary: #09090b;
-            --text-secondary: #1e293b;
-            --text-muted: #475569;
-            --accent-upgrade: #1d4ed8;
-            --accent-upgrade-border: #2563eb;
         }
 
         * {
@@ -612,10 +609,6 @@ async def index():
                 radial-gradient(circle at 52% 76%, rgba(236, 72, 153, 0.18), transparent 48%);
             filter: blur(28px);
             animation: pyroxFogDrift 14s ease-in-out infinite alternate;
-        }
-
-        body.light-mode .pyrox-fog-layer {
-            opacity: 0.22;
         }
 
         @keyframes pyroxFogDrift {
@@ -908,7 +901,6 @@ async def index():
             color: var(--text-primary);
         }
 
-        /* Clean full-height history list without nested inner scroll box */
         .all-history-block {
             display: flex;
             flex-direction: column;
@@ -1220,26 +1212,6 @@ async def index():
             font-size: 0.96rem;
         }
 
-        .msg-ai img.zoomable-img {
-            max-width: 100%;
-            max-height: 380px;
-            border-radius: 14px;
-            border: 1px solid var(--border-subtle);
-            margin-top: 6px;
-            cursor: zoom-in;
-        }
-
-        .upgrade-prompt-card {
-            margin-top: 6px;
-            padding: 14px 16px;
-            border-radius: 14px;
-            background-color: var(--bg-elevated);
-            border: 1px solid var(--accent-upgrade-border);
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
         .msg-actions {
             display: flex;
             align-items: center;
@@ -1310,22 +1282,6 @@ async def index():
             opacity: 1;
         }
 
-        .image-generating-strip {
-            display: none;
-            margin-bottom: 6px;
-            padding: 7px 12px;
-            border-radius: 10px;
-            background-color: var(--bg-elevated);
-            border: 1px solid var(--border-user);
-            font-size: 0.9rem;
-            font-weight: 700;
-            color: var(--text-primary);
-        }
-
-        .image-generating-strip.show {
-            display: block;
-        }
-
         .attachment-chip-bar {
             display: none;
             align-items: center;
@@ -1382,7 +1338,7 @@ async def index():
 
         .plus-small-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: 1fr;
             gap: 6px;
             padding-top: 6px;
             border-top: 1px solid var(--border-subtle);
@@ -1394,13 +1350,13 @@ async def index():
             background-color: var(--bg-elevated);
             border: 1px solid var(--border-subtle);
             color: var(--text-primary);
-            font-size: 0.84rem;
+            font-size: 0.86rem;
             font-weight: 650;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 5px;
+            gap: 6px;
         }
 
         .input-shell {
@@ -1632,29 +1588,6 @@ async def index():
             cursor: pointer;
         }
 
-        .single-price-banner {
-            border: 1px solid var(--accent-upgrade-border);
-            background-color: var(--bg-elevated);
-            border-radius: 14px;
-            padding: 14px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .old-price {
-            text-decoration: line-through;
-            color: var(--text-muted);
-            font-size: 0.98rem;
-            margin-right: 6px;
-        }
-
-        .new-price {
-            font-size: 1.36rem;
-            font-weight: 800;
-            color: var(--text-primary);
-        }
-
         .video-frame {
             flex: 1;
             min-height: 0;
@@ -1707,34 +1640,6 @@ async def index():
             height: 44px;
             border-radius: 50%;
             background-color: var(--text-primary);
-        }
-
-        .zoom-modal-backdrop {
-            position: fixed;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.9);
-            display: none;
-            align-items: center;
-            justify-content: center;
-            z-index: 250;
-            padding: 16px;
-        }
-
-        .zoom-modal-backdrop.show {
-            display: flex;
-        }
-
-        .zoom-img-target {
-            max-width: 95vw;
-            max-height: 85vh;
-            border-radius: 12px;
-            transition: transform 0.2s ease;
-            cursor: zoom-in;
-        }
-
-        .zoom-img-target.zoomed {
-            transform: scale(1.75);
-            cursor: zoom-out;
         }
 
         .robot-check-box {
@@ -1795,7 +1700,7 @@ async def index():
         </svg>
         <div style="font-size:1.85rem;font-weight:800;letter-spacing:0.2px;color:#09090b;">Welcome to Pyrox</div>
         <p style="max-width:340px;font-size:0.98rem;color:#475569;line-height:1.5;">
-            Bring your files, your ideas, and your next big question. Log in for the full experience.
+            Photo khinch kar padho, fill-in-the-blanks samjho, ya file aur chat se turant madad lo.
         </p>
     </div>
 
@@ -1875,19 +1780,11 @@ async def index():
         </label>
 
         <div style="display:flex;flex-direction:column;margin-top:6px;">
-            <button type="button" onclick="selectChooserAccount('Harshit Singh', 'harshit@pyrox.app')" style="display:flex;align-items:center;gap:12px;padding:12px 8px;background:none;border:none;border-bottom:1px solid #e2e8f0;text-align:left;cursor:pointer;color:#0f172a;">
+            <button type="button" onclick="selectChooserAccount('Harshit', 'harshit@pyrox.app')" style="display:flex;align-items:center;gap:12px;padding:12px 8px;background:none;border:none;border-bottom:1px solid #e2e8f0;text-align:left;cursor:pointer;color:#0f172a;">
                 <span style="width:36px;height:36px;border-radius:999px;background:#2563eb;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;">H</span>
                 <span style="display:flex;flex-direction:column;">
-                    <strong style="font-size:0.95rem;">Harshit Singh</strong>
+                    <strong style="font-size:0.95rem;">Harshit</strong>
                     <span style="font-size:0.82rem;color:#475569;">harshit@pyrox.app</span>
-                </span>
-            </button>
-
-            <button type="button" onclick="selectChooserAccount('Alka Singh', 'alkasingh9268@gmail.com')" style="display:flex;align-items:center;gap:12px;padding:12px 8px;background:none;border:none;border-bottom:1px solid #e2e8f0;text-align:left;cursor:pointer;color:#0f172a;">
-                <span style="width:36px;height:36px;border-radius:999px;background:#0f766e;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;">A</span>
-                <span style="display:flex;flex-direction:column;">
-                    <strong style="font-size:0.95rem;">Alka Singh</strong>
-                    <span style="font-size:0.82rem;color:#475569;">alkasingh9268@gmail.com</span>
                 </span>
             </button>
 
@@ -1915,14 +1812,14 @@ async def index():
 
             <div class="nav-item" onclick="newChat(); closeSidebar();">+ New Chat</div>
 
-            <div class="nav-item" onclick="activateImageModeBar(); closeSidebar();">
-                <span>Images</span>
-                <span class="quota-pill" id="sidebarImgQuota">2/2</span>
+            <div class="nav-item" onclick="openCamera(); closeSidebar();">
+                <span>Camera Vision</span>
+                <span class="quota-pill">Read</span>
             </div>
 
-            <div class="nav-item" onclick="openModal('videoModal'); closeSidebar();">
-                <span>Video</span>
-                <span class="quota-pill">Soon</span>
+            <div class="nav-item" onclick="triggerFilePicker(); closeSidebar();">
+                <span>File Vision</span>
+                <span class="quota-pill">Docs</span>
             </div>
 
             <div class="nav-item" onclick="toggleModelSublist()">Pyrox Only ▾</div>
@@ -1991,20 +1888,16 @@ async def index():
                     </svg>
                     <span class="greeting-logo-title" id="greetingBrandName">Pyrox</span>
                 </div>
-                <h1 id="greetingText">Swagatam! How can I assist you today?</h1>
+                <h1 id="greetingText">Swagatam! Kya padhna ya samajhna hai aaj?</h1>
                 <div class="starter-chips-row">
-                    <button type="button" class="starter-chip" onclick="useStarterPrompt('Explain a complex topic simply')">Explain simply</button>
+                    <button type="button" class="starter-chip" onclick="useStarterPrompt('Photo ya page mein kya likha hai aur fill in the blanks mein kya bharna hai?')">Read photo / blanks</button>
+                    <button type="button" class="starter-chip" onclick="useStarterPrompt('Kisi topic ko Hinglish mein aasan tarike se samjhao')">Explain simply</button>
                     <button type="button" class="starter-chip" onclick="useStarterPrompt('Help me write and debug Python code')">Coding help</button>
-                    <button type="button" class="starter-chip" onclick="useStarterPrompt('Generate an ultra detailed image of a futuristic mountain peak at sunset')">Generate image</button>
                 </div>
             </div>
         </section>
 
         <footer class="bottom-dock dock-slid-up" id="bottomDock" onclick="event.stopPropagation()">
-            <div class="image-generating-strip" id="imageModeBanner">
-                Image generation mode active — enter prompt to generate image
-            </div>
-
             <div class="attachment-chip-bar" id="attachmentChipBar">
                 <span id="attachmentChipLabel">Attached file</span>
                 <button type="button" class="close-x" onclick="clearPendingAttachment()">✕</button>
@@ -2016,38 +1909,22 @@ async def index():
                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                         <polyline points="14 2 14 8 20 8"></polyline>
                     </svg>
-                    <span>File</span>
+                    <span>File Vision</span>
                 </button>
                 <button type="button" class="plus-big-btn" onclick="openCamera()">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
                         <circle cx="12" cy="13" r="4"></circle>
                     </svg>
-                    <span>Camera</span>
-                </button>
-                <button type="button" class="plus-big-btn" onclick="openModal('libraryModal')">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
-                        <polyline points="2 17 12 22 22 17"></polyline>
-                        <polyline points="2 12 12 17 22 12"></polyline>
-                    </svg>
-                    <span>Drive</span>
+                    <span>Camera Vision</span>
                 </button>
                 <div class="plus-small-grid">
-                    <button type="button" class="plus-small-btn" onclick="activateImageModeBar(); closePlusMenu();">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                            <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                            <polyline points="21 15 16 10 5 21"></polyline>
-                        </svg>
-                        <span>Image Creation</span>
-                    </button>
                     <button type="button" class="plus-small-btn" onclick="promptCanvasMode()">
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M12 20h9"></path>
                             <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
                         </svg>
-                        <span>Canvas</span>
+                        <span>Notes / Canvas</span>
                     </button>
                 </div>
             </div>
@@ -2145,18 +2022,6 @@ async def index():
     </div>
 </div>
 
-<div class="overlay-modal" id="videoModal" onclick="closeModal('videoModal')">
-    <div class="modal-box" onclick="event.stopPropagation()">
-        <div class="modal-head">
-            <span>Pyrox Video</span>
-            <button type="button" class="close-x" onclick="closeModal('videoModal')">Close</button>
-        </div>
-        <p style="font-size:0.98rem;color:var(--text-secondary);line-height:1.55;">
-            AI Video generation module is staged for upcoming video API integration without slowing chat performance.
-        </p>
-    </div>
-</div>
-
 <div class="overlay-modal" id="settingsModal" onclick="closeModal('settingsModal')">
     <div class="modal-box" onclick="event.stopPropagation()">
         <div class="modal-head">
@@ -2180,32 +2045,6 @@ async def index():
         <div id="libraryModalBody" style="display:flex;flex-direction:column;gap:8px;font-size:0.98rem;color:var(--text-secondary);">
             No chats yet.
         </div>
-    </div>
-</div>
-
-<div class="overlay-modal" id="upgradeModal" onclick="closeModal('upgradeModal')">
-    <div class="modal-box" onclick="event.stopPropagation()">
-        <div class="modal-head">
-            <span>Pyrox Pro Upgrade</span>
-            <button type="button" class="close-x" onclick="closeModal('upgradeModal')">✕</button>
-        </div>
-        <p style="font-size:0.95rem;color:var(--text-secondary);line-height:1.55;">
-            2 free image generations per month ho chuki hain. Pyrox Pro upgrade lene par aapko bahut achhi aur high-quality images aur zyada limits milengi.
-        </p>
-        <div class="single-price-banner">
-            <div>
-                <div style="font-weight:800;font-size:1.05rem;">Pyrox Pro</div>
-                <div style="font-size:0.84rem;color:var(--text-secondary);">High-quality images & extended access</div>
-            </div>
-            <div>
-                <span class="old-price">₹800</span>
-                <span class="new-price">₹139/mo</span>
-            </div>
-        </div>
-        <button type="button" class="action-btn" style="background-color:var(--accent-upgrade);border-color:var(--accent-upgrade-border);color:#ffffff;" onclick="confirmUpgrade()">
-            Upgrade to Pyrox Pro
-        </button>
-        <div id="upgradeStatusMsg" style="font-size:0.88rem;color:var(--text-secondary);"></div>
     </div>
 </div>
 
@@ -2241,7 +2080,7 @@ async def index():
 <div class="overlay-modal camera-sheet" id="cameraModal" onclick="closeCamera()">
     <div class="modal-box" onclick="event.stopPropagation()">
         <div class="modal-head">
-            <span>Camera</span>
+            <span>Camera Vision</span>
             <button type="button" class="close-x" onclick="closeCamera()">Close</button>
         </div>
         <div class="video-frame" id="cameraFrame">
@@ -2257,16 +2096,10 @@ async def index():
     </div>
 </div>
 
-<div class="zoom-modal-backdrop" id="imageZoomModal" onclick="closeImageZoom()">
-    <button type="button" class="close-x" style="position:fixed;top:18px;right:18px;z-index:260;" onclick="closeImageZoom()">✕ Close</button>
-    <img id="zoomedImgElement" class="zoom-img-target" src="" alt="Zoomed view" onclick="event.stopPropagation(); this.classList.toggle('zoomed');" />
-</div>
-
 <script>
     const NORMAL_DAILY_LIMIT = 40;
     const CODING_DAILY_LIMIT = 30;
     const WARNING_REMAINING_THRESHOLD = 5;
-    const MONTHLY_FREE_IMAGE_LIMIT = 2;
     const MAX_INPUT_CHARS = 6000;
 
     let chatStarted = false;
@@ -2284,7 +2117,6 @@ async def index():
     let latestAudioPlayer = null;
     let feedbackTargetSnippet = "";
     let activeDislikeBtn = null;
-    let imageModeActive = false;
 
     let recognition = null;
     let isDictating = false;
@@ -2296,22 +2128,6 @@ async def index():
             <line x1="12" y1="19" x2="12" y2="23"></line>
         </svg>
     `;
-
-    function openImageZoom(src) {
-        if (!src) return;
-        const modal = document.getElementById("imageZoomModal");
-        const img = document.getElementById("zoomedImgElement");
-        img.classList.remove("zoomed");
-        img.src = src;
-        modal.classList.add("show");
-    }
-
-    function closeImageZoom() {
-        const modal = document.getElementById("imageZoomModal");
-        const img = document.getElementById("zoomedImgElement");
-        img.classList.remove("zoomed");
-        modal.classList.remove("show");
-    }
 
     function isUserSignedUp() {
         return Boolean(localStorage.getItem("pyrox_signed_up"));
@@ -2440,59 +2256,6 @@ async def index():
         closeModal("googleModal");
     }
 
-    function getMonthKey() {
-        const now = new Date();
-        return `${now.getFullYear()}-${now.getMonth() + 1}`;
-    }
-
-    function getMonthlyImageCount() {
-        const data = JSON.parse(localStorage.getItem("pyrox_monthly_images") || "{}");
-        if (data.month !== getMonthKey()) return 0;
-        return Number(data.count || 0);
-    }
-
-    function incrementMonthlyImageCount() {
-        const next = getMonthlyImageCount() + 1;
-        localStorage.setItem(
-            "pyrox_monthly_images",
-            JSON.stringify({ month: getMonthKey(), count: next })
-        );
-        refreshImageQuotaUI();
-        return next;
-    }
-
-    function isImageLockedThisMonth() {
-        return getMonthlyImageCount() >= MONTHLY_FREE_IMAGE_LIMIT;
-    }
-
-    function refreshImageQuotaUI() {
-        const remaining = Math.max(0, MONTHLY_FREE_IMAGE_LIMIT - getMonthlyImageCount());
-        const pill = document.getElementById("sidebarImgQuota");
-        if (pill) {
-            pill.textContent = isImageLockedThisMonth() ? "Pro Needed" : `${remaining}/2`;
-        }
-    }
-
-    function activateImageModeBar() {
-        if (isImageLockedThisMonth()) {
-            const banner = document.getElementById("imageModeBanner");
-            banner.textContent = "2 free images ho chuki hain — Pyrox Pro upgrade le lo, bahut achhi aur high-quality image milegi.";
-            banner.classList.add("show");
-            return;
-        }
-        imageModeActive = true;
-        const banner = document.getElementById("imageModeBanner");
-        banner.textContent = "Image creation active — type a prompt and send";
-        banner.classList.add("show");
-        document.getElementById("promptInput").focus();
-    }
-
-    function clearImageModeBar() {
-        imageModeActive = false;
-        const banner = document.getElementById("imageModeBanner");
-        banner.classList.remove("show");
-    }
-
     function showPendingAttachmentChip(label) {
         const bar = document.getElementById("attachmentChipBar");
         const txt = document.getElementById("attachmentChipLabel");
@@ -2608,8 +2371,8 @@ async def index():
         const el = document.getElementById("greetingText");
         if (el) {
             el.textContent = name
-                ? `Swagatam ${name}! How can I assist you today?`
-                : "Swagatam! How can I assist you today?";
+                ? `Swagatam ${name}! Kya padhna ya samajhna hai aaj?`
+                : "Swagatam! Kya padhna ya samajhna hai aaj?";
         }
     }
 
@@ -2726,10 +2489,6 @@ async def index():
         document.getElementById("ttsToggleBtn").textContent = `Auto Voice Reply: ${ttsEnabled ? "On" : "Off"}`;
     }
 
-    function confirmUpgrade() {
-        document.getElementById("upgradeStatusMsg").textContent = "Pyrox Pro (₹139/mo) selected for high-quality image generation.";
-    }
-
     function loadFolders() {
         return JSON.parse(localStorage.getItem("pyrox_folders") || "[]");
     }
@@ -2838,7 +2597,6 @@ async def index():
 
     function newChat() {
         stopGeneration();
-        clearImageModeBar();
         clearPendingAttachment();
         activeFolderId = null;
         const stage = document.getElementById("scrollStage");
@@ -2854,9 +2612,9 @@ async def index():
                 </div>
                 <h1 id="greetingText"></h1>
                 <div class="starter-chips-row">
-                    <button type="button" class="starter-chip" onclick="useStarterPrompt('Explain a complex topic simply')">Explain simply</button>
+                    <button type="button" class="starter-chip" onclick="useStarterPrompt('Photo ya page mein kya likha hai aur fill in the blanks mein kya bharna hai?')">Read photo / blanks</button>
+                    <button type="button" class="starter-chip" onclick="useStarterPrompt('Kisi topic ko Hinglish mein aasan tarike se samjhao')">Explain simply</button>
                     <button type="button" class="starter-chip" onclick="useStarterPrompt('Help me write and debug Python code')">Coding help</button>
-                    <button type="button" class="starter-chip" onclick="useStarterPrompt('Generate an ultra detailed image of a futuristic mountain peak at sunset')">Generate image</button>
                 </div>
             </div>
         `;
@@ -3001,10 +2759,10 @@ async def index():
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         canvas.getContext("2d").drawImage(video, 0, 0);
-        pendingAttachmentDataUrl = canvas.toDataURL("image/png");
+        pendingAttachmentDataUrl = canvas.toDataURL("image/jpeg", 0.88);
         pendingFileDataUrl = null;
-        pendingAttachmentName = "camera_photo.png";
-        showPendingAttachmentChip("camera_photo.png");
+        pendingAttachmentName = "camera_photo.jpg";
+        showPendingAttachmentChip("camera_photo.jpg");
         closeCamera();
         document.getElementById("promptInput").focus();
     }
@@ -3031,7 +2789,7 @@ async def index():
         let finalCommitted = "";
 
         recognition = new SR();
-        recognition.lang = "en-IN";
+        recognition.lang = "hi-IN";
         recognition.continuous = false;
         recognition.interimResults = true;
 
@@ -3369,24 +3127,6 @@ async def index():
         );
     }
 
-    function detectImageGenerationIntent(text) {
-        const lower = text.toLowerCase().trim();
-        if (imageModeActive) {
-            return { isImage: true, prompt: text };
-        }
-        if (lower.startsWith("/image ")) {
-            return { isImage: true, prompt: text.slice(7).trim() };
-        }
-        const imagePatterns = [
-            /\b(generate|create|make|draw)\s+(an?\s+)?(image|photo|picture|pic|art|wallpaper)\b/i,
-            /\b(image|photo|picture|tasveer)\s+(bana|banao|banade|bana\s*do|bana\s*de|generate|create)\b/i,
-        ];
-        if (imagePatterns.some((rx) => rx.test(text))) {
-            return { isImage: true, prompt: text };
-        }
-        return { isImage: false, prompt: text };
-    }
-
     async function sendMessage(overrideText = null, isRegenerate = false) {
         if (isRequestInFlight) return;
         if (isDictating) stopDictationManual(false);
@@ -3397,16 +3137,13 @@ async def index():
         if (!checkInputCharLimit(raw)) return;
         if (!raw && !pendingAttachmentDataUrl && !pendingFileDataUrl) return;
 
-        const messageToSend = raw || `Please check ${pendingAttachmentName || "this attachment"}`;
+        const messageToSend = raw || `Please read ${pendingAttachmentName || "this attachment"} and tell me what is written and what needs to be done.`;
         const isHeavy = detectHeavyCodingIntent(messageToSend);
 
         if (isDailyLimitReached(isHeavy)) {
             updateLimitWarningBanner(isHeavy);
             return;
         }
-
-        const wasImageMode = imageModeActive;
-        clearImageModeBar();
 
         const attachmentToSend = pendingAttachmentDataUrl;
         const fileToSend = pendingFileDataUrl;
@@ -3433,90 +3170,38 @@ async def index():
         activeAbortController = new AbortController();
         setGeneratingState(true);
 
-        const imgIntent = detectImageGenerationIntent(messageToSend);
-        const searchLikely =
-            !imgIntent.isImage &&
-            /\b(aaj|kal|today|tomorrow|news|latest|festival|tyohar|weather|price|rate|2025|2026|2027|kab hai|kya chal raha|fal\.ai|fal ai)\b/i.test(
-                messageToSend
-            );
+        const searchLikely = /\b(aaj|kal|today|tomorrow|news|latest|festival|tyohar|weather|price|rate|2025|2026|2027|kab hai|kya chal raha)\b/i.test(
+            messageToSend
+        );
 
         if (searchLikely) setSearchingBanner(true);
 
         try {
-            if (imgIntent.isImage || wasImageMode) {
-                if (isImageLockedThisMonth()) {
-                    const upgradeMsg = "Aapki 2 free images poori ho chuki hain. Aage image banane ke liye Pyrox Pro upgrade le lo — isse aapko bahut achhi aur high-quality image milegi.";
-                    bodyDiv.innerHTML = `
-                        <div class="upgrade-prompt-card">
-                            <div style="font-weight:750;">Pyrox Pro Upgrade Required</div>
-                            <div style="font-size:0.95rem;color:var(--text-secondary);line-height:1.5;">${upgradeMsg}</div>
-                            <div>
-                                <button type="button" class="action-btn" style="background-color:var(--accent-upgrade);border-color:var(--accent-upgrade-border);color:#ffffff;" onclick="openModal('upgradeModal')">
-                                    Upgrade le lo (High Quality)
-                                </button>
-                            </div>
-                        </div>
-                    `;
-                    appendItemToActiveFolder("ai", upgradeMsg);
-                } else {
-                    const res = await fetch("/api/generate-image", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                            prompt: imgIntent.prompt || messageToSend,
-                            mode: "auto",
-                        }),
-                        signal: activeAbortController.signal,
-                    });
-                    const data = await res.json();
-                    if (!res.ok) {
-                        bodyDiv.textContent = data.detail || "Image generation failed.";
-                    } else {
-                        incrementMonthlyImageCount();
-                        const finalImgSrc = data.image_url || data.image_data || "";
-                        const imgEl = document.createElement("img");
-                        imgEl.className = "zoomable-img";
-                        imgEl.src = finalImgSrc;
-                        imgEl.alt = imgIntent.prompt || messageToSend;
-                        imgEl.onclick = () => openImageZoom(finalImgSrc);
-                        bodyDiv.innerHTML = "";
-                        bodyDiv.appendChild(imgEl);
-                        row.appendChild(
-                            buildResponseActionsBar(
-                                `Generated image: ${imgIntent.prompt || messageToSend}`,
-                                messageToSend
-                            )
-                        );
-                        appendItemToActiveFolder("ai", `[Generated Image: ${imgIntent.prompt || messageToSend}]`);
-                    }
-                }
+            const res = await fetch("/api/chat", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    message: messageToSend,
+                    user_name: getUserName(),
+                    theme_label: getThemeLabel(),
+                    model_mode: selectedModelMode,
+                    enable_tts: ttsEnabled,
+                    image_data_url: attachmentToSend,
+                    file_name: fileNameToSend,
+                    file_data_url: fileToSend,
+                    regenerate: isRegenerate,
+                }),
+                signal: activeAbortController.signal,
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                bodyDiv.textContent = data.detail || "Request failed.";
             } else {
-                const res = await fetch("/api/chat", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        message: messageToSend,
-                        user_name: getUserName(),
-                        theme_label: getThemeLabel(),
-                        model_mode: selectedModelMode,
-                        enable_tts: ttsEnabled,
-                        image_data_url: attachmentToSend,
-                        file_name: fileNameToSend,
-                        file_data_url: fileToSend,
-                        regenerate: isRegenerate,
-                    }),
-                    signal: activeAbortController.signal,
-                });
-                const data = await res.json();
-                if (!res.ok) {
-                    bodyDiv.textContent = data.detail || "Request failed.";
-                } else {
-                    const reply = data.reply || "";
-                    bodyDiv.innerHTML = renderRichMarkdown(reply);
-                    row.appendChild(buildResponseActionsBar(reply, messageToSend));
-                    appendItemToActiveFolder("ai", reply);
-                    if (data.audio_url) playAudioFromUrl(data.audio_url);
-                }
+                const reply = data.reply || "";
+                bodyDiv.innerHTML = renderRichMarkdown(reply);
+                row.appendChild(buildResponseActionsBar(reply, messageToSend));
+                appendItemToActiveFolder("ai", reply);
+                if (data.audio_url) playAudioFromUrl(data.audio_url);
             }
         } catch (err) {
             bodyDiv.textContent = err.name === "AbortError" ? "Stopped." : "Connection error.";
@@ -3534,7 +3219,6 @@ async def index():
     refreshGreeting();
     refreshThemeLabel();
     renderLibraryFolders();
-    refreshImageQuotaUI();
     updateLimitWarningBanner();
 </script>
 </body>
