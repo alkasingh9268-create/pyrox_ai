@@ -4,7 +4,7 @@ import datetime
 import io
 import os
 import re
-from typing import Optional
+from typing import Any, Dict, List, Optional
 import urllib.parse
 import zipfile
 import xml.etree.ElementTree as ET
@@ -23,36 +23,18 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "").strip()
 SERP_API_KEY = os.environ.get("SERPAPI_API_KEY", "").strip()
-FAL_KEY = (
-    os.environ.get("FAL_KEY", "").strip()
-    or os.environ.get("PALM_KEY", "").strip()
-)
 
 MALE_VOICE = "hi-IN-MadhurNeural"
 MAX_CHAT_CHARS = 8000
 CACHED_GROQ_MODEL: Optional[str] = None
 
-FAL_MODELS = {
-    "flux1": "https://fal.run/fal-ai/flux/schnell",
-    "ultra": "https://fal.run/fal-ai/flux-pro/v1.1-ultra",
-}
-
-ULTRA_KEYWORDS = (
-    "ultra",
-    "4k",
-    "8k",
-    "high detail",
-    "hyper realistic",
-    "photorealistic",
-    "cinematic",
-    "pro",
-)
-
 
 class ChatRequest(BaseModel):
     message: str
+    history: List[Dict[str, str]] = []
     voice: str = MALE_VOICE
     user_name: Optional[str] = None
+    user_email: Optional[str] = None
     theme_label: str = "Pyrox"
     model_mode: str = "Pyrox Only"
     enable_tts: bool = False
@@ -60,12 +42,6 @@ class ChatRequest(BaseModel):
     file_name: Optional[str] = None
     file_data_url: Optional[str] = None
     regenerate: bool = False
-
-
-class ImageRequest(BaseModel):
-    prompt: str
-    mode: str = "auto"
-    image_size: str = "square_hd"
 
 
 class FeedbackRequest(BaseModel):
@@ -164,8 +140,6 @@ def should_search_web(message: str) -> bool:
         "who is",
         "what is",
         "how much",
-        "fal.ai",
-        "fal ai",
         "api",
     ]
     return any(t in q for t in triggers)
@@ -235,11 +209,11 @@ def extract_text_from_data_url(file_name: Optional[str], data_url: Optional[str]
                 xml_bytes = zf.read("word/document.xml")
                 root = ET.fromstring(xml_bytes)
                 texts = [elem.text for elem in root.iter() if elem.text]
-                return " ".join(texts)[:4000].strip()
+                return " ".join(texts)[:5000].strip()
 
         decoded = raw_bytes.decode("utf-8", errors="ignore")
         cleaned = re.sub(r"\s+", " ", decoded).strip()
-        return cleaned[:4000]
+        return cleaned[:5000]
     except Exception:
         return ""
 
@@ -275,7 +249,7 @@ def is_short_greeting(message: str) -> bool:
 
 def detect_language_style(message: str) -> str:
     if re.search(r"[\u0900-\u097F]", message):
-        return "Hindi (Devanagari)"
+        return "Hindi (Devanagari) — match user's natural conversational tone"
     hinglish_markers = {
         "kya",
         "hai",
@@ -298,46 +272,28 @@ def detect_language_style(message: str) -> str:
         "kyun",
         "kab",
         "kahan",
+        "samjha",
+        "likho",
+        "banado",
+        "bana",
     }
     words = set(re.findall(r"[a-zA-Z']+", message.lower()))
     if len(words.intersection(hinglish_markers)) >= 1:
-        return "Casual Hinglish (mirror user's tone naturally and clearly)"
-    return "Clear, authoritative English"
+        return "Natural Hinglish (mirror user's exact vibe, warmth, and sharpness)"
+    return "Clear, crisp, authoritative English"
 
 
-def pick_fal_model_key(prompt: str, mode: str = "auto") -> str:
-    m = (mode or "auto").strip().lower()
-    if m in ("ultra", "pro", "high"):
-        return "ultra"
-    if m in ("flux1", "fast", "normal"):
-        return "flux1"
-    p = (prompt or "").lower()
-    return "ultra" if any(k in p for k in ULTRA_KEYWORDS) else "flux1"
-
-
-def call_fal_endpoint(endpoint_url: str, payload: dict) -> dict:
-    if not FAL_KEY:
-        return {"ok": False, "error": "FAL_KEY missing in server environment."}
-    headers = {
-        "Authorization": f"Key {FAL_KEY}",
-        "Content-Type": "application/json",
-    }
-    res = requests.post(endpoint_url, json=payload, headers=headers, timeout=90)
-    try:
-        data = res.json()
-    except Exception:
-        data = {"detail": res.text[:250]}
-
-    if res.status_code != 200:
-        err_detail = data.get("detail") or data.get("error") or str(data)
-        return {"ok": False, "error": str(err_detail)[:250]}
-
-    images = data.get("images") or []
-    if images and images[0].get("url"):
-        return {"ok": True, "url": images[0]["url"]}
-    if data.get("image") and isinstance(data["image"], dict) and data["image"].get("url"):
-        return {"ok": True, "url": data["image"]["url"]}
-    return {"ok": False, "error": "No image returned from fal.ai"}
+def detect_audience_persona(message: str) -> str:
+    q = message.lower()
+    if any(k in q for k in ["class 6", "class 7", "class 8", "class 9", "class 10", "school", "homework", "exam", "baccha", "bacha", "easy mein", "simple mein", "samjhao"]):
+        return "AUTO-PERSONA [STUDENT / YOUNG LEARNER]: Explain step-by-step with crystal-clear examples, encouraging peer tone, zero confusing jargon."
+    if any(k in q for k in ["uncle", "aunty", "elder", "senior", "baba", "dada", "dadi", "papa", "mummy", "slowly", "aram se", "simple words"]):
+        return "AUTO-PERSONA [ELDER / RESPECTFUL GUIDE]: Warm, patient, respectful tone, clean formatting, zero tech slang, easy-to-follow steps."
+    if any(k in q for k in ["team", "meeting", "client", "startup", "deploy", "architecture", "production", "sprint", "roadmap", "business"]):
+        return "AUTO-PERSONA [TEAM / PROFESSIONAL BUILDER]: Executive, high-signal, structured deliverables, trade-offs, and production-ready precision."
+    if any(k in q for k in ["prompt", "system prompt", "mega prompt", "instruction", "agent", "bot bana", "ai bana"]):
+        return "AUTO-PERSONA [PROMPT ARCHITECT ENGINE]: Build deep, comprehensive, structured, production-grade system prompts with Role, Persona Adaptability, Edge-Cases, I/O Rules, Memory Guardrails, and Execution Steps — never shallow bullets."
+    return "AUTO-PERSONA [ADAPTIVE PEER]: Automatically read the user's age, energy, and intent from their words without needing manual instructions; be sharp, friendly, and directly useful."
 
 
 @app.post("/api/chat")
@@ -373,43 +329,69 @@ async def chat_endpoint(req: ChatRequest):
             else f"Current Date: {datetime.datetime.now().strftime('%A, %d %B %Y')} (India). {get_special_day_note(datetime.datetime.now())}"
         )
 
-        short_mode = is_short_greeting(user_msg) and not req.image_data_url and not doc_text
-        user_label = req.user_name.strip() if req.user_name and req.user_name.strip() else ""
-        identity_line = (
-            f"Active session Gmail profile name: {user_label} (for greeting/account display only). "
-            if user_label
-            else ""
+        short_mode = (
+            is_short_greeting(user_msg)
+            and not req.image_data_url
+            and not doc_text
+            and len(req.history) == 0
         )
+
+        clean_user_name = (req.user_name or "").strip()
+        clean_user_email = (req.user_email or "").strip()
+        memory_user_line = (
+            f"User Profile Memory: The user currently chatting is named '{clean_user_name}'"
+            + (f" ({clean_user_email})" if clean_user_email else "")
+            + ". Always remember their exact name without adding any fake surname."
+            if clean_user_name
+            else "User Profile Memory: No user name set yet; if they share their name in chat, remember it across all turns."
+        )
+
         creator_line = (
-            "Creator/Maker Rule: Pyrox AI was created by Harshit. Harshit means Harshit—this creator identity is permanent and has zero connection to whichever Gmail account is currently logged in or speaking."
+            "Permanent Creator Rule: Pyrox AI was created by Harshit. This is an unchangeable core fact."
         )
         lang_mode = detect_language_style(user_msg)
+        audience_mode = detect_audience_persona(user_msg)
         regen_rule = (
-            " Provide a fresh, sharper explanation or angle without repeating identical wording."
+            " Provide a sharper, deeper angle without repeating identical phrasing."
             if req.regenerate
             else ""
         )
 
         core_persona = (
-            "You are Pyrox, a sharp, clear, and persuasive AI assistant built to help both young learners (students/kids) "
-            "and adults with calm clarity, practical logic, and structured answers. "
-            "Adapt your tone smoothly: keep explanations simple and encouraging when a concept is tricky, "
-            "and direct, structured, and high-signal when solving technical, coding, or real-world questions. "
-            "When explaining trade-offs or recommending a practical approach, persuade clearly with honest reasons and real pros/cons—never sounding robotic or dismissive. "
-            "Never guess or invent facts when uncertain; state clearly what is verified vs unknown. "
-            "Format responses cleanly with bold key terms, concise paragraphs, and structured lists or code blocks where helpful."
+            "You are Pyrox, an elite, adaptive AI collaborator with unmatched communication skills and deep execution power.\n"
+            "CORE OPERATING LAWS (FOLLOW STRICTLY ON EVERY RESPONSE):\n"
+            "1. WORK-FIRST OUTPUT (KAAM PEHLE): Lead immediately with the real deliverable — exact code, working solution, complete prompt, or direct answer first. Keep explanations tight and practical after the solution; zero fluff or robotic preambles.\n"
+            "2. SELF-AUDITING & EDGE-CASE CATCHER: Before finalizing any code, logic, or plan, silently catch bugs, edge cases, missing validations, or wrong assumptions and warn/fix them proactively to save the user's time.\n"
+            "3. BIG TASK DECOMPOSITION: When given a large or complex project, break it into clean, numbered, actionable milestones without overwhelming the user.\n"
+            "4. ONE SHARP QUESTION WHEN NEEDED: If critical info is missing, never ask 10 questions — ask at most ONE focused question that moves the work forward.\n"
+            "5. AUTOMATIC PERSONALITY CHANGER: Detect who you are talking to (kid/student, young builder, adult, elder, or team) from their tone and vocabulary automatically — never force the user to write manual instructions to get the right tone.\n"
+            "6. UNFORGETTABLE MEMORY & CONTINUITY: Read the full conversation history carefully. Never forget the user's name, past corrections, project decisions, or prior context in this session.\n"
+            "7. PROMPT ARCHITECT SUPERPOWER: Whenever the user asks for a prompt (for an AI, app, system, or agent), generate a complete, ultra-detailed, battle-tested prompt with clear sections, rules, edge cases, and examples — never cut corners.\n"
+            "8. HONESTY & FORMATTING: Never fabricate facts. Format cleanly with bold highlights, structured lists, and copy-ready code blocks."
         )
 
         if short_mode:
             system_prompt = (
-                f"{core_persona} {creator_line} Mode: {req.model_mode}. {context_block} {identity_line} "
-                f"Style: {lang_mode}. Reply in 1 crisp, natural sentence.{regen_rule}"
+                f"{core_persona}\n{creator_line}\n{memory_user_line}\n{audience_mode}\n"
+                f"Mode: {req.model_mode}. {context_block} Style: {lang_mode}. "
+                f"Reply in 1 crisp, natural, friendly sentence.{regen_rule}"
             )
         else:
             system_prompt = (
-                f"{core_persona} {creator_line} Mode: {req.model_mode}. {context_block} {identity_line} "
-                f"Style: {lang_mode}. Give direct, high-signal answers first, followed by clear breakdown.{regen_rule}"
+                f"{core_persona}\n{creator_line}\n{memory_user_line}\n{audience_mode}\n"
+                f"Mode: {req.model_mode}. {context_block} Style: {lang_mode}.{regen_rule}"
             )
+
+        messages_payload: List[Dict[str, str]] = [
+            {"role": "system", "content": system_prompt}
+        ]
+
+        # Include up to last 18 conversation turns so Pyrox never forgets context or names
+        for turn in req.history[-18:]:
+            role = turn.get("role", "")
+            content = (turn.get("content") or "").strip()
+            if role in ("user", "assistant") and content:
+                messages_payload.append({"role": role, "content": content[:3500]})
 
         parts = []
         if user_msg:
@@ -418,19 +400,17 @@ async def chat_endpoint(req: ChatRequest):
             parts.append(f"[Attached Document: {req.file_name or 'file'}]\n{doc_text}")
         if req.image_data_url:
             parts.append(
-                f"[Attached Image: {req.file_name or 'photo.png'} received. Analyze context and assist the user clearly.]"
+                f"[Attached Image: {req.file_name or 'photo.png'} received. Analyze context and assist clearly.]"
             )
 
         effective_prompt = "\n\n".join(parts) or "User shared an attachment."
+        messages_payload.append({"role": "user", "content": effective_prompt})
 
         payload = {
             "model": model_id,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": effective_prompt},
-            ],
-            "temperature": 0.75 if req.regenerate else 0.55,
-            "max_tokens": 200 if short_mode else 950,
+            "messages": messages_payload,
+            "temperature": 0.72 if req.regenerate else 0.52,
+            "max_tokens": 220 if short_mode else 3800,
         }
 
         res = requests.post(
@@ -440,7 +420,7 @@ async def chat_endpoint(req: ChatRequest):
                 "Content-Type": "application/json",
             },
             json=payload,
-            timeout=25,
+            timeout=35,
         )
 
         if res.status_code != 200:
@@ -481,54 +461,6 @@ async def listen_endpoint(req: ListenRequest):
             status_code=500, content={"detail": "Unable to generate voice audio."}
         )
     return {"audio_url": f"/static/listen_out.mp3?v={stamp}"}
-
-
-@app.post("/api/generate-image")
-async def generate_image_endpoint(req: ImageRequest):
-    if not FAL_KEY:
-        return JSONResponse(
-            status_code=400,
-            content={
-                "detail": "FAL_KEY missing in environment variables. Set FAL_KEY on Render first."
-            },
-        )
-
-    prompt = req.prompt.strip()
-    if not prompt:
-        return JSONResponse(
-            status_code=400, content={"detail": "Please enter an image prompt."}
-        )
-
-    try:
-        chosen_key = pick_fal_model_key(prompt, req.mode)
-        base_payload = {
-            "prompt": prompt,
-            "image_size": req.image_size or "square_hd",
-            "num_images": 1,
-            "enable_safety_checker": True,
-        }
-        first = call_fal_endpoint(FAL_MODELS[chosen_key], base_payload)
-        if first["ok"]:
-            return {
-                "image_url": first["url"],
-                "model": chosen_key,
-            }
-
-        fallback_key = "ultra" if chosen_key == "flux1" else "flux1"
-        second = call_fal_endpoint(FAL_MODELS[fallback_key], base_payload)
-        if second["ok"]:
-            return {
-                "image_url": second["url"],
-                "model": fallback_key,
-                "fallback": True,
-            }
-
-        return JSONResponse(
-            status_code=502,
-            content={"detail": second.get("error") or first.get("error") or "Image generation failed."},
-        )
-    except Exception as exc:
-        return JSONResponse(status_code=500, content={"detail": str(exc)})
 
 
 @app.post("/api/feedback")
@@ -596,28 +528,44 @@ async def index():
             color: #09090b;
         }
 
+        /* Single heavy monochrome smoke layer that disappears once chat starts */
         .pyrox-fog-layer {
             position: fixed;
-            inset: -12%;
+            inset: -14%;
             pointer-events: none;
             z-index: 1;
-            opacity: 0.46;
+            opacity: 0.72;
             background:
-                radial-gradient(circle at 22% 24%, rgba(56, 189, 248, 0.24), transparent 44%),
-                radial-gradient(circle at 78% 28%, rgba(168, 85, 247, 0.22), transparent 46%),
-                radial-gradient(circle at 52% 76%, rgba(236, 72, 153, 0.18), transparent 48%);
-            filter: blur(28px);
+                radial-gradient(circle at 28% 26%, rgba(148, 163, 184, 0.24), transparent 46%),
+                radial-gradient(circle at 74% 34%, rgba(100, 116, 139, 0.22), transparent 50%),
+                radial-gradient(circle at 50% 78%, rgba(71, 85, 105, 0.26), transparent 52%);
+            filter: blur(36px);
             animation: pyroxFogDrift 14s ease-in-out infinite alternate;
+            transition: opacity 0.65s ease, visibility 0.65s ease;
         }
 
-        body.light-mode .pyrox-fog-layer {
-            opacity: 0.22;
+        body.chat-active .pyrox-fog-layer {
+            opacity: 0 !important;
+            visibility: hidden;
         }
 
         @keyframes pyroxFogDrift {
             0% { transform: translate3d(-2%, -2%, 0) scale(1); }
             50% { transform: translate3d(2.5%, 1.5%, 0) scale(1.04); }
             100% { transform: translate3d(-1.5%, 2.5%, 0) scale(1.02); }
+        }
+
+        /* Pyrox Custom 5-Tip Black Flame + White 'P' Badge */
+        .pyrox-logo-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #ffffff;
+            border-radius: 26%;
+            border: 1px solid rgba(15, 23, 42, 0.14);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
+            flex-shrink: 0;
+            overflow: hidden;
         }
 
         .splash-overlay {
@@ -813,8 +761,8 @@ async def index():
 
         .sidebar.open {
             width: 76vw;
-            min-width: 248px;
-            max-width: 330px;
+            min-width: 256px;
+            max-width: 336px;
             border-right-color: var(--border-subtle);
             padding: 16px 12px;
         }
@@ -840,7 +788,7 @@ async def index():
         .sidebar-brand-group {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 9px;
             min-width: 0;
         }
 
@@ -937,16 +885,62 @@ async def index():
             gap: 8px;
         }
 
-        .google-pill {
-            padding: 11px 10px;
-            border-radius: 10px;
+        .profile-pill-row {
+            padding: 10px 11px;
+            border-radius: 12px;
             border: 1px solid var(--border-subtle);
             background-color: var(--bg-elevated);
-            font-size: 0.96rem;
-            font-weight: 700;
-            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
             cursor: pointer;
-            text-align: center;
+            min-width: 0;
+        }
+
+        .profile-avatar-circle {
+            width: 32px;
+            height: 32px;
+            border-radius: 999px;
+            background-color: #2563eb;
+            color: #ffffff;
+            font-size: 0.92rem;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.25);
+        }
+
+        .profile-avatar-circle img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .profile-url-text {
+            font-size: 0.9rem;
+            font-weight: 650;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            min-width: 0;
+        }
+
+        .upgrade-sidebar-btn {
+            padding: 11px 12px;
+            border-radius: 11px;
+            background-color: var(--accent-upgrade);
+            border: 1px solid var(--accent-upgrade-border);
+            color: #ffffff;
+            font-size: 0.96rem;
+            font-weight: 750;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
 
         .main-area {
@@ -1021,14 +1015,15 @@ async def index():
             color: var(--text-primary);
             border: 1px solid var(--border-subtle);
             border-radius: 10px;
-            padding: 7px 11px;
-            font-size: 0.84rem;
+            padding: 7px 12px;
+            font-size: 0.86rem;
             font-weight: 700;
             cursor: pointer;
-            max-width: 120px;
             white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+        }
+
+        .header-gmail-btn.hidden-when-logged-in {
+            display: none;
         }
 
         .dots-btn {
@@ -1048,7 +1043,7 @@ async def index():
             position: absolute;
             top: 46px;
             right: 0;
-            width: 200px;
+            width: 205px;
             background-color: var(--bg-surface);
             border: 1px solid var(--border-subtle);
             border-radius: 12px;
@@ -1196,43 +1191,24 @@ async def index():
             position: absolute;
             top: 8px;
             right: 8px;
-            padding: 5px 10px;
+            padding: 5px 11px;
             border-radius: 6px;
             border: 1px solid var(--border-subtle);
             background-color: var(--bg-surface);
             color: var(--text-primary);
-            font-size: 0.78rem;
+            font-size: 0.8rem;
             font-weight: 700;
             cursor: pointer;
+            z-index: 4;
         }
 
         .msg-ai pre {
             background-color: var(--bg-elevated);
             border: 1px solid var(--border-subtle);
             border-radius: 10px;
-            padding: 12px;
+            padding: 14px 12px 12px 12px;
             overflow-x: auto;
             font-size: 0.96rem;
-        }
-
-        .msg-ai img.zoomable-img {
-            max-width: 100%;
-            max-height: 380px;
-            border-radius: 14px;
-            border: 1px solid var(--border-subtle);
-            margin-top: 6px;
-            cursor: zoom-in;
-        }
-
-        .upgrade-prompt-card {
-            margin-top: 6px;
-            padding: 14px 16px;
-            border-radius: 14px;
-            background-color: var(--bg-elevated);
-            border: 1px solid var(--accent-upgrade-border);
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
         }
 
         .msg-actions {
@@ -1305,22 +1281,6 @@ async def index():
             opacity: 1;
         }
 
-        .image-generating-strip {
-            display: none;
-            margin-bottom: 6px;
-            padding: 7px 12px;
-            border-radius: 10px;
-            background-color: var(--bg-elevated);
-            border: 1px solid var(--border-user);
-            font-size: 0.9rem;
-            font-weight: 700;
-            color: var(--text-primary);
-        }
-
-        .image-generating-strip.show {
-            display: block;
-        }
-
         .attachment-chip-bar {
             display: none;
             align-items: center;
@@ -1360,7 +1320,7 @@ async def index():
             position: absolute;
             bottom: 98px;
             left: 12px;
-            width: 276px;
+            width: 268px;
             background-color: var(--bg-surface);
             border: 1px solid var(--border-subtle);
             border-radius: 14px;
@@ -1389,29 +1349,6 @@ async def index():
             align-items: center;
             gap: 10px;
             text-align: left;
-        }
-
-        .plus-small-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 6px;
-            padding-top: 6px;
-            border-top: 1px solid var(--border-subtle);
-        }
-
-        .plus-small-btn {
-            padding: 9px 7px;
-            border-radius: 8px;
-            background-color: var(--bg-elevated);
-            border: 1px solid var(--border-subtle);
-            color: var(--text-primary);
-            font-size: 0.84rem;
-            font-weight: 650;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 5px;
         }
 
         .input-shell {
@@ -1474,9 +1411,10 @@ async def index():
             line-height: 1.42;
         }
 
+        /* Sharp, bold, larger Submit Arrow */
         .send-btn, .stop-btn {
-            width: 46px;
-            height: 46px;
+            width: 48px;
+            height: 48px;
             border-radius: 15px;
             border: none;
             background-color: var(--text-primary);
@@ -1486,8 +1424,6 @@ async def index():
             justify-content: center;
             cursor: pointer;
             flex-shrink: 0;
-            font-size: 1.35rem;
-            font-weight: 800;
         }
 
         .stop-btn {
@@ -1495,6 +1431,8 @@ async def index():
             background-color: var(--bg-elevated);
             color: var(--text-primary);
             border: 1px solid var(--border-user);
+            font-size: 1.2rem;
+            font-weight: 800;
         }
 
         .stop-btn.visible {
@@ -1653,15 +1591,8 @@ async def index():
             justify-content: space-between;
         }
 
-        .old-price {
-            text-decoration: line-through;
-            color: var(--text-muted);
-            font-size: 0.98rem;
-            margin-right: 6px;
-        }
-
         .new-price {
-            font-size: 1.36rem;
+            font-size: 1.38rem;
             font-weight: 800;
             color: var(--text-primary);
         }
@@ -1766,33 +1697,55 @@ async def index():
 <body class="pre-login-white">
 <div class="pyrox-fog-layer" aria-hidden="true"></div>
 
+<!-- Reusable Pyrox 5-Tip Black Flame + White 'P' Symbol Definition -->
 <svg width="0" height="0" style="position:absolute;visibility:hidden;">
     <defs>
-        <linearGradient id="pyroxOuterGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stop-color="#38bdf8" />
-            <stop offset="50%" stop-color="#6366f1" />
-            <stop offset="100%" stop-color="#a855f7" />
-        </linearGradient>
-        <linearGradient id="pyroxMidGrad" x1="100%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stop-color="#60a5fa" />
-            <stop offset="55%" stop-color="#818cf8" />
-            <stop offset="100%" stop-color="#ec4899" />
-        </linearGradient>
-        <linearGradient id="pyroxCoreGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stop-color="#ffffff" />
-            <stop offset="100%" stop-color="#bae6fd" />
-        </linearGradient>
+        <symbol id="pyroxFlameIcon" viewBox="0 0 100 100">
+            <rect width="100" height="100" rx="24" fill="#ffffff" />
+            <!-- 5-tip soft-edged solid black flame -->
+            <path fill="#09090b" d="
+                M50 11
+                C53 20, 56 28, 55 37
+                C59 31, 65 26, 69 24
+                C71 31, 70 39, 67 45
+                C73 41, 79 41, 82 43
+                C84 53, 81 67, 73 77
+                C65 86, 54 90, 44 89
+                C32 88, 22 79, 18 67
+                C15 57, 17 47, 21 43
+                C24 46, 27 50, 29 52
+                C26 42, 28 32, 35 26
+                C38 30, 40 35, 41 39
+                C40 28, 43 18, 50 11 Z" />
+            <!-- Clean bold white 'P' inside -->
+            <path fill="#ffffff" d="
+                M39 51
+                C39 48.5, 41 47, 43.5 47
+                L54.5 47
+                C62 47, 67 51.5, 67 58.5
+                C67 65.5, 62 70, 54.5 70
+                L47.5 70
+                L47.5 87
+                C47.5 88.5, 46 89.5, 44 89.5
+                L41 89.5
+                C39.8 89.5, 39 88.5, 39 87
+                Z
+                M47.5 54.5
+                L47.5 62.5
+                L53.8 62.5
+                C57.2 62.5, 59 60.8, 59 58.5
+                C59 56.2, 57.2 54.5, 53.8 54.5
+                Z" />
+        </symbol>
     </defs>
 </svg>
 
 <div class="splash-overlay" id="splashOverlay">
     <div class="splash-stage">
         <div class="splash-star-wrap">
-            <svg width="52" height="52" viewBox="0 0 100 100" fill="none">
-                <path d="M50 4 C55 34, 66 45, 96 50 C66 55, 55 66, 50 96 C45 66, 34 55, 4 50 C34 45, 45 34, 50 4 Z" fill="url(#pyroxOuterGrad)" />
-                <path d="M50 20 C53 40, 60 47, 80 50 C60 53, 53 60, 50 80 C47 60, 40 53, 20 50 C40 47, 47 40, 50 20 Z" fill="url(#pyroxMidGrad)" />
-                <path d="M50 34 C51.5 44, 56 48.5, 66 50 C56 51.5, 51.5 56, 50 66 C48.5 56, 44 51.5, 34 50 C44 48.5, 48.5 44, 50 34 Z" fill="url(#pyroxCoreGrad)" />
-            </svg>
+            <span class="pyrox-logo-badge" style="width:58px;height:58px;">
+                <svg width="56" height="56"><use href="#pyroxFlameIcon"></use></svg>
+            </span>
         </div>
         <div class="splash-word-flash" id="splashWord">Pyrox</div>
     </div>
@@ -1800,11 +1753,9 @@ async def index():
 
 <div class="pyrox-welcome-screen" id="pyroxWelcomeScreen">
     <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:14px;padding:16px;">
-        <svg width="56" height="56" viewBox="0 0 100 100" fill="none">
-            <path d="M50 4 C55 34, 66 45, 96 50 C66 55, 55 66, 50 96 C45 66, 34 55, 4 50 C34 45, 45 34, 50 4 Z" fill="url(#pyroxOuterGrad)" />
-            <path d="M50 20 C53 40, 60 47, 80 50 C60 53, 53 60, 50 80 C47 60, 40 53, 20 50 C40 47, 47 40, 50 20 Z" fill="url(#pyroxMidGrad)" />
-            <path d="M50 34 C51.5 44, 56 48.5, 66 50 C56 51.5, 51.5 56, 50 66 C48.5 56, 44 51.5, 34 50 C44 48.5, 48.5 44, 50 34 Z" fill="url(#pyroxCoreGrad)" />
-        </svg>
+        <span class="pyrox-logo-badge" style="width:68px;height:68px;">
+            <svg width="66" height="66"><use href="#pyroxFlameIcon"></use></svg>
+        </span>
         <div style="font-size:1.85rem;font-weight:800;letter-spacing:0.2px;color:#09090b;">Welcome to Pyrox</div>
         <p style="max-width:340px;font-size:0.98rem;color:#475569;line-height:1.5;">
             Bring your files, your ideas, and your next big question. Log in for the full experience.
@@ -1829,12 +1780,10 @@ async def index():
 
 <div class="onboarding-signup-screen" id="onboardingSignupScreen">
     <div class="onboarding-top-row">
-        <div style="display:flex;align-items:center;gap:8px;">
-            <svg width="28" height="28" viewBox="0 0 100 100" fill="none">
-                <path d="M50 4 C55 34, 66 45, 96 50 C66 55, 55 66, 50 96 C45 66, 34 55, 4 50 C34 45, 45 34, 50 4 Z" fill="url(#pyroxOuterGrad)" />
-                <path d="M50 20 C53 40, 60 47, 80 50 C60 53, 53 60, 50 80 C47 60, 40 53, 20 50 C40 47, 47 40, 50 20 Z" fill="url(#pyroxMidGrad)" />
-                <path d="M50 34 C51.5 44, 56 48.5, 66 50 C56 51.5, 51.5 56, 50 66 C48.5 56, 44 51.5, 34 50 C44 48.5, 48.5 44, 50 34 Z" fill="url(#pyroxCoreGrad)" />
-            </svg>
+        <div style="display:flex;align-items:center;gap:9px;">
+            <span class="pyrox-logo-badge" style="width:32px;height:32px;">
+                <svg width="30" height="30"><use href="#pyroxFlameIcon"></use></svg>
+            </span>
             <span style="font-weight:800;font-size:1.12rem;color:#09090b;">Pyrox</span>
         </div>
         <button type="button" class="onboarding-cross-btn" onclick="skipWelcomeToDarkApp()" aria-label="Skip sign up">✕</button>
@@ -1872,11 +1821,9 @@ async def index():
 <div class="overlay-modal" id="googleChooserModal" onclick="closeModal('googleChooserModal')">
     <div class="modal-box" style="background-color:#ffffff;color:#09090b;border-radius:20px;padding:22px 18px;max-width:390px;" onclick="event.stopPropagation()">
         <div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;">
-            <svg width="34" height="34" viewBox="0 0 100 100" fill="none">
-                <path d="M50 4 C55 34, 66 45, 96 50 C66 55, 55 66, 50 96 C45 66, 34 55, 4 50 C34 45, 45 34, 50 4 Z" fill="url(#pyroxOuterGrad)" />
-                <path d="M50 20 C53 40, 60 47, 80 50 C60 53, 53 60, 50 80 C47 60, 40 53, 20 50 C40 47, 47 40, 50 20 Z" fill="url(#pyroxMidGrad)" />
-                <path d="M50 34 C51.5 44, 56 48.5, 66 50 C56 51.5, 51.5 56, 50 66 C48.5 56, 44 51.5, 34 50 C44 48.5, 48.5 44, 50 34 Z" fill="url(#pyroxCoreGrad)" />
-            </svg>
+            <span class="pyrox-logo-badge" style="width:40px;height:40px;">
+                <svg width="38" height="38"><use href="#pyroxFlameIcon"></use></svg>
+            </span>
             <div style="font-size:1.35rem;font-weight:700;color:#0f172a;">Choose an account</div>
             <div style="font-size:0.9rem;color:#475569;">to continue to Pyrox</div>
         </div>
@@ -1887,19 +1834,11 @@ async def index():
         </label>
 
         <div style="display:flex;flex-direction:column;margin-top:6px;">
-            <button type="button" onclick="selectChooserAccount('Harshit Singh', 'harshit@pyrox.app')" style="display:flex;align-items:center;gap:12px;padding:12px 8px;background:none;border:none;border-bottom:1px solid #e2e8f0;text-align:left;cursor:pointer;color:#0f172a;">
+            <button type="button" onclick="selectChooserAccount('Harshit', 'harshit@gmail.com', '')" style="display:flex;align-items:center;gap:12px;padding:12px 8px;background:none;border:none;border-bottom:1px solid #e2e8f0;text-align:left;cursor:pointer;color:#0f172a;">
                 <span style="width:36px;height:36px;border-radius:999px;background:#2563eb;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;">H</span>
                 <span style="display:flex;flex-direction:column;">
-                    <strong style="font-size:0.95rem;">Harshit Singh</strong>
-                    <span style="font-size:0.82rem;color:#475569;">harshit@pyrox.app</span>
-                </span>
-            </button>
-
-            <button type="button" onclick="selectChooserAccount('Alka Singh', 'alkasingh9268@gmail.com')" style="display:flex;align-items:center;gap:12px;padding:12px 8px;background:none;border:none;border-bottom:1px solid #e2e8f0;text-align:left;cursor:pointer;color:#0f172a;">
-                <span style="width:36px;height:36px;border-radius:999px;background:#0f766e;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;">A</span>
-                <span style="display:flex;flex-direction:column;">
-                    <strong style="font-size:0.95rem;">Alka Singh</strong>
-                    <span style="font-size:0.82rem;color:#475569;">alkasingh9268@gmail.com</span>
+                    <strong style="font-size:0.95rem;">Harshit</strong>
+                    <span style="font-size:0.82rem;color:#475569;">harshit@gmail.com</span>
                 </span>
             </button>
 
@@ -1915,22 +1854,15 @@ async def index():
         <div class="sidebar-top">
             <div class="sidebar-title">
                 <div class="sidebar-brand-group">
-                    <svg width="24" height="24" viewBox="0 0 100 100" fill="none">
-                        <path d="M50 4 C55 34, 66 45, 96 50 C66 55, 55 66, 50 96 C45 66, 34 55, 4 50 C34 45, 45 34, 50 4 Z" fill="url(#pyroxOuterGrad)" />
-                        <path d="M50 20 C53 40, 60 47, 80 50 C60 53, 53 60, 50 80 C47 60, 40 53, 20 50 C40 47, 47 40, 50 20 Z" fill="url(#pyroxMidGrad)" />
-                        <path d="M50 34 C51.5 44, 56 48.5, 66 50 C56 51.5, 51.5 56, 50 66 C48.5 56, 44 51.5, 34 50 C44 48.5, 48.5 44, 50 34 Z" fill="url(#pyroxCoreGrad)" />
-                    </svg>
+                    <span class="pyrox-logo-badge" style="width:28px;height:28px;">
+                        <svg width="26" height="26"><use href="#pyroxFlameIcon"></use></svg>
+                    </span>
                     <span id="sidebarThemeTitle">Pyrox</span>
                 </div>
                 <span style="font-size:0.92rem;color:var(--text-secondary);cursor:pointer;" onclick="closeSidebar()">✕</span>
             </div>
 
             <div class="nav-item" onclick="newChat(); closeSidebar();">+ New Chat</div>
-
-            <div class="nav-item" onclick="activateImageModeBar(); closeSidebar();">
-                <span>Images</span>
-                <span class="quota-pill" id="sidebarImgQuota">2/2</span>
-            </div>
 
             <div class="nav-item" onclick="openModal('videoModal'); closeSidebar();">
                 <span>Video</span>
@@ -1950,9 +1882,17 @@ async def index():
         </div>
 
         <div class="sidebar-footer">
-            <div class="google-pill" id="googleAccountBtn" onclick="openModal('googleModal')">
-                Gmail with Pyrox
+            <!-- Profile photo + Gmail URL/email above Settings when connected -->
+            <div class="profile-pill-row" id="sidebarProfileRow" onclick="openModal('googleModal')">
+                <div class="profile-avatar-circle" id="sidebarProfileAvatar">G</div>
+                <div class="profile-url-text" id="sidebarProfileUrl">Connect Account</div>
             </div>
+
+            <div class="upgrade-sidebar-btn" onclick="openModal('upgradeModal'); closeSidebar();">
+                <span>Upgrade to Pro</span>
+                <span>₹79/mo</span>
+            </div>
+
             <div class="nav-item" onclick="openModal('settingsModal')">Settings</div>
         </div>
     </aside>
@@ -1971,8 +1911,9 @@ async def index():
             </div>
 
             <div class="top-right" onclick="event.stopPropagation()">
+                <!-- Disappears from top-right once logged in and moves into sidebar above Settings -->
                 <button type="button" class="header-gmail-btn" id="headerGmailBtn" onclick="openModal('googleModal')">
-                    Gmail
+                    Sign in
                 </button>
                 <button type="button" class="dots-btn" id="dotsBtn" onclick="toggleDotsMenu(event)" aria-label="More options">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
@@ -1983,6 +1924,7 @@ async def index():
                 </button>
 
                 <div class="dots-menu" id="dotsMenu">
+                    <div class="dots-item" onclick="openModal('upgradeModal'); closeDotsMenu();">Upgrade (₹79/mo)</div>
                     <div class="dots-item" onclick="newChat(); closeDotsMenu();">Clear Chat</div>
                     <div class="dots-item" onclick="exportChat(); closeDotsMenu();">Export Chat</div>
                     <div class="dots-item" onclick="openModal('libraryModal'); closeDotsMenu();">All Chats</div>
@@ -1996,27 +1938,21 @@ async def index():
         <section class="scroll-stage" id="scrollStage">
             <div class="greeting-center" id="greetingBox">
                 <div class="greeting-logo-row">
-                    <svg width="46" height="46" viewBox="0 0 100 100" fill="none">
-                        <path d="M50 4 C55 34, 66 45, 96 50 C66 55, 55 66, 50 96 C45 66, 34 55, 4 50 C34 45, 45 34, 50 4 Z" fill="url(#pyroxOuterGrad)" />
-                        <path d="M50 20 C53 40, 60 47, 80 50 C60 53, 53 60, 50 80 C47 60, 40 53, 20 50 C40 47, 47 40, 50 20 Z" fill="url(#pyroxMidGrad)" />
-                        <path d="M50 34 C51.5 44, 56 48.5, 66 50 C56 51.5, 51.5 56, 50 66 C48.5 56, 44 51.5, 34 50 C44 48.5, 48.5 44, 50 34 Z" fill="url(#pyroxCoreGrad)" />
-                    </svg>
+                    <span class="pyrox-logo-badge" style="width:52px;height:52px;">
+                        <svg width="50" height="50"><use href="#pyroxFlameIcon"></use></svg>
+                    </span>
                     <span class="greeting-logo-title" id="greetingBrandName">Pyrox</span>
                 </div>
                 <h1 id="greetingText">Swagatam! How can I assist you today?</h1>
                 <div class="starter-chips-row">
-                    <button type="button" class="starter-chip" onclick="useStarterPrompt('Explain a complex topic simply')">Explain simply</button>
-                    <button type="button" class="starter-chip" onclick="useStarterPrompt('Help me write and debug Python code')">Coding help</button>
-                    <button type="button" class="starter-chip" onclick="useStarterPrompt('Generate an ultra detailed image of a futuristic mountain peak at sunset')">Generate image</button>
+                    <button type="button" class="starter-chip" onclick="useStarterPrompt('Build a complete, ultra-detailed system prompt for my app')">Architect a prompt</button>
+                    <button type="button" class="starter-chip" onclick="useStarterPrompt('Help me write and debug Python code with edge cases')">Coding help</button>
+                    <button type="button" class="starter-chip" onclick="useStarterPrompt('Break down a tough topic into simple steps')">Explain simply</button>
                 </div>
             </div>
         </section>
 
         <footer class="bottom-dock dock-slid-up" id="bottomDock" onclick="event.stopPropagation()">
-            <div class="image-generating-strip" id="imageModeBanner">
-                Image generation mode active — enter prompt to generate image
-            </div>
-
             <div class="attachment-chip-bar" id="attachmentChipBar">
                 <div class="attachment-preview-left">
                     <img id="attachmentThumbImg" class="attachment-thumb-img" src="" alt="Preview" style="display:none;" />
@@ -2048,23 +1984,13 @@ async def index():
                     </svg>
                     <span>Drive</span>
                 </button>
-                <div class="plus-small-grid">
-                    <button type="button" class="plus-small-btn" onclick="activateImageModeBar(); closePlusMenu();">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                            <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                            <polyline points="21 15 16 10 5 21"></polyline>
-                        </svg>
-                        <span>Image Creation</span>
-                    </button>
-                    <button type="button" class="plus-small-btn" onclick="promptCanvasMode()">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M12 20h9"></path>
-                            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
-                        </svg>
-                        <span>Canvas</span>
-                    </button>
-                </div>
+                <button type="button" class="plus-big-btn" onclick="promptCanvasMode()">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 20h9"></path>
+                        <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                    </svg>
+                    <span>Canvas</span>
+                </button>
             </div>
 
             <input type="file" id="filePicker" accept="image/*,.pdf,.txt,.doc,.docx,.py,.js,.html,.css,.json,.md" style="display:none;" onchange="handleFileSelected(event)" />
@@ -2072,7 +1998,7 @@ async def index():
             <div class="input-shell">
                 <button type="button" class="icon-action-btn" id="plusBtn" onclick="togglePlusMenu(event)" title="More actions">+</button>
 
-                <button type="button" class="icon-action-btn" id="micBtn" onclick="toggleDictation(event)" title="Voice input">
+                <button type="button" class="icon-action-btn" id="micBtn" onclick="toggleDictation(event)" title="Voice input (7s auto-stop)">
                     <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
                         <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
                         <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
@@ -2094,7 +2020,12 @@ async def index():
                 ></textarea>
 
                 <button type="button" class="stop-btn" id="stopGenBtn" onclick="stopGeneration()">■</button>
-                <button type="button" class="send-btn" id="sendBtn" onclick="sendMessage()">↑</button>
+                <button type="button" class="send-btn" id="sendBtn" onclick="sendMessage()" aria-label="Send message">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="square" stroke-linejoin="miter">
+                        <line x1="12" y1="20" x2="12" y2="5"></line>
+                        <polyline points="5 12 12 4 19 12"></polyline>
+                    </svg>
+                </button>
             </div>
             <div class="ai-disclaimer">Pyrox is AI and can make mistakes.</div>
         </footer>
@@ -2104,7 +2035,7 @@ async def index():
 <div class="overlay-modal" id="googleModal" onclick="closeModal('googleModal')">
     <div class="modal-box" onclick="event.stopPropagation()">
         <div class="modal-head">
-            <span>Gmail with Pyrox</span>
+            <span>Account & Profile</span>
             <button type="button" class="close-x" onclick="closeModal('googleModal')">✕</button>
         </div>
 
@@ -2119,11 +2050,14 @@ async def index():
 
         <div class="white-or">or</div>
 
-        <label class="field-label" for="googleEmailInput">Email</label>
+        <label class="field-label" for="googleEmailInput">Email / Profile URL</label>
         <input type="email" class="field-input" id="googleEmailInput" placeholder="you@gmail.com" />
 
-        <label class="field-label" for="googleNameInput">Name</label>
+        <label class="field-label" for="googleNameInput">Your Name</label>
         <input type="text" class="field-input" id="googleNameInput" placeholder="Your name" />
+
+        <label class="field-label" for="googlePhotoFileInput">Profile Photo (Optional)</label>
+        <input type="file" id="googlePhotoFileInput" accept="image/*" class="field-input" onchange="handleProfilePhotoUpload(event)" />
 
         <label class="robot-check-box">
             <input type="checkbox" id="gmailRobotCheck" />
@@ -2146,7 +2080,7 @@ async def index():
             <button type="button" class="close-x" onclick="closeModal('logoutConfirmModal')">✕</button>
         </div>
         <p style="font-size:0.95rem;color:var(--text-secondary);line-height:1.5;">
-            Kya aap sach mein apne connected Gmail account se log out karna chahte hain?
+            Kya aap sach mein apne connected account se log out karna chahte hain?
         </p>
         <label class="robot-check-box">
             <input type="checkbox" id="logoutRobotCheck" />
@@ -2201,24 +2135,23 @@ async def index():
 <div class="overlay-modal" id="upgradeModal" onclick="closeModal('upgradeModal')">
     <div class="modal-box" onclick="event.stopPropagation()">
         <div class="modal-head">
-            <span>Pyrox Pro Upgrade</span>
+            <span>Pyrox Pro Unlimited</span>
             <button type="button" class="close-x" onclick="closeModal('upgradeModal')">✕</button>
         </div>
         <p style="font-size:0.95rem;color:var(--text-secondary);line-height:1.55;">
-            2 free image generations per month ho chuki hain. Pyrox Pro upgrade lene par aapko bahut achhi aur high-quality images aur zyada limits milengi.
+            Unlimited daily chats, deep prompt architect mode, priority speed, and full memory context — pocket-friendly plan.
         </p>
         <div class="single-price-banner">
             <div>
-                <div style="font-weight:800;font-size:1.05rem;">Pyrox Pro</div>
-                <div style="font-size:0.84rem;color:var(--text-secondary);">High-quality images & extended access</div>
+                <div style="font-weight:800;font-size:1.05rem;">Pyrox Pro Unlimited</div>
+                <div style="font-size:0.84rem;color:var(--text-secondary);">Unlimited chats & full reasoning power</div>
             </div>
             <div>
-                <span class="old-price">₹800</span>
-                <span class="new-price">₹139/mo</span>
+                <span class="new-price">₹79/mo</span>
             </div>
         </div>
-        <button type="button" class="action-btn" style="background-color:var(--accent-upgrade);border-color:var(--accent-upgrade-border);color:#ffffff;" onclick="confirmUpgrade()">
-            Upgrade to Pyrox Pro
+        <button type="button" class="action-btn" style="background-color:var(--accent-upgrade);border-color:var(--accent-upgrade-border);color:#ffffff;font-weight:800;" onclick="confirmUpgrade()">
+            Upgrade to Pyrox Pro (₹79/mo)
         </button>
         <div id="upgradeStatusMsg" style="font-size:0.88rem;color:var(--text-secondary);"></div>
     </div>
@@ -2281,9 +2214,9 @@ async def index():
     const NORMAL_DAILY_LIMIT = 40;
     const CODING_DAILY_LIMIT = 30;
     const WARNING_REMAINING_THRESHOLD = 5;
-    const MONTHLY_FREE_IMAGE_LIMIT = 2;
     const MAX_INPUT_CHARS = 6000;
     const MALE_VOICE = "hi-IN-MadhurNeural";
+    const MIC_SILENCE_TIMEOUT_MS = 7000;
 
     let chatStarted = false;
     let activeAbortController = null;
@@ -2300,10 +2233,12 @@ async def index():
     let latestAudioPlayer = null;
     let feedbackTargetSnippet = "";
     let activeDislikeBtn = null;
-    let imageModeActive = false;
+    let tempUploadedAvatarDataUrl = "";
+    let currentConversationHistory = [];
 
     let recognition = null;
     let isDictating = false;
+    let micSilenceTimer = null;
 
     const MIC_SVG = `
         <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
@@ -2333,22 +2268,50 @@ async def index():
         return Boolean(localStorage.getItem("pyrox_signed_up"));
     }
 
+    function handleProfilePhotoUpload(e) {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+            tempUploadedAvatarDataUrl = reader.result || "";
+        };
+        reader.readAsDataURL(file);
+    }
+
     function syncHeaderAccountUI() {
         const gBtn = document.getElementById("headerGmailBtn");
-        const sideBtn = document.getElementById("googleAccountBtn");
+        const avatarEl = document.getElementById("sidebarProfileAvatar");
+        const urlEl = document.getElementById("sidebarProfileUrl");
         const card = document.getElementById("connectedAccountCard");
+
         const name = (localStorage.getItem("pyrox_user_name") || "").trim();
         const email = (localStorage.getItem("pyrox_user_email") || "").trim();
+        const photo = (localStorage.getItem("pyrox_user_photo") || "").trim();
+        const loggedIn = Boolean(name || email || isUserSignedUp());
 
+        // Hide top-right button once logged in so profile moves cleanly into expanded menu above Settings
         if (gBtn) {
-            gBtn.textContent = name ? `Gmail: ${name.split(" ")[0]}` : "Gmail";
+            gBtn.classList.toggle("hidden-when-logged-in", loggedIn);
+            gBtn.textContent = "Sign in";
         }
-        if (sideBtn) {
-            sideBtn.textContent = name ? `Gmail: ${name}` : "Gmail with Pyrox";
+
+        if (avatarEl) {
+            if (photo) {
+                avatarEl.innerHTML = `<img src="${photo}" alt="Profile" />`;
+            } else {
+                const initial = (name || email || "P").charAt(0).toUpperCase();
+                avatarEl.textContent = initial;
+            }
         }
+
+        // Only profile photo + clean email/URL — zero "Gmail Harshit Singh" clutter
+        if (urlEl) {
+            urlEl.textContent = email || name || "Connect Account";
+        }
+
         if (card) {
-            card.textContent = (name || email)
-                ? `Connected (Verified): ${name || "User"} (${email || "No email"})`
+            card.textContent = loggedIn
+                ? `Connected: ${email || name}`
                 : "Not connected yet";
         }
     }
@@ -2407,7 +2370,7 @@ async def index():
         transitionToDarkStudio();
     }
 
-    function selectChooserAccount(name, email) {
+    function selectChooserAccount(name, email, photoUrl = "") {
         const chk = document.getElementById("chooserRobotCheck");
         if (chk && !chk.checked) {
             alert("Please tick 'I am not a robot' first.");
@@ -2415,6 +2378,7 @@ async def index():
         }
         localStorage.setItem("pyrox_user_name", name);
         localStorage.setItem("pyrox_user_email", email);
+        if (photoUrl) localStorage.setItem("pyrox_user_photo", photoUrl);
         localStorage.setItem("pyrox_signed_up", "1");
         transitionToDarkStudio();
     }
@@ -2448,65 +2412,13 @@ async def index():
         }
         localStorage.removeItem("pyrox_user_name");
         localStorage.removeItem("pyrox_user_email");
+        localStorage.removeItem("pyrox_user_photo");
         localStorage.removeItem("pyrox_signed_up");
         syncHeaderAccountUI();
         refreshGreeting();
         document.getElementById("accountStatusMsg").textContent = "Logged out safely.";
         closeModal("logoutConfirmModal");
         closeModal("googleModal");
-    }
-
-    function getMonthKey() {
-        const now = new Date();
-        return `${now.getFullYear()}-${now.getMonth() + 1}`;
-    }
-
-    function getMonthlyImageCount() {
-        const data = JSON.parse(localStorage.getItem("pyrox_monthly_images") || "{}");
-        if (data.month !== getMonthKey()) return 0;
-        return Number(data.count || 0);
-    }
-
-    function incrementMonthlyImageCount() {
-        const next = getMonthlyImageCount() + 1;
-        localStorage.setItem(
-            "pyrox_monthly_images",
-            JSON.stringify({ month: getMonthKey(), count: next })
-        );
-        refreshImageQuotaUI();
-        return next;
-    }
-
-    function isImageLockedThisMonth() {
-        return getMonthlyImageCount() >= MONTHLY_FREE_IMAGE_LIMIT;
-    }
-
-    function refreshImageQuotaUI() {
-        const remaining = Math.max(0, MONTHLY_FREE_IMAGE_LIMIT - getMonthlyImageCount());
-        const pill = document.getElementById("sidebarImgQuota");
-        if (pill) {
-            pill.textContent = isImageLockedThisMonth() ? "Pro Needed" : `${remaining}/2`;
-        }
-    }
-
-    function activateImageModeBar() {
-        if (isImageLockedThisMonth()) {
-            const banner = document.getElementById("imageModeBanner");
-            banner.textContent = "2 free images ho chuki hain — Pyrox Pro upgrade le lo, bahut achhi aur high-quality image milegi.";
-            banner.classList.add("show");
-            return;
-        }
-        imageModeActive = true;
-        const banner = document.getElementById("imageModeBanner");
-        banner.textContent = "Image creation active — type a prompt and send";
-        banner.classList.add("show");
-        document.getElementById("promptInput").focus();
-    }
-
-    function clearImageModeBar() {
-        imageModeActive = false;
-        const banner = document.getElementById("imageModeBanner");
-        banner.classList.remove("show");
     }
 
     function showPendingAttachmentChip(label, thumbSrc = null) {
@@ -2583,10 +2495,10 @@ async def index():
         const banner = document.getElementById("statusStrip");
 
         if (curr.total >= NORMAL_DAILY_LIMIT) {
-            banner.textContent = "Daily 40-question limit reached. Resets tomorrow.";
+            banner.textContent = "Daily 40-question limit reached. Upgrade to Pyrox Pro (₹79/mo) for unlimited chats.";
             banner.classList.add("show");
         } else if (isHeavyContext && curr.heavy >= CODING_DAILY_LIMIT) {
-            banner.textContent = "Daily 30-question coding/heavy limit reached. Resets tomorrow.";
+            banner.textContent = "Daily 30-question coding limit reached. Upgrade to Pyrox Pro (₹79/mo) for unlimited chats.";
             banner.classList.add("show");
         } else if (remNormal <= WARNING_REMAINING_THRESHOLD || (isHeavyContext && remHeavy <= WARNING_REMAINING_THRESHOLD)) {
             const rem = isHeavyContext ? Math.min(remNormal, remHeavy) : remNormal;
@@ -2628,6 +2540,10 @@ async def index():
 
     function getUserName() {
         return localStorage.getItem("pyrox_user_name") || "";
+    }
+
+    function getUserEmail() {
+        return localStorage.getItem("pyrox_user_email") || "";
     }
 
     function getThemeLabel() {
@@ -2719,7 +2635,10 @@ async def index():
 
     function openModal(id) {
         if (id === "libraryModal") renderLibraryModal();
-        if (id === "googleModal") syncHeaderAccountUI();
+        if (id === "googleModal") {
+            tempUploadedAvatarDataUrl = "";
+            syncHeaderAccountUI();
+        }
         document.getElementById(id).classList.add("show");
     }
 
@@ -2737,6 +2656,10 @@ async def index():
         const email = document.getElementById("googleEmailInput").value.trim();
         if (name) localStorage.setItem("pyrox_user_name", name);
         if (email) localStorage.setItem("pyrox_user_email", email);
+        if (tempUploadedAvatarDataUrl) {
+            localStorage.setItem("pyrox_user_photo", tempUploadedAvatarDataUrl);
+            tempUploadedAvatarDataUrl = "";
+        }
         localStorage.setItem("pyrox_signed_up", "1");
         syncHeaderAccountUI();
         refreshGreeting();
@@ -2758,7 +2681,7 @@ async def index():
     }
 
     function confirmUpgrade() {
-        document.getElementById("upgradeStatusMsg").textContent = "Pyrox Pro (₹139/mo) selected for high-quality image generation.";
+        document.getElementById("upgradeStatusMsg").textContent = "Pyrox Pro Unlimited (₹79/mo) selected! Unlimited chats unlocked.";
     }
 
     function loadFolders() {
@@ -2791,7 +2714,7 @@ async def index():
         const folders = loadFolders();
         const target = folders.find((f) => f.id === activeFolderId);
         if (target) {
-            target.items.push({ role, content: content.slice(0, 600) });
+            target.items.push({ role, content: content.slice(0, 3500) });
             saveFolders(folders);
         }
     }
@@ -2824,10 +2747,15 @@ async def index():
         const target = folders.find((f) => f.id === folderId);
         if (!target) return;
         activeFolderId = target.id;
+        currentConversationHistory = [];
         const stage = document.getElementById("scrollStage");
         stage.innerHTML = "";
-        chatStarted = true;
+        markChatStarted();
         target.items.forEach((m) => {
+            currentConversationHistory.push({
+                role: m.role === "user" ? "user" : "assistant",
+                content: m.content,
+            });
             if (m.role === "user") {
                 const row = document.createElement("div");
                 row.className = "msg-row msg-user";
@@ -2863,31 +2791,31 @@ async def index():
     function clearSavedFolders() {
         localStorage.removeItem("pyrox_folders");
         activeFolderId = null;
+        currentConversationHistory = [];
         renderLibraryFolders();
         renderLibraryModal();
     }
 
     function newChat() {
         stopGeneration();
-        clearImageModeBar();
         clearPendingAttachment();
         activeFolderId = null;
+        currentConversationHistory = [];
+        document.body.classList.remove("chat-active");
         const stage = document.getElementById("scrollStage");
         stage.innerHTML = `
             <div class="greeting-center" id="greetingBox">
                 <div class="greeting-logo-row">
-                    <svg width="46" height="46" viewBox="0 0 100 100" fill="none">
-                        <path d="M50 4 C55 34, 66 45, 96 50 C66 55, 55 66, 50 96 C45 66, 34 55, 4 50 C34 45, 45 34, 50 4 Z" fill="url(#pyroxOuterGrad)" />
-                        <path d="M50 20 C53 40, 60 47, 80 50 C60 53, 53 60, 50 80 C47 60, 40 53, 20 50 C40 47, 47 40, 50 20 Z" fill="url(#pyroxMidGrad)" />
-                        <path d="M50 34 C51.5 44, 56 48.5, 66 50 C56 51.5, 51.5 56, 50 66 C48.5 56, 44 51.5, 34 50 C44 48.5, 48.5 44, 50 34 Z" fill="url(#pyroxCoreGrad)" />
-                    </svg>
+                    <span class="pyrox-logo-badge" style="width:52px;height:52px;">
+                        <svg width="50" height="50"><use href="#pyroxFlameIcon"></use></svg>
+                    </span>
                     <span class="greeting-logo-title" id="greetingBrandName">${getThemeLabel()}</span>
                 </div>
                 <h1 id="greetingText"></h1>
                 <div class="starter-chips-row">
-                    <button type="button" class="starter-chip" onclick="useStarterPrompt('Explain a complex topic simply')">Explain simply</button>
-                    <button type="button" class="starter-chip" onclick="useStarterPrompt('Help me write and debug Python code')">Coding help</button>
-                    <button type="button" class="starter-chip" onclick="useStarterPrompt('Generate an ultra detailed image of a futuristic mountain peak at sunset')">Generate image</button>
+                    <button type="button" class="starter-chip" onclick="useStarterPrompt('Build a complete, ultra-detailed system prompt for my app')">Architect a prompt</button>
+                    <button type="button" class="starter-chip" onclick="useStarterPrompt('Help me write and debug Python code with edge cases')">Coding help</button>
+                    <button type="button" class="starter-chip" onclick="useStarterPrompt('Break down a tough topic into simple steps')">Explain simply</button>
                 </div>
             </div>
         `;
@@ -3045,7 +2973,17 @@ async def index():
         const micBtn = document.getElementById("micBtn");
         micBtn.classList.toggle("mic-recording", recording);
         micBtn.innerHTML = recording ? `<span class="curved-stop-square"></span>` : MIC_SVG;
-        micBtn.title = recording ? "Stop dictation" : "Voice input";
+        micBtn.title = recording ? "Stop dictation" : "Voice input (7s auto-stop)";
+    }
+
+    function resetMicSilenceTimer() {
+        if (micSilenceTimer) clearTimeout(micSilenceTimer);
+        if (!isDictating) return;
+        micSilenceTimer = setTimeout(() => {
+            if (isDictating) {
+                stopDictationManual(false);
+            }
+        }, MIC_SILENCE_TIMEOUT_MS);
     }
 
     function toggleDictation(e) {
@@ -3059,54 +2997,75 @@ async def index():
         const inputEl = document.getElementById("promptInput");
         if (!SR || !inputEl) return;
 
-        const baseText = inputEl.value.trim();
-        let finalCommitted = "";
+        let accumulatedBase = inputEl.value.trim();
 
-        recognition = new SR();
-        recognition.lang = "en-IN";
-        recognition.continuous = false;
-        recognition.interimResults = true;
-
-        recognition.onstart = () => {
-            isDictating = true;
-            setMicButtonAsStopSquare(true);
-        };
-
-        recognition.onresult = (event) => {
+        const startRecognitionSession = () => {
             if (!isDictating) return;
-            let interim = "";
-            for (let i = event.resultIndex; i < event.results.length; i++) {
-                const seg = event.results[i][0].transcript || "";
-                if (event.results[i].isFinal) {
-                    finalCommitted += (finalCommitted ? " " : "") + seg.trim();
-                } else {
-                    interim += seg;
+            recognition = new SR();
+            recognition.lang = "en-IN";
+            recognition.continuous = true;
+            recognition.interimResults = true;
+
+            let sessionFinal = "";
+
+            recognition.onresult = (event) => {
+                if (!isDictating) return;
+                resetMicSilenceTimer();
+                let interim = "";
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const seg = event.results[i][0].transcript || "";
+                    if (event.results[i].isFinal) {
+                        sessionFinal += (sessionFinal ? " " : "") + seg.trim();
+                    } else {
+                        interim += seg;
+                    }
                 }
+                const merged = [accumulatedBase, sessionFinal, interim.trim()].filter(Boolean).join(" ").trim();
+                inputEl.value = merged;
+                checkInputCharLimit(merged);
+            };
+
+            recognition.onerror = (ev) => {
+                if (ev && (ev.error === "no-speech" || ev.error === "aborted") && isDictating) {
+                    return;
+                }
+                stopDictationManual(false);
+            };
+
+            recognition.onend = () => {
+                // Keep mic alive across brief breaths until full 7-second silence timer expires
+                if (isDictating) {
+                    accumulatedBase = inputEl.value.trim();
+                    try {
+                        startRecognitionSession();
+                    } catch (_) {
+                        stopDictationManual(false);
+                    }
+                } else {
+                    setMicButtonAsStopSquare(false);
+                    recognition = null;
+                }
+            };
+
+            try {
+                recognition.start();
+            } catch (_) {
+                stopDictationManual(false);
             }
-            const merged = [baseText, finalCommitted, interim.trim()].filter(Boolean).join(" ").trim();
-            inputEl.value = merged;
-            checkInputCharLimit(merged);
         };
 
-        recognition.onerror = () => {
-            stopDictationManual(false);
-        };
-
-        recognition.onend = () => {
-            isDictating = false;
-            setMicButtonAsStopSquare(false);
-            recognition = null;
-        };
-
-        try {
-            recognition.start();
-        } catch (_) {
-            stopDictationManual(false);
-        }
+        isDictating = true;
+        setMicButtonAsStopSquare(true);
+        resetMicSilenceTimer();
+        startRecognitionSession();
     }
 
     function stopDictationManual(clearInputText = false) {
         isDictating = false;
+        if (micSilenceTimer) {
+            clearTimeout(micSilenceTimer);
+            micSilenceTimer = null;
+        }
         setMicButtonAsStopSquare(false);
         if (recognition) {
             recognition.onresult = null;
@@ -3125,9 +3084,35 @@ async def index():
     function markChatStarted() {
         if (!chatStarted) {
             chatStarted = true;
+            // Remove smoky background once conversation starts
+            document.body.classList.add("chat-active");
             const g = document.getElementById("greetingBox");
             if (g) g.remove();
         }
+    }
+
+    function copyTextReliable(textToCopy, feedbackEl, defaultLabel) {
+        const cleanStr = String(textToCopy || "");
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(cleanStr).catch(() => fallbackCopyText(cleanStr));
+        } else {
+            fallbackCopyText(cleanStr);
+        }
+        if (feedbackEl && defaultLabel) {
+            feedbackEl.textContent = "Copied!";
+            setTimeout(() => (feedbackEl.textContent = defaultLabel), 1200);
+        }
+    }
+
+    function fallbackCopyText(str) {
+        const ta = document.createElement("textarea");
+        ta.value = str;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand("copy"); } catch (_) {}
+        document.body.removeChild(ta);
     }
 
     function renderRichMarkdown(mdText) {
@@ -3135,23 +3120,30 @@ async def index():
         const container = document.createElement("div");
         container.innerHTML = rawHtml;
         container.querySelectorAll("pre").forEach((pre) => {
+            const rawCode = pre.textContent || pre.innerText || "";
             const wrap = document.createElement("div");
             wrap.className = "code-block-wrap";
             const btn = document.createElement("button");
             btn.type = "button";
             btn.className = "code-copy-btn";
             btn.textContent = "Copy";
-            btn.onclick = () => {
-                const codeText = pre.innerText || "";
-                navigator.clipboard.writeText(codeText).catch(() => {});
-                btn.textContent = "Copied";
-                setTimeout(() => (btn.textContent = "Copy"), 1100);
-            };
+            btn.setAttribute("data-copy-payload", rawCode);
             pre.parentNode.insertBefore(wrap, pre);
             wrap.appendChild(pre);
             wrap.appendChild(btn);
         });
         return container.innerHTML;
+    }
+
+    function attachCodeCopyListeners(rootEl) {
+        if (!rootEl) return;
+        rootEl.querySelectorAll(".code-copy-btn").forEach((btn) => {
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                const payload = btn.getAttribute("data-copy-payload") || "";
+                copyTextReliable(payload, btn, "Copy");
+            };
+        });
     }
 
     function appendUserMessage(text, imgUrl, fileLabel) {
@@ -3280,7 +3272,7 @@ async def index():
         const copyBtn = document.createElement("button");
         copyBtn.type = "button";
         copyBtn.className = "icon-symbol-btn";
-        copyBtn.title = "Copy";
+        copyBtn.title = "Copy response";
         copyBtn.innerHTML = `
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
@@ -3288,7 +3280,7 @@ async def index():
             </svg>
         `;
         copyBtn.onclick = () => {
-            navigator.clipboard.writeText(plainText).catch(() => {});
+            copyTextReliable(plainText, null, null);
             copyBtn.classList.add("liquid-filled");
             setTimeout(() => copyBtn.classList.remove("liquid-filled"), 950);
         };
@@ -3331,6 +3323,7 @@ async def index():
 
         const bodyDiv = document.createElement("div");
         bodyDiv.innerHTML = htmlContent;
+        attachCodeCopyListeners(bodyDiv);
         row.appendChild(bodyDiv);
 
         if (plainText) {
@@ -3403,24 +3396,6 @@ async def index():
         );
     }
 
-    function detectImageGenerationIntent(text) {
-        const lower = text.toLowerCase().trim();
-        if (imageModeActive) {
-            return { isImage: true, prompt: text };
-        }
-        if (lower.startsWith("/image ")) {
-            return { isImage: true, prompt: text.slice(7).trim() };
-        }
-        const imagePatterns = [
-            /\b(generate|create|make|draw)\s+(an?\s+)?(image|photo|picture|pic|art|wallpaper)\b/i,
-            /\b(image|photo|picture|tasveer)\s+(bana|banao|banade|bana\s*do|bana\s*de|generate|create)\b/i,
-        ];
-        if (imagePatterns.some((rx) => rx.test(text))) {
-            return { isImage: true, prompt: text };
-        }
-        return { isImage: false, prompt: text };
-    }
-
     async function sendMessage(overrideText = null, isRegenerate = false) {
         if (isRequestInFlight) return;
         if (isDictating) stopDictationManual(false);
@@ -3439,9 +3414,6 @@ async def index():
             return;
         }
 
-        const wasImageMode = imageModeActive;
-        clearImageModeBar();
-
         const attachmentToSend = pendingAttachmentDataUrl;
         const fileToSend = pendingFileDataUrl;
         const fileNameToSend = pendingAttachmentName;
@@ -3458,6 +3430,8 @@ async def index():
         appendItemToActiveFolder("user", messageToSend);
         recordQuestionUsage(isHeavy);
 
+        const historySnapshot = currentConversationHistory.slice(-18);
+
         const { row, bodyDiv } = appendAIMessage(
             `<div class="thinking-dots"><span></span><span></span></div>`,
             "",
@@ -3467,91 +3441,47 @@ async def index():
         activeAbortController = new AbortController();
         setGeneratingState(true);
 
-        const imgIntent = detectImageGenerationIntent(messageToSend);
         const searchLikely =
-            !imgIntent.isImage &&
-            /\b(aaj|kal|today|tomorrow|news|latest|festival|tyohar|weather|price|rate|2025|2026|2027|kab hai|kya chal raha|fal\.ai|fal ai)\b/i.test(
+            /\b(aaj|kal|today|tomorrow|news|latest|festival|tyohar|weather|price|rate|2025|2026|2027|kab hai|kya chal raha)\b/i.test(
                 messageToSend
             );
 
         if (searchLikely) setSearchingBanner(true);
 
         try {
-            if (imgIntent.isImage || wasImageMode) {
-                if (isImageLockedThisMonth()) {
-                    const upgradeMsg = "Aapki 2 free images poori ho chuki hain. Aage image banane ke liye Pyrox Pro upgrade le lo — isse aapko bahut achhi aur high-quality image milegi.";
-                    bodyDiv.innerHTML = `
-                        <div class="upgrade-prompt-card">
-                            <div style="font-weight:750;">Pyrox Pro Upgrade Required</div>
-                            <div style="font-size:0.95rem;color:var(--text-secondary);line-height:1.5;">${upgradeMsg}</div>
-                            <div>
-                                <button type="button" class="action-btn" style="background-color:var(--accent-upgrade);border-color:var(--accent-upgrade-border);color:#ffffff;" onclick="openModal('upgradeModal')">
-                                    Upgrade le lo (High Quality)
-                                </button>
-                            </div>
-                        </div>
-                    `;
-                    appendItemToActiveFolder("ai", upgradeMsg);
-                } else {
-                    const res = await fetch("/api/generate-image", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                            prompt: imgIntent.prompt || messageToSend,
-                            mode: "auto",
-                        }),
-                        signal: activeAbortController.signal,
-                    });
-                    const data = await res.json();
-                    if (!res.ok) {
-                        bodyDiv.textContent = data.detail || "Image generation failed.";
-                    } else {
-                        incrementMonthlyImageCount();
-                        const finalImgSrc = data.image_url || data.image_data || "";
-                        const imgEl = document.createElement("img");
-                        imgEl.className = "zoomable-img";
-                        imgEl.src = finalImgSrc;
-                        imgEl.alt = imgIntent.prompt || messageToSend;
-                        imgEl.onclick = () => openImageZoom(finalImgSrc);
-                        bodyDiv.innerHTML = "";
-                        bodyDiv.appendChild(imgEl);
-                        row.appendChild(
-                            buildResponseActionsBar(
-                                `Generated image: ${imgIntent.prompt || messageToSend}`,
-                                messageToSend
-                            )
-                        );
-                        appendItemToActiveFolder("ai", `[Generated Image: ${imgIntent.prompt || messageToSend}]`);
-                    }
-                }
+            const res = await fetch("/api/chat", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    message: messageToSend,
+                    history: historySnapshot,
+                    voice: MALE_VOICE,
+                    user_name: getUserName(),
+                    user_email: getUserEmail(),
+                    theme_label: getThemeLabel(),
+                    model_mode: selectedModelMode,
+                    enable_tts: ttsEnabled,
+                    image_data_url: attachmentToSend,
+                    file_name: fileNameToSend,
+                    file_data_url: fileToSend,
+                    regenerate: isRegenerate,
+                }),
+                signal: activeAbortController.signal,
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                bodyDiv.textContent = data.detail || "Request failed.";
             } else {
-                const res = await fetch("/api/chat", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        message: messageToSend,
-                        voice: MALE_VOICE,
-                        user_name: getUserName(),
-                        theme_label: getThemeLabel(),
-                        model_mode: selectedModelMode,
-                        enable_tts: ttsEnabled,
-                        image_data_url: attachmentToSend,
-                        file_name: fileNameToSend,
-                        file_data_url: fileToSend,
-                        regenerate: isRegenerate,
-                    }),
-                    signal: activeAbortController.signal,
-                });
-                const data = await res.json();
-                if (!res.ok) {
-                    bodyDiv.textContent = data.detail || "Request failed.";
-                } else {
-                    const reply = data.reply || "";
-                    bodyDiv.innerHTML = renderRichMarkdown(reply);
-                    row.appendChild(buildResponseActionsBar(reply, messageToSend));
-                    appendItemToActiveFolder("ai", reply);
-                    if (data.audio_url) playAudioFromUrl(data.audio_url);
-                }
+                const reply = data.reply || "";
+                bodyDiv.innerHTML = renderRichMarkdown(reply);
+                attachCodeCopyListeners(bodyDiv);
+                row.appendChild(buildResponseActionsBar(reply, messageToSend));
+
+                currentConversationHistory.push({ role: "user", content: messageToSend });
+                currentConversationHistory.push({ role: "assistant", content: reply });
+                appendItemToActiveFolder("ai", reply);
+
+                if (data.audio_url) playAudioFromUrl(data.audio_url);
             }
         } catch (err) {
             bodyDiv.textContent = err.name === "AbortError" ? "Stopped." : "Connection error.";
@@ -3569,7 +3499,6 @@ async def index():
     refreshGreeting();
     refreshThemeLabel();
     renderLibraryFolders();
-    refreshImageQuotaUI();
     updateLimitWarningBanner();
 </script>
 </body>
